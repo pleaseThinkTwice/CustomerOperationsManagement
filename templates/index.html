@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>客户运营平台 · 智能问答 & 智能查数</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">客户运营平台 <span class="ver">v2</span></div>
+    <div class="status" id="statusBar">加载中…</div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="qa">智能问答 QA</button>
+    <button class="tab" data-tab="nl2sql">智能查数 NL2SQL</button>
+  </nav>
+
+  <!-- ================= QA ================= -->
+  <section class="panel active" id="panel-qa">
+    <div class="ask-box">
+      <input id="qaInput" type="text" placeholder="随便问，比如：支持解析哪些文档格式？" />
+      <button id="qaBtn" class="primary">提问</button>
+    </div>
+    <div class="answer" id="qaAnswer">
+      <div class="placeholder">在上方输入问题，点击「提问」。</div>
+    </div>
+
+    <details class="kb-manage">
+      <summary>知识库管理</summary>
+      <div class="kb-actions">
+        <label class="upload-btn">
+          上传文档（pdf/docx/pptx/xlsx/html/txt）
+          <input type="file" id="kbFile" hidden />
+        </label>
+        <button id="kbSync">重新同步知识库</button>
+        <span id="kbMsg" class="msg"></span>
+      </div>
+    </details>
+  </section>
+
+  <!-- ================= NL2SQL ================= -->
+  <section class="panel" id="panel-nl2sql">
+    <div class="ask-box">
+      <input id="sqlInput" type="text" placeholder="用自然语言查数，比如：各 OEM 的接入车辆数是多少？" />
+      <button id="sqlBtn" class="primary">查询</button>
+    </div>
+    <div class="answer" id="sqlAnswer">
+      <div class="placeholder">在上方输入查询需求，点击「查询」。结果会展示：分析报告 + SQL + 数据表。</div>
+    </div>
+    <details class="kb-manage">
+      <summary>已登记的可查询表（schema）</summary>
+      <div id="schemaBox" class="schema-box">加载中…</div>
+    </details>
+  </section>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

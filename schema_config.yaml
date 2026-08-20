@@ -1,0 +1,70 @@
+# ============================================================================
+# NL2SQL 表结构配置（堡垒机统一维护）
+# ----------------------------------------------------------------------------
+# 说明：
+#   - NL2SQL 启动时读取本文件，把 tables 拼进 LLM 的上下文来生成 SQL。
+#   - 新增 / 修改可查询的表，只改这里，代码无需改动。
+#   - dialect: SQL 方言（用于提示词），Doris 用 MySQL 语法。
+#   - tables[].name 必须是可直接查询的完整表名（含库名）。
+#   - intents（可选）：把高频报表写成示例，命中意图关键词时作为 few-shot 提示 LLM，
+#     显著提升生成准确率；不填也能工作。
+#
+# 下方 tab1~tab3 为示例，请按堡垒机真实库表补充 / 修改；tab4 及更多表同理追加。
+# ============================================================================
+
+dialect: MySQL   # Doris 兼容 MySQL 语法
+
+tables:
+  - name: metric_device.dm_ss_bdpd_md_info
+    desc: 客档表（车辆接入档案）
+    columns:
+      deviceid: 虚拟车架号
+      vin: 真实车架号
+      oem: 客户英文简称
+      cell_cap: 电芯容量(Ah)
+      first_online_date: 首次介入时间
+      last_online_date: 最新活跃时间
+      vehicle_type: 车型
+      sfc_pack: 电池包号
+      cell_structure: 电池串并联结构
+
+  - name: ods_pts.dwi_ss_bdpd_pts_luocell_sys_info_n_i
+    desc: 出货信息表
+    columns:
+      maktx: 出货类型（含'模组'/'电芯'/'系统'，用 LIKE 匹配）
+      cell: 电芯条码
+      module: 模组条码
+      pack: pack条码
+      cell_cap: 项目电芯容量(Ah)
+      cust_grp_name: 客户中文名称
+      assembled_date: 装配时间
+
+  - name: ob.kds_wcl_prd.warning_result_outgoing_car
+    desc: 历史已外发表（重点失效模式来源）
+    columns:
+      deviceid: 虚拟车架号
+      oem: 客户英文简称
+      cell_cap: 项目电芯容量(Ah)
+      vehicle_type: 车型
+      fault_type: 预警模式
+
+  # - name: <tab4 真实表名待补>
+  #   desc: 工单/预警闭环表
+  #   columns:
+  #     vincode: 真实车架号
+  #     alerttype: 预警类型
+  #     barcodescan: 电池包条码
+  #     directaccount: 客户英文简称(oem)
+  #     cellcapacity: 电芯容量(Ah)
+  #     vehiclebrand: 车辆品牌
+  #     workstatus: 工单状态（含'完成'表示闭环，用 LIKE 匹配）
+
+# 高频报表示例（可选，命中关键词时作为 few-shot 提示）
+intents:
+  - name: 项目车辆接入总数
+    keywords: [接入, 接入总数, 车辆总数, 出货数量, 介入占比]
+    note: 客档表统计接入车辆数，出货信息表统计出货数量，可按 oem / cell_cap / 车型 / 出货类型 汇总，接入占比 = 接入车辆数 / 出货数量。
+
+  - name: 客户重点失效模式
+    keywords: [失效模式, 预警模式, 外发, 重点失效]
+    note: 取自历史已外发表，按 cell_cap、fault_type(预警模式) 汇总外发数量。

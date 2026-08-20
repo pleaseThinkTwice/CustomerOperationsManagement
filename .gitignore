@@ -1,4 +1,24 @@
-node_modules/
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# 本地数据库与运行时
+data.db
+uploads/*
+!uploads/.gitkeep
+
+# 日志
+flask_out.log
+flask_err.log
+*.log
+
+# 敏感配置（凭据绝不进 Git）
+config.local.py
 .env
-npm-debug.log*
+
+# OS
 .DS_Store
+Thumbs.db

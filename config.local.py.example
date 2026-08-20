@@ -1,0 +1,20 @@
+# -*- coding: utf-8 -*-
+"""
+本地凭据覆盖示例。
+用法：复制为 config.local.py 并填入真实凭据。config.local.py 已被 .gitignore 忽略，不会进 Git。
+
+只需写你要覆盖的项，其余沿用 config.py 默认值 / 环境变量。
+"""
+
+# ---- LLM ----
+LLM_ENABLED = True
+LLM_API_KEY = "在这里填你的-key"
+LLM_API_URL = "https://aigate-dev.catl.com/v1/chat/completions"
+LLM_MODEL = "DeepSeek-V4-Flash"
+
+# ---- Doris 只读堡垒机账号 ----
+DORIS_ENABLED = True
+DORIS_HOST = "172.18.45.7"
+DORIS_PORT = 19030
+DORIS_USER = "在这里填账号"
+DORIS_PASS = "在这里填密码"

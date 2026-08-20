@@ -1,0 +1,20 @@
+# 客户运营平台 v2 —— 只做 QA + NL2SQL
+# Python 3.13
+
+# Web
+flask>=3.0
+
+# 配置
+pyyaml>=6.0
+
+# QA 文档解析
+pypdf>=4.0            # pdf
+python-docx>=1.1      # docx
+python-pptx>=0.6      # pptx
+openpyxl>=3.1         # xlsx
+beautifulsoup4>=4.12  # html
+pandas>=2.0           # 表格处理/导出
+rapidfuzz>=3.0        # 库内 Q&A 字面直答匹配
+
+# NL2SQL / Doris（MySQL 协议只读）
+pymysql>=1.1
