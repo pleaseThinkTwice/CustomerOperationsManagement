@@ -35,7 +35,7 @@ class KBRouter:
         conn = db.get_conn()
         try:
             rows = conn.execute(
-                "SELECT source, title, content FROM knowledge_chunks ORDER BY id"
+                "SELECT source_type, title, content FROM knowledge_chunks ORDER BY id"
             ).fetchall()
         finally:
             conn.close()

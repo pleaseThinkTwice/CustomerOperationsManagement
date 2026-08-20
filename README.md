@@ -15,7 +15,7 @@
 |---|---|
 | `app.py` | Flask 主程序，全部 `/api/*` 路由 + 前端入口 |
 | `config.py` | 配置（环境变量 / `config.local.py` 覆盖，凭据不进 Git） |
-| `db.py` / `schema.sql` | SQLite 初始化与表结构（QA / 知识库） |
+| `db.py` / `schema.sql` | SQLite 初始化与完整 v2 表结构（当前仅 QA/知识库/文档相关表被业务逻辑使用） |
 | `seed.py` | 种子数据（默认用户 + 示例 Q&A） |
 | `kb_parser.py` | 文档解析（pdf/docx/pptx/xlsx/html/txt） |
 | `kb_router.py` | QA 路由：库内直答 → 整库 prompt LLM 兜底 |

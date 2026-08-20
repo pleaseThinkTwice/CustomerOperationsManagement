@@ -21,6 +21,7 @@ tables:
       deviceid: 虚拟车架号
       vin: 真实车架号
       oem: 客户英文简称
+      oem_ch: 客户中文名
       cell_cap: 电芯容量(Ah)
       first_online_date: 首次介入时间
       last_online_date: 最新活跃时间

@@ -5,9 +5,9 @@
 """
 import db
 
-DEFAULT_USER = ("admin", "管理员")
+DEFAULT_USER = ("管理员", "客户运营", "管理员")  # name, department, position
 
-SEED_QA = [
+SEED_QA = [  # (question, answer, category)
     ("平台支持哪些功能", "当前平台提供两大功能：智能问答（QA，基于知识库文档回答问题）与智能查数（NL2SQL，用自然语言查询 Doris 数据并生成报告）。", "平台"),
     ("QA 是怎么工作的", "QA 会先在标准问答库里做字面匹配，命中就直接返回人工维护的标准答案（零幻觉）；未命中则把整个知识库作为上下文交给 LLM 生成回答。", "QA"),
     ("支持解析哪些文档格式", "知识库支持解析 pdf、docx、pptx、xlsx、html、txt 等格式，解析后作为问答语料。", "QA"),
@@ -26,16 +26,17 @@ def run():
     conn = db.get_conn()
     try:
         cur = conn.cursor()
-        # 用户
+        # 用户（幂等重灌）
+        cur.execute("DELETE FROM users")
         cur.execute(
-            "INSERT OR IGNORE INTO users(username, display) VALUES(?, ?)",
+            "INSERT INTO users(name, department, position) VALUES(?, ?, ?)",
             DEFAULT_USER,
         )
         # Q&A（幂等重灌）
         cur.execute("DELETE FROM qa")
         cur.executemany(
-            "INSERT INTO qa(question, answer, category) VALUES(?, ?, ?)",
-            SEED_QA,
+            "INSERT INTO qa(category, question, answer) VALUES(?, ?, ?)",
+            [(c, q, a) for (q, a, c) in SEED_QA],
         )
         conn.commit()
         print(f"[seed] 用户 1，Q&A {len(SEED_QA)} 条 已写入")

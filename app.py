@@ -29,13 +29,16 @@ def sync_qa_to_knowledge():
     """把 qa 表同步为 knowledge_chunks（source=qa）。"""
     conn = db.get_conn()
     try:
-        conn.execute("DELETE FROM knowledge_chunks WHERE source='qa'")
-        rows = conn.execute("SELECT question, answer FROM qa ORDER BY id").fetchall()
+        conn.execute("DELETE FROM knowledge_chunks WHERE source_type='qa'")
+        rows = conn.execute(
+            "SELECT question, answer, category FROM qa ORDER BY id"
+        ).fetchall()
         for r in rows:
             content = f"问：{r['question']}\n答：{r['answer']}"
             conn.execute(
-                "INSERT INTO knowledge_chunks(source, title, content) VALUES('qa', ?, ?)",
-                (r["question"], content),
+                "INSERT INTO knowledge_chunks(source_type, source_file, title, "
+                "content, category) VALUES('qa', 'qa', ?, ?, ?)",
+                (r["question"], content, r["category"]),
             )
         conn.commit()
         return len(rows)
@@ -51,7 +54,7 @@ def sync_folder_to_knowledge():
     conn = db.get_conn()
     count = 0
     try:
-        conn.execute("DELETE FROM knowledge_chunks WHERE source='folder'")
+        conn.execute("DELETE FROM knowledge_chunks WHERE category='folder_kb'")
         for root, _dirs, files in os.walk(folder):
             for fn in files:
                 ext = os.path.splitext(fn)[1].lower()
@@ -61,11 +64,12 @@ def sync_folder_to_knowledge():
                 res = kb_parser.parse_file(path)
                 if not res["ok"]:
                     continue
+                stype = ext.lstrip(".")
                 for chunk in kb_parser.chunk_text(res["text"]):
                     conn.execute(
-                        "INSERT INTO knowledge_chunks(source, title, content) "
-                        "VALUES('folder', ?, ?)",
-                        (fn, chunk),
+                        "INSERT INTO knowledge_chunks(source_type, source_file, "
+                        "title, content, category) VALUES(?, ?, ?, ?, 'folder_kb')",
+                        (stype, fn, fn, chunk),
                     )
                     count += 1
         conn.commit()
@@ -207,7 +211,8 @@ def knowledge_list():
     conn = db.get_conn()
     try:
         rows = conn.execute(
-            "SELECT id, source, title, substr(content,1,120) preview, created_at "
+            "SELECT id, source_type, source_file, title, "
+            "substr(content,1,120) preview, created_at "
             "FROM knowledge_chunks ORDER BY id DESC LIMIT 500"
         ).fetchall()
     finally:
@@ -237,20 +242,20 @@ def knowledge_upload():
         return jsonify({"error": res["error"], "filename": fname}), 400
 
     chunks = kb_parser.chunk_text(res["text"])
+    stype = os.path.splitext(fname)[1].lower().lstrip(".")
+    oem = (request.form.get("oem") or "").strip() or None
     conn = db.get_conn()
     try:
-        cur = conn.execute(
-            "INSERT INTO documents(filename, path, filetype, size, chunk_count) "
-            "VALUES(?, ?, ?, ?, ?)",
-            (fname, save_path, os.path.splitext(fname)[1].lower(),
-             os.path.getsize(save_path), len(chunks)),
+        conn.execute(
+            "INSERT INTO documents(oem, scope, doc_type, title, file_path, "
+            "file_name, uploader) VALUES(?, 'internal', ?, ?, ?, ?, ?)",
+            (oem, stype, fname, save_path, fname, request.form.get("uploader")),
         )
-        doc_id = cur.lastrowid
         for ch in chunks:
             conn.execute(
-                "INSERT INTO knowledge_chunks(source, title, content, doc_id) "
-                "VALUES('document', ?, ?, ?)",
-                (fname, ch, doc_id),
+                "INSERT INTO knowledge_chunks(source_type, source_file, title, "
+                "content, category) VALUES(?, ?, ?, ?, 'upload')",
+                (stype, fname, fname, ch),
             )
         conn.commit()
     finally:
