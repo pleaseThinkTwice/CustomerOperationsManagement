@@ -1,0 +1,16 @@
+{
+  "name": "customer-operations-management",
+  "version": "1.0.0",
+  "description": "Customer operations management project starter",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": [
+    "customer",
+    "operations",
+    "management"
+  ],
+  "license": "MIT"
+}
