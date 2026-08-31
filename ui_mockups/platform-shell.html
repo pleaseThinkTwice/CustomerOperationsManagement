@@ -1,0 +1,316 @@
+<title>客户运营平台 · 界面样板</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#eef2f8; --panel:#ffffff; --panel-2:#f6f8fc; --elev:#ffffff;
+  --line:#dde5f0; --line-strong:#c7d3e5;
+  --ink:#141d2e; --ink-2:#3a4761; --muted:#6c7a94; --faint:#9aa8c0;
+  --brand:#2563eb; --brand-ink:#fff; --brand-soft:#e6efff;
+  --ok:#16a34a; --ok-soft:#dcfce7; --warn:#d97706; --warn-soft:#fef1dc;
+  --danger:#dc2626; --danger-soft:#fde4e4; --info:#0891b2; --info-soft:#dbf3f8;
+  --ring:rgba(37,99,235,.35);
+  --shadow:0 1px 2px rgba(20,29,46,.06),0 8px 24px rgba(20,29,46,.08);
+  --nav:#0f1a30; --nav-ink:#c4d2ea; --nav-ink-2:#8296b8; --nav-on:#1c2c4d;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0a1120; --panel:#111b2e; --panel-2:#0e1728; --elev:#16223b;
+  --line:#22304c; --line-strong:#2d3d5e;
+  --ink:#e8eefb; --ink-2:#b7c4dc; --muted:#8496b6; --faint:#5e6f8f;
+  --brand:#4f8cff; --brand-ink:#08122a; --brand-soft:#182a49;
+  --ok:#34d399; --ok-soft:#0f2e26; --warn:#fbbf24; --warn-soft:#2e2410;
+  --danger:#f87171; --danger-soft:#33141a; --info:#38bdf8; --info-soft:#0b2833;
+  --ring:rgba(79,140,255,.45);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 34px rgba(0,0,0,.5);
+  --nav:#0a1424; --nav-ink:#c4d2ea; --nav-ink-2:#6c80a4; --nav-on:#16233f;
+}}
+:root[data-theme="dark"]{
+  --bg:#0a1120; --panel:#111b2e; --panel-2:#0e1728; --elev:#16223b;
+  --line:#22304c; --line-strong:#2d3d5e;
+  --ink:#e8eefb; --ink-2:#b7c4dc; --muted:#8496b6; --faint:#5e6f8f;
+  --brand:#4f8cff; --brand-ink:#08122a; --brand-soft:#182a49;
+  --ok:#34d399; --ok-soft:#0f2e26; --warn:#fbbf24; --warn-soft:#2e2410;
+  --danger:#f87171; --danger-soft:#33141a; --info:#38bdf8; --info-soft:#0b2833;
+  --ring:rgba(79,140,255,.45);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 34px rgba(0,0,0,.5);
+  --nav:#0a1424; --nav-ink:#c4d2ea; --nav-ink-2:#6c80a4; --nav-on:#16233f;
+}
+:root[data-theme="light"]{
+  --bg:#eef2f8; --panel:#ffffff; --panel-2:#f6f8fc; --elev:#ffffff;
+  --line:#dde5f0; --line-strong:#c7d3e5;
+  --ink:#141d2e; --ink-2:#3a4761; --muted:#6c7a94; --faint:#9aa8c0;
+  --brand:#2563eb; --brand-ink:#fff; --brand-soft:#e6efff;
+  --ok:#16a34a; --ok-soft:#dcfce7; --warn:#d97706; --warn-soft:#fef1dc;
+  --danger:#dc2626; --danger-soft:#fde4e4; --info:#0891b2; --info-soft:#dbf3f8;
+  --ring:rgba(37,99,235,.35);
+  --shadow:0 1px 2px rgba(20,29,46,.06),0 8px 24px rgba(20,29,46,.08);
+  --nav:#0f1a30; --nav-ink:#c4d2ea; --nav-ink-2:#8296b8; --nav-on:#1c2c4d;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:"Manrope","PingFang SC","Microsoft YaHei",system-ui,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;text-wrap:balance}
+
+.app{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+
+/* ---------- 侧栏 ---------- */
+.side{background:var(--nav);color:var(--nav-ink);display:flex;flex-direction:column;padding:16px 12px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:11px;padding:6px 8px 16px}
+.brand .mk{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#4f8cff,#7db1ff);display:grid;place-items:center;color:#08122a;font-weight:800;font-size:17px}
+.brand b{font-size:15px;font-weight:800;color:#fff;letter-spacing:-.2px}
+.brand small{display:block;color:var(--nav-ink-2);font-size:11px;font-weight:600;margin-top:1px}
+.nav{display:flex;flex-direction:column;gap:2px;margin-top:6px;overflow-y:auto}
+.navlbl{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--nav-ink-2);padding:12px 10px 5px}
+.nav a{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;color:var(--nav-ink);text-decoration:none;font-weight:600;font-size:13.5px}
+.nav a .ic{width:18px;text-align:center;opacity:.9}
+.nav a:hover{background:var(--nav-on);color:#fff}
+.nav a.on{background:linear-gradient(90deg,var(--nav-on),transparent);color:#fff;position:relative}
+.nav a.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:#4f8cff}
+.nav a .bdg{margin-left:auto;background:var(--danger);color:#fff;font-size:10.5px;font-weight:800;border-radius:999px;padding:1px 7px}
+.sidefoot{margin-top:auto;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:10px}
+.sidefoot .av{width:32px;height:32px;border-radius:9px;background:#4f8cff;color:#08122a;display:grid;place-items:center;font-weight:800;font-size:13px}
+.sidefoot b{color:#fff;font-size:13px}.sidefoot small{color:var(--nav-ink-2);font-size:11px}
+
+/* ---------- 主区 ---------- */
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--panel) 88%,transparent);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);padding:12px 24px;display:flex;align-items:center;gap:14px}
+.pgt{font-size:17px;font-weight:800;letter-spacing:-.2px}
+.pgt small{display:block;font-size:12px;font-weight:600;color:var(--muted)}
+.spacer{flex:1}
+.selbox{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:7px 11px;font-weight:600;cursor:pointer}
+.selbox .lbl{color:var(--muted);font-size:12px}
+.iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink-2);cursor:pointer;display:grid;place-items:center;font-size:15px}
+.iconbtn:hover{border-color:var(--line-strong);color:var(--ink)}
+
+.content{padding:22px 24px 60px;display:flex;flex-direction:column;gap:20px}
+
+/* 筛选行 */
+.filters{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.caps{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.capchk{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 12px;font-weight:600;font-size:12.5px;cursor:pointer}
+.capchk .bx{width:15px;height:15px;border-radius:5px;border:1.5px solid var(--line-strong);display:grid;place-items:center;color:transparent;font-size:10px}
+.capchk.on{background:var(--brand-soft);border-color:transparent;color:var(--brand)}
+.capchk.on .bx{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.link{color:var(--brand);font-weight:700;font-size:12.5px;cursor:pointer;background:none;border:none}
+
+/* 统计块 */
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 17px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.tile .ic{position:absolute;right:14px;top:14px;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:16px}
+.tile .k{color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+.tile .v{font-size:28px;font-weight:800;margin-top:8px;letter-spacing:-.6px}
+.tile .v small{font-size:13px;color:var(--muted);font-weight:600;margin-left:3px}
+.tile .d{margin-top:6px;font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;gap:4px}
+.up{color:var(--ok)}.down{color:var(--danger)}
+
+/* 卡片布局 */
+.grid{display:grid;gap:16px}
+.g-2{grid-template-columns:1.5fr 1fr}
+.g-3{grid-template-columns:repeat(3,1fr)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+.phead{display:flex;align-items:center;gap:10px;padding:15px 17px;border-bottom:1px solid var(--line)}
+.phead h3{font-size:15px;font-weight:800}
+.phead .sub{color:var(--muted);font-size:12px;font-weight:600}
+.phead .r{margin-left:auto;display:flex;gap:8px}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:9px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--line-strong)}
+.btn.ai{background:linear-gradient(135deg,var(--brand),#7db1ff);border-color:transparent;color:var(--brand-ink);box-shadow:0 4px 12px var(--ring)}
+.pbody{padding:16px 17px}
+
+/* 迷你条形（接入趋势，纯 CSS，无第三方库） */
+.bars{display:flex;align-items:flex-end;gap:14px;height:150px;padding:8px 4px 0}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+.bar .col{width:100%;max-width:46px;border-radius:8px 8px 3px 3px;background:linear-gradient(180deg,var(--brand),color-mix(in srgb,var(--brand) 55%,transparent));position:relative}
+.bar .col span{position:absolute;top:-19px;left:0;right:0;text-align:center;font-size:11.5px;font-weight:700}
+.bar .cap{color:var(--muted);font-size:11.5px;font-weight:600}
+
+/* 车辆洞察小卡 */
+.insight{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.iblock{border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--panel-2)}
+.iblock .t{color:var(--muted);font-size:12px;font-weight:700}
+.iblock .n{font-size:22px;font-weight:800;margin-top:4px}
+.iblock .n.warn{color:var(--warn)}
+.iblock .go{margin-top:8px;font-size:12px;font-weight:700;color:var(--brand);cursor:pointer}
+
+/* 表格 */
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:560px}
+th{text-align:left;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:11px 17px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+td{padding:12px 17px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--panel-2)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700}
+.badge.no{color:var(--danger);background:var(--danger-soft)}
+.badge.yes{color:var(--ok);background:var(--ok-soft)}
+.badge.info{color:var(--info);background:var(--info-soft)}
+.num{font-weight:800}
+
+/* 关键人 / 会议 列表 */
+.people{display:flex;flex-direction:column}
+.person{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.person:last-child{border:none}
+.person .av{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-weight:800;color:#fff;flex:none}
+.person .nm{font-weight:700}.person .ro{color:var(--muted);font-size:12.5px}
+.person .ct{margin-left:auto;text-align:right;font-size:12px;color:var(--muted)}
+.visit{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--line)}
+.visit:last-child{border:none}
+.vdot{width:9px;height:9px;border-radius:50%;flex:none}
+.vd-done{background:var(--faint)}.vd-plan{background:var(--ok)}.vd-late{background:var(--danger)}
+.visit .vt{font-weight:700}.visit .vs{color:var(--muted);font-size:12.5px}
+.visit .vday{margin-left:auto;font-weight:700;font-size:12.5px}
+
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+@media (max-width:1000px){.app{grid-template-columns:1fr}.side{display:none}.tiles{grid-template-columns:repeat(2,1fr)}.g-2,.g-3{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <!-- 侧栏 -->
+  <aside class="side">
+    <div class="brand"><div class="mk">运</div><div><b>客户运营平台</b><small>v2 · 客户界面作业台</small></div></div>
+    <nav class="nav">
+      <div class="navlbl">运营</div>
+      <a class="on"><span class="ic">◆</span>首页看板</a>
+      <a><span class="ic">🔗</span>客户档案</a>
+      <a><span class="ic">☻</span>会议纪要</a>
+      <a><span class="ic">⚠</span>预警闭环<span class="bdg">3</span></a>
+      <a><span class="ic">☰</span>阶段总结</a>
+      <div class="navlbl">智能</div>
+      <a><span class="ic">❓</span>Q&amp;A 知识库</a>
+      <a><span class="ic">📊</span>数智分析</a>
+      <a><span class="ic">📁</span>文档管理</a>
+      <div class="navlbl">管理</div>
+      <a><span class="ic">🔗</span>OEM 映射</a>
+      <a><span class="ic">🗂</span>需求管理<span class="bdg">5</span></a>
+      <a><span class="ic">🛡️</span>用户与权限</a>
+    </nav>
+    <div class="sidefoot"><div class="av">冯</div><div><b>冯锦轶</b><small>管理员</small></div></div>
+  </aside>
+
+  <!-- 主区 -->
+  <div class="main">
+    <div class="topbar">
+      <div class="pgt">首页看板<small>广汽埃安 · GHD 全维度洞察</small></div>
+      <div class="spacer"></div>
+      <div class="selbox"><span class="lbl">客户</span><b>广汽埃安 (GHD)</b><span style="color:var(--muted)">▾</span></div>
+      <button class="iconbtn" id="themeBtn" title="切换主题">🌙</button>
+      <button class="iconbtn" title="意见箱">✉</button>
+    </div>
+
+    <div class="content">
+      <!-- 容量筛选 -->
+      <div class="filters">
+        <span style="color:var(--muted);font-weight:700;font-size:12.5px">电芯容量</span>
+        <div class="caps" id="caps">
+          <span class="capchk on"><span class="bx">✓</span>180 Ah</span>
+          <span class="capchk on"><span class="bx">✓</span>200 Ah</span>
+          <span class="capchk"><span class="bx">✓</span>228 Ah</span>
+          <span class="capchk"><span class="bx">✓</span>280 Ah</span>
+        </div>
+        <button class="link" onclick="allCaps(true)">全选</button>
+        <button class="link" onclick="allCaps(false)">清空</button>
+      </div>
+
+      <!-- 统计块 -->
+      <div class="tiles">
+        <div class="tile"><div class="ic" style="background:var(--brand-soft);color:var(--brand)">🚗</div>
+          <div class="k">接入车辆</div><div class="v mono">48,210</div><div class="d up">▲ 3.2% 环比</div></div>
+        <div class="tile"><div class="ic" style="background:var(--info-soft);color:var(--info)">📦</div>
+          <div class="k">累计出货</div><div class="v mono">61,540</div><div class="d up">介入占比 78.3%</div></div>
+        <div class="tile"><div class="ic" style="background:var(--warn-soft);color:var(--warn)">🛡️</div>
+          <div class="k">已过保</div><div class="v mono">2,904</div><div class="d down">▲ 需重点跟进</div></div>
+        <div class="tile"><div class="ic" style="background:var(--danger-soft);color:var(--danger)">⚠</div>
+          <div class="k">未闭环预警</div><div class="v mono">3</div><div class="d down">最久 6 天</div></div>
+      </div>
+
+      <!-- 接入趋势 + 车辆洞察 -->
+      <div class="grid g-2">
+        <div class="panel">
+          <div class="phead"><h3>接入趋势</h3><span class="sub">按容量分组 · 近 6 月</span>
+            <div class="r"><button class="btn ai">⚡ AI 生成图表</button></div></div>
+          <div class="pbody">
+            <div class="bars" id="bars"></div>
+            <div style="display:flex;justify-content:space-between;color:var(--muted);font-size:12px;font-weight:600;margin-top:14px;padding:0 4px">
+              <span>3月</span><span>4月</span><span>5月</span><span>6月</span><span>7月</span><span>8月</span></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="phead"><h3>车辆洞察</h3><span class="sub">实时下钻</span></div>
+          <div class="pbody">
+            <div class="insight">
+              <div class="iblock"><div class="t">活跃车辆</div><div class="n mono">41,882</div><div class="go">查看清单 →</div></div>
+              <div class="iblock"><div class="t">里程调表疑似</div><div class="n warn mono">126</div><div class="go">导出 CSV →</div></div>
+            </div>
+            <div class="iblock" style="margin-top:12px">
+              <div class="t">AI 客户画像</div>
+              <p style="margin:8px 0 0;color:var(--ink-2);font-size:13px;line-height:1.6">广汽埃安整体接入健康度良好，180/200Ah 为主力项目；近期 200Ah 出现电压采样类预警集中，建议优先闭环并同步售后。</p>
+              <div class="go" style="margin-top:8px">重新生成画像 →</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 重点失效模式 表 -->
+      <div class="panel">
+        <div class="phead"><h3>客户重点失效模式</h3><span class="sub">历史外发聚合 · 关联不外发规则</span>
+          <div class="r"><button class="btn">导出</button><button class="btn ai">⚡ AI 分析</button></div></div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>电芯容量</th><th>预警模式</th><th>预警逻辑</th><th>外发数量</th><th>不外发</th><th>处理措施</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">200 Ah</td><td>电压采样异常</td><td>ΔV &gt; 80mV 持续 3 天</td><td class="num mono">42</td><td><span class="badge no">规则命中</span></td><td>OTA 校准 + 观察</td></tr>
+              <tr><td class="mono">180 Ah</td><td>温度一致性差</td><td>单体温差 &gt; 8℃</td><td class="num mono">27</td><td><span class="badge yes">正常外发</span></td><td>返厂检测</td></tr>
+              <tr><td class="mono">280 Ah</td><td>SOC 跳变</td><td>相邻帧跳变 &gt; 15%</td><td class="num mono">11</td><td><span class="badge info">待定级</span></td><td>算法复核中</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 关键人 / 拜访 / 会议 -->
+      <div class="grid g-3">
+        <div class="panel">
+          <div class="phead"><h3>外部关键人</h3></div>
+          <div class="pbody people">
+            <div class="person"><div class="av" style="background:#4f8cff">刘</div><div><div class="nm">刘工</div><div class="ro">电池系统 · 总监</div></div><div class="ct">决策型<br>138****2043</div></div>
+            <div class="person"><div class="av" style="background:#10b981">周</div><div><div class="nm">周经理</div><div class="ro">质量部 · 经理</div></div><div class="ct">细节型<br>139****8817</div></div>
+            <div class="person"><div class="av" style="background:#8b5cf6">吴</div><div><div class="nm">吴主管</div><div class="ro">售后 · 主管</div></div><div class="ct">配合型<br>137****5560</div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="phead"><h3>拜访计划</h3><span class="sub">三色状态</span></div>
+          <div class="pbody">
+            <div class="visit"><span class="vdot vd-plan"></span><div><div class="vt">Q3 质量复盘</div><div class="vs">对接：周经理</div></div><div class="vday" style="color:var(--ok)">09-12</div></div>
+            <div class="visit"><span class="vdot vd-late"></span><div><div class="vt">280Ah 项目启动</div><div class="vs">对接：刘工</div></div><div class="vday" style="color:var(--danger)">已逾期</div></div>
+            <div class="visit"><span class="vdot vd-done"></span><div><div class="vt">年中技术交流</div><div class="vs">对接：吴主管</div></div><div class="vday" style="color:var(--muted)">已完成</div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="phead"><h3>近期会议</h3></div>
+          <div class="pbody">
+            <div class="visit"><span class="vdot" style="background:var(--brand)"></span><div><div class="vt">预警闭环周例会</div><div class="vs">共识 4 · 任务 6</div></div><div class="vday">08-28</div></div>
+            <div class="visit"><span class="vdot" style="background:var(--brand)"></span><div><div class="vt">200Ah 专项分析</div><div class="vs">共识 3 · 任务 2</div></div><div class="vday">08-21</div></div>
+            <div class="visit"><span class="vdot" style="background:var(--brand)"></span><div><div class="vt">客户月度沟通</div><div class="vs">共识 5 · 任务 3</div></div><div class="vday">08-14</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 迷你条形
+const data=[62,68,71,80,86,100], lbl=['9.8k','11k','12k','14k','15k','18k'];
+document.getElementById('bars').innerHTML=data.map((h,i)=>
+  `<div class="bar"><div class="col" style="height:${h}%"><span>${lbl[i]}</span></div></div>`).join('');
+
+// 容量勾选
+document.getElementById('caps').addEventListener('click',e=>{const c=e.target.closest('.capchk');if(c)c.classList.toggle('on');});
+function allCaps(on){document.querySelectorAll('#caps .capchk').forEach(c=>c.classList.toggle('on',on));}
+
+// 主题
+const tb=document.getElementById('themeBtn');
+function applyTheme(t){document.documentElement.setAttribute('data-theme',t);tb.textContent=t==='dark'?'🌙':'☀️';try{localStorage.setItem('cop-theme',t)}catch(e){}}
+tb.onclick=()=>applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');
+(function(){let t='dark';try{t=localStorage.getItem('cop-theme')||'dark'}catch(e){}applyTheme(t);})();
+</script>
