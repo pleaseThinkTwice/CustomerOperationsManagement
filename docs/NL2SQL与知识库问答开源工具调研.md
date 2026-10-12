@@ -43,6 +43,50 @@ Star 数为 2026-10 抓取 GitHub 页面所得，仅作热度参考。
 | [Open WebUI](https://github.com/open-webui/open-webui) | 154.4k | Open WebUI 许可（须保留“Open WebUI”品牌） | pip / Docker / K8s；数据卷挂 `/app/backend/data`，可用 PostgreSQL | 通用聊天门户；混合检索、多种向量库与 OCR 提取 | 先给全公司一个统一的 AI 聊天入口，知识库是附带能力 |
 | [AnythingLLM](https://github.com/Mintplex-Labs/anything-llm) | 67.0k | MIT | 桌面版或 Docker（多用户权限仅 Docker 版有） | 拖拽上传、带引用的文档问答；默认 LanceDB；Agent 与 MCP | 小团队或个人试用，许可最宽松 |
 
+## 效果展示
+
+大模型已经能把常见的业务问题直接变成可执行的 SQL；公开榜单上最好的系统约 80% 答对，人类专家约 93%，剩下的差距主要靠术语库和示例 SQL 补。
+
+### 问数实测：5 个中文问题 → SQL → 结果
+
+示例库为模拟的客户运营数据（200 个客户、1,250 笔订单、524 张工单，SQLite）。SQL 由大模型（Claude）根据表结构生成，结果为在示例库上的实际执行输出；SQLBot、DB-GPT 等工具接入大模型后，就是把这一步做成了界面并自动出图。复现脚本见 [demo/](demo/)。
+
+| 业务问题 | 难度 | 生成的 SQL 要点 | 执行结果 |
+| --- | --- | --- | --- |
+| 华东区的 VIP 客户有多少个？ | 单表过滤 | `WHERE region='华东' AND level='VIP'` | 13 个 |
+| 2026 年每个季度的成交额（不含退款）？ | 分组聚合 | 按月份换算季度，`status='已完成'` 排除退款 | Q1 145.9 万 · Q2 131.1 万 · Q3 146.8 万 · Q4（截至 10 月初）7.6 万 |
+| 今年哪类工单平均解决时间最长？ | 聚合 + 排序 | 只统计已解决工单，`AVG(resolve_hours)` | 质量类 52.4 小时，其次物流 50.0、退款 49.2、咨询 43.2 |
+| 最近 90 天没下过单的 VIP 客户？ | 关联 + 日期计算 | `LEFT JOIN` 保留从未下单的客户，`HAVING` 判断最近下单日 | 26 个，其中 3 个从未下单（客户047、128、165） |
+| 成交额前 5 的客户各有几张未解决工单？ | 跨三表 | 订单汇总排序 + 工单子查询 | 客户075（14.6 万，0 张）、客户139（12.6 万，1 张）等 |
+
+第 4 题生成的完整 SQL：
+
+```sql
+SELECT c.name AS 客户, c.region AS 区域, MAX(o.order_date) AS 最近下单日
+FROM customers c LEFT JOIN orders o ON o.customer_id = c.id
+WHERE c.level = 'VIP'
+GROUP BY c.id
+HAVING 最近下单日 IS NULL OR 最近下单日 < date('2026-10-12', '-90 day')
+ORDER BY 最近下单日;
+```
+
+容易出错的地方是口径：“成交额”是否含退款、“活跃客户”怎么算，模型只能猜。把这些定义写进 SQLBot 的术语库或 WrenAI 的语义层，是准确率从“能用”到“可信”的关键。
+
+### 公开榜单上的准确率
+
+| 评测 | 测什么 | 当前最好成绩 | 对照 |
+| --- | --- | --- | --- |
+| [BIRD](https://benchmarklist.com/benchmarks/bird_sql/) | 95 个真实数据库、带脏数据和业务知识的问数 | 约 80–82%（Gemini-SQL2 报 80.04%，[来源](https://aiweekly.co/alerts/googles-gemini-sql2-tops-bird-text-to-sql-at-8004)） | 人类专家 92.96% |
+| [Spider 2.0-Lite](https://github.com/xlang-ai/Spider2) | 企业级数仓：上百张表、多步分析 | 约 72–76%（[Oracle 报 72.02%](https://blogs.oracle.com/cloud-infrastructure/oci-gen-ai-tops-spider-2-lite)） | 说明复杂数仓仍需人工复核 |
+
+榜单成绩多为厂商自报，各来源数字有出入，仅用来判断量级；在公司数据上的真实效果以 POC 为准。
+
+### 知识库：RAGFlow 解析复杂文档
+
+![RAGFlow 把 PDF 中的表格还原成独立切片](images/ragflow-chunking.png)
+
+截图来自 [RAGFlow 官方演示](https://github.com/infiniflow/ragflow)：右侧是原始 PDF，左侧是解析后的切片，“Eligibility and requirements”表格被完整识别成一个切片。提问时答案会引用这些切片，点击可回到原文位置核对。
+
 ## 选型建议与落地架构
 
 问数和知识库分成两个服务部署在公司平台上，共用一个大模型；它们自带的配置库、向量库和上传文件都写进平台的 `/data` 持久化卷。
