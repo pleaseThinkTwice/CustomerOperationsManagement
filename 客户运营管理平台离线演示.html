@@ -2003,8 +2003,10 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .t3-svgdl:hover{opacity:1;}
 .t3-svgdl:hover{opacity:1;}
 .t3-tbl{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap;}
-.t3-tbl th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);}
-.t3-tbl td{padding:9px 10px;border-bottom:1px solid var(--line);}
+.t3-tbl th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--line);text-transform:none;letter-spacing:0;vertical-align:middle;}
+.t3-tbl td{padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:middle;}
+/* 对齐规则：文本/编号列左对齐；数值列(.num)右对齐+等宽数字；状态/操作列(.ctr)居中；表头与该列内容同向 */
+.t3-tbl .ctr{text-align:center;}
 .t3-tbl tbody tr:hover{background:var(--bg-secondary);}
 .t3-tbl .num{text-align:right;font-variant-numeric:tabular-nums;}
 .t3-tbl .lk{color:var(--accent);cursor:pointer;font-weight:600;}
@@ -4567,8 +4569,19 @@ const ThreeView = (() => {
       return { label: m, value: arr.reduce((s, v) => s + v, 0), color: modeColor(m) };
     }).filter(x => x.value > 0).sort((a, b) => b.value - a.value);
   }
+  // 看板表格列宽：按百分比给出各列建议宽度（空串=自适应分剩余），自动布局下内容不会被截断
+  const colg = (...w) => `<colgroup>${w.map(x => x ? `<col style="width:${x}%">` : '<col>').join('')}</colgroup>`;
+  // 表头对齐方式同步到同列单元格，保证表头与内容对齐一致
+  function alignCells(t) {
+    const al = [...t.querySelectorAll('thead th')].map(th => th.classList.contains('num') ? 'num' : th.classList.contains('ctr') ? 'ctr' : '');
+    t.querySelectorAll('tbody tr').forEach(tr => {
+      if (tr.cells.length !== al.length) return;
+      [...tr.cells].forEach((td, i) => { if (al[i]) td.classList.add(al[i]); });
+    });
+  }
   // 给 host 内所有看板表格启用点击表头排序（todo 任务#3）
   function enableSort(host) {
+    host.querySelectorAll('table.t3-tbl').forEach(alignCells);
     if (window.Utils && Utils.enableTableSort) {
       host.querySelectorAll('table.t3-tbl').forEach(t => Utils.enableTableSort(t));
     }
@@ -4668,7 +4681,7 @@ const ThreeView = (() => {
     const tot = rows.reduce((t, r) => ({ alarm: t.alarm + r.alarm, closed: t.closed + r.closed, complaint: t.complaint + r.complaint }), { alarm: 0, closed: 0, complaint: 0 });
     const rate = (c, a) => a ? (100 * c / a).toFixed(1) + '%' : '-';
     const share = v => tot.alarm ? (100 * v / tot.alarm).toFixed(1) + '%' : '-';
-    const modeTable = `<table class="t3-tbl"><thead><tr><th>失效模式</th><th class="num">⚠️ 预警外发</th><th class="num">✅ 闭环</th><th class="num">闭环率</th><th class="num">📣 客诉</th><th class="num">预警占比</th></tr></thead><tbody>${
+    const modeTable = `<table class="t3-tbl">${colg('', 14, 14, 14, 14, 14)}<thead><tr><th>失效模式</th><th class="num">⚠️ 预警外发</th><th class="num">✅ 闭环</th><th class="num">闭环率</th><th class="num">📣 客诉</th><th class="num">预警占比</th></tr></thead><tbody>${
       rows.map(r => `<tr><td><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${modeColor(r.mode)};margin-right:7px"></i><b>${esc(r.mode)}</b></td>
         <td class="num"><b>${fmt(r.alarm)}</b></td><td class="num">${fmt(r.closed)}</td><td class="num">${rate(r.closed, r.alarm)}</td>
         <td class="num">${fmt(r.complaint)}</td><td class="num">${share(r.alarm)}</td></tr>`).join('')
@@ -4827,8 +4840,8 @@ const ThreeView = (() => {
       <!-- 项目列表 -->
       <div class="t3-card">
         <div class="chead"><div><div class="ctitle" title="一行 = 一款电芯（容量 × 结构），点击行进入项目视角">🗂️ 电芯项目</div></div></div>
-        <div class="tblwrap"><table class="t3-tbl"><thead>
-          <tr><th>电芯项目</th><th class="num">容量(Ah)</th><th>电池结构</th><th>状态</th><th>SOP</th><th class="num">累计出货(Pack)</th><th class="num">接入数</th><th class="num">接入率</th><th class="num">过保数(率)</th><th class="num">预警外发</th><th class="num">已闭环(率)</th><th>操作</th></tr>
+        <div class="tblwrap"><table class="t3-tbl">${colg(12, 7, 8, 7, 7, 10, 7, 7, 9, 7, 9, 10)}<thead>
+          <tr><th>电芯项目</th><th class="num">容量(Ah)</th><th>电池结构</th><th class="ctr">状态</th><th>SOP</th><th class="num">累计出货(Pack)</th><th class="num">接入数</th><th class="num">接入率</th><th class="num">过保数(率)</th><th class="num">预警外发</th><th class="num">已闭环(率)</th><th class="ctr">操作</th></tr>
         </thead><tbody>${projRows}</tbody></table></div>
       </div>
       <!-- 关键人 / 拜访 / 会议：每块都能直接新增或跳到对应页面 -->
@@ -4981,13 +4994,13 @@ const ThreeView = (() => {
         </div>
         <div class="t3-card">
           <div class="chead"><div><div class="ctitle" title="按电芯项目维护">🛡️ 质保台账</div></div></div>
-          <div class="tblwrap"><table class="t3-tbl"><thead><tr><th>车型</th><th>PN</th><th>质保条款</th></tr></thead><tbody>${wRows}</tbody></table></div>
+          <div class="tblwrap"><table class="t3-tbl">${colg(20, 20, '')}<thead><tr><th>车型</th><th>PN</th><th>质保条款</th></tr></thead><tbody>${wRows}</tbody></table></div>
         </div>
       </div>
       <!-- 适用车型 -->
       <div class="t3-card">
         <div class="chead"><div><div class="ctitle" title="该电芯项目下所有车型">🚗 适用车型明细</div></div></div>
-        <div class="tblwrap"><table class="t3-tbl"><thead><tr><th>车型</th><th>电池结构</th><th class="num">接入</th><th class="num">占比</th><th class="num">过保数</th><th class="num">预警外发</th><th class="num">预警占比</th></tr></thead><tbody>${carRows}</tbody></table></div>
+        <div class="tblwrap"><table class="t3-tbl">${colg(18, 17, 13, 13, 13, 13, 13)}<thead><tr><th>车型</th><th>电池结构</th><th class="num">接入</th><th class="num">占比</th><th class="num">过保数</th><th class="num">预警外发</th><th class="num">预警占比</th></tr></thead><tbody>${carRows}</tbody></table></div>
       </div>
       <!-- 项目关键处置事件 -->
       <div class="t3-card">
@@ -5097,9 +5110,9 @@ const ThreeView = (() => {
       <!-- 跨客户对比 -->
       <div class="t3-card">
         <div class="chead"><div><div class="ctitle" title="同一颗电芯，不同客户的质量差异一目了然">🏢 跨客户对比（该电芯所有客户）</div></div></div>
-        <div class="tblwrap"><table class="t3-tbl"><thead><tr>
+        <div class="tblwrap"><table class="t3-tbl">${colg(10, 10, 10, 9, 9, 9, 12, 8, 9, 14)}<thead><tr>
           <th>客户</th><th class="num">出货(Pack)</th><th class="num">出货(Cell)</th><th class="num">接入数</th><th class="num">今年接入</th>
-          <th class="num">预警外发</th><th class="num">已闭环(率)</th><th class="num">ppm</th><th class="num">出货占比</th><th>操作</th>
+          <th class="num">预警外发</th><th class="num">已闭环(率)</th><th class="num">ppm</th><th class="num">出货占比</th><th class="ctr">操作</th>
         </tr></thead><tbody>${custRows}${sumRow}</tbody></table></div>
       </div>
       <!-- SOH 分布 + 失效率走势（失效模式占比在质量分析里，不再单独成卡） -->
@@ -5122,15 +5135,15 @@ const ThreeView = (() => {
       <div class="t3-card">
         <div class="chead"><div><div class="ctitle" title="批次 → 预警 → 车辆 · 近似口径">🗃️ 电芯批次追溯</div></div></div>
         <div style="max-width:760px;">${batchBarHtml}</div>
-        <div class="tblwrap" style="margin-top:8px;"><table class="t3-tbl"><thead><tr>
-          <th>客户</th><th>批次号</th><th>电芯基地</th><th class="num">出货颗数</th><th class="num">失效颗数</th><th class="num">失效率(ppm)</th><th>状态</th>
+        <div class="tblwrap" style="margin-top:8px;"><table class="t3-tbl">${colg(12, 16, 16, 14, 12, 14, 16)}<thead><tr>
+          <th>客户</th><th>批次号</th><th>电芯基地</th><th class="num">出货颗数</th><th class="num">失效颗数</th><th class="num">失效率(ppm)</th><th class="ctr">状态</th>
         </tr></thead><tbody>${batchRows}</tbody></table></div>
       </div>
       <!-- 异常电芯明细 -->
       <div class="t3-card">
         <div class="chead"><div><div class="ctitle" title="关联预警闭环工单">🔎 异常电芯明细（高风险）</div></div></div>
-        <div class="tblwrap"><table class="t3-tbl"><thead><tr>
-          <th>客户</th><th>VIN</th><th>电池包号</th><th>电芯位号</th><th>失效模式</th><th class="num">SOH</th><th>预警状态</th>
+        <div class="tblwrap"><table class="t3-tbl">${colg(11, 20, 15, 12, 18, 10, 14)}<thead><tr>
+          <th>客户</th><th>VIN</th><th>电池包号</th><th>电芯位号</th><th>失效模式</th><th class="num">SOH</th><th class="ctr">预警状态</th>
         </tr></thead><tbody>${riskRows}</tbody></table></div>
       </div>
       <!-- 电芯批次关键处置事件 -->
