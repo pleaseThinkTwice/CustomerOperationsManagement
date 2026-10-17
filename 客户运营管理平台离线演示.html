@@ -2010,6 +2010,7 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .t3-tbl td{padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:middle;}
 /* 对齐规则：文本/编号列与数值列(.num，等宽数字)均左对齐；状态/操作列(.ctr)居中；表头与该列内容同向 */
 .t3-tbl .ctr{text-align:center;}
+.t3-box:hover rect[fill-opacity]{fill-opacity:.4;}
 .t3-tbl.dense th,.t3-tbl.dense td{padding-left:9px;padding-right:9px;}   /* 列多的表收紧左右留白，尽量一屏放下 */
 .t3-tbl tbody tr:hover{background:var(--bg-secondary);}
 .t3-tbl .num{text-align:left;font-variant-numeric:tabular-nums;}
@@ -2319,12 +2320,25 @@ tbody tr:hover { background: var(--bg-card-hover); }
     };
   }
 
+  // SOH 分区间箱线统计：按累计里程 / 累计循环数分桶，每桶 min/P25/中位数/P75/max + 样本数
+  function makeSohBox() {
+    function box(ranges, f) {
+      return ranges.map(function (r, i) {
+        var med = f(i), sp = 0.6 + i * 0.25;
+        return { range: r, n: Math.round(3200 / (i + 1.2)), min: +(med - sp * 3.2).toFixed(1), q1: +(med - sp).toFixed(1), median: +med.toFixed(1), q3: +Math.min(100, med + sp * 0.9).toFixed(1), max: +Math.min(100, med + sp * 2.2).toFixed(1) };
+      });
+    }
+    return {
+      mileage: box(['0~2万', '2~4万', '4~6万', '6~8万', '8~10万', '10~15万', '15~20万', '20万+'], function (i) { return 99 - i * 1.6 - i * i * 0.12; }),
+      cycle: box(['0~100', '100~200', '200~300', '300~500', '500~800', '800~1200', '1200+'], function (i) { return 99 - i * 1.9 - i * i * 0.15; }),
+    };
+  }
   function threeView(view, q) {
     if (view === 'project') {
       return {
         view: 'project', oem: q.oem || OEM, cellCap: q.cell_cap || '153',
         info: { packShip: 20240, moduleShip: 8096, cellShip: 827000, conn: 15300, packIdMiss: 214, access15: 312, connRate: 75.6, insured: 11000, overdue: 12, alarm: 320, closed: 240, alarm7: 28, closed7: 22, struct: '1P204S', cap: q.cell_cap || 153, s: 204, sop: '2025-06', qy: '8年', qkm: '30万', qsoh: '80' },
-        trend: makeTrend(),
+        trend: makeTrend(), sohBox: makeSohBox(),
         cars: [{ name: '小米SU7', vehicle_model: 'SU7', struct: '1P204S', conn: 9600, packIdMiss: 130, overdue: 7, alarm: 180 }, { name: '小米YU7', vehicle_model: 'YU7', struct: '1P204S', conn: 5700, packIdMiss: 84, overdue: 5, alarm: 140 }],
         warranty: [{ vehicle_model: '小米SU7', pn: 'XR153-01', years: 8, mileage: 300000, soh: 80 }],
         modesDetail: MODES.map(function (m) { return { name: m, count: Math.round(Math.random() * 40 + 5) }; }),
@@ -4238,6 +4252,7 @@ const ThreeView = (() => {
     gran: 'month',         // month/year/d15（接入走势粒度）
     timeRange: { mode: 'all', start: '', end: '' },   // 全局时间筛选：3m/6m/12m/all/custom
     level: 'Pack',         // Pack/Module/Cell（项目视角出货层级）
+    sohAxis: 'mileage',    // mileage/cycle（项目视角 SOH 箱线图分桶维度）
     view: 'customer',      // customer/project/cell
     oem: '',
     cellCap: '',
@@ -4365,6 +4380,46 @@ const ThreeView = (() => {
     const dots = data.map((v, i) => `<circle class="t3-dot" cx="${xs[i]}" cy="${ys[i]}" r="3.6" fill="${color}"><title>${esc(labels[i])}：${fmt(v)}</title></circle>`).join('');
     const area = `M${xs[0]},${padT + ih} ` + xs.map((x, i) => `L${x},${ys[i]}`).join(' ') + ` L${xs[xs.length - 1]},${padT + ih} Z`;
     return `<svg viewBox="0 0 ${w} ${h}" class="chart"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".22"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${grid}<path d="${area}" fill="url(#${id})"/><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>${dots}${xl}</svg>`;
+  }
+
+  // ---- SVG 箱线图（每个区间一个箱体，平铺）----
+  // bins: [{range, n, min, q1, median, q3, max}]；thr：质保 SOH 门槛（虚线参考）
+  function boxPlot(bins, thr) {
+    if (!bins || !bins.length) return '<div class="t3-empty">暂无 SOH 分布数据</div>';
+    const w = 480, h = 236, padL = 44, padR = 10, padT = 18, padB = 42;   // 卡片为半宽，画布收窄以保证文字可读
+    const iw = w - padL - padR, ih = h - padT - padB;
+    const t = Number(thr);
+    const lo = Math.min(...bins.map(b => b.min), isFinite(t) && t > 0 ? t : 100);
+    const step = (100 - lo) > 25 ? 10 : 5;
+    const ymin = Math.floor((lo - 1) / step) * step, ymax = 100;
+    const Y = v => padT + ih * (1 - (v - ymin) / (ymax - ymin));
+    let grid = '';
+    for (let v = ymin; v <= ymax; v += step) {
+      grid += `<line x1="${padL}" y1="${Y(v)}" x2="${w - padR}" y2="${Y(v)}" stroke="var(--grid)"/>` +
+        `<text x="${padL - 8}" y="${Y(v) + 4}" text-anchor="end" class="tick">${v}%</text>`;
+    }
+    const slot = iw / bins.length, bw = Math.min(44, slot * 0.5);
+    let marks = '';
+    bins.forEach((b, i) => {
+      const cx = padL + slot * (i + 0.5);
+      const tip = `${b.range}（${fmt(b.n)} 辆）\n最大 ${b.max}%\nP75 ${b.q3}%\n中位数 ${b.median}%\nP25 ${b.q1}%\n最小 ${b.min}%`;
+      marks += `<g class="t3-box"><title>${esc(tip)}</title>` +
+        `<rect x="${cx - slot / 2}" y="${padT}" width="${slot}" height="${ih}" fill="transparent"/>` +
+        `<line x1="${cx}" y1="${Y(b.max)}" x2="${cx}" y2="${Y(b.q3)}" stroke="${SEQ.g2}" stroke-width="1.5"/>` +
+        `<line x1="${cx}" y1="${Y(b.q1)}" x2="${cx}" y2="${Y(b.min)}" stroke="${SEQ.g2}" stroke-width="1.5"/>` +
+        `<line x1="${cx - bw / 4}" y1="${Y(b.max)}" x2="${cx + bw / 4}" y2="${Y(b.max)}" stroke="${SEQ.g2}" stroke-width="1.5"/>` +
+        `<line x1="${cx - bw / 4}" y1="${Y(b.min)}" x2="${cx + bw / 4}" y2="${Y(b.min)}" stroke="${SEQ.g2}" stroke-width="1.5"/>` +
+        `<rect x="${cx - bw / 2}" y="${Y(b.q3)}" width="${bw}" height="${Math.max(1, Y(b.q1) - Y(b.q3))}" rx="3" fill="${SEQ.g2}" fill-opacity=".22" stroke="${SEQ.g2}" stroke-width="1.5"/>` +
+        `<line x1="${cx - bw / 2}" y1="${Y(b.median)}" x2="${cx + bw / 2}" y2="${Y(b.median)}" stroke="${SEQ.g1}" stroke-width="2.4"/>` +
+        `</g>` +
+        `<text x="${cx}" y="${padT + ih + 15}" text-anchor="middle" class="tick">${esc(b.range)}</text>` +
+        `<text x="${cx}" y="${padT + ih + 29}" text-anchor="middle" class="tick" style="font-size:9px;">n=${fmt(b.n)}</text>`;
+    });
+    const ref = isFinite(t) && t > ymin && t < ymax
+      ? `<line x1="${padL}" y1="${Y(t)}" x2="${w - padR}" y2="${Y(t)}" stroke="var(--muted)" stroke-dasharray="5 4"/>` +
+        `<text x="${padL + 6}" y="${Y(t) - 5}" class="tick">质保门槛 ${t}%</text>` : '';
+    return `<svg viewBox="0 0 ${w} ${h}" class="chart">${grid}${ref}${marks}</svg>` +
+      `<div class="legend lg-c"><span>箱体 = P25~P75</span><span>中线 = 中位数</span><span>须 = 最小~最大</span></div>`;
   }
 
   // ---- SVG 柱状 ----
@@ -4970,15 +5025,11 @@ const ThreeView = (() => {
         <td>${stint(w.years, w.mileage, w.soh)}</td></tr>`;
     }).join('') || '<tr><td colspan="3" class="t3-empty">暂无质保台账，可在质保配置维护</td></tr>';
 
-    // SOH 衰减走势（演示近似，标示口径）
-    const sohData = []; const sohLabels = [];
-    const ageMonths = Math.max(1, Math.min(48, Math.round(((new Date('2026-09-15') - new Date((info.sop || '2024-01') + '-01')) / (30 * 24 * 3600 * 1000)) || 20)));
-    for (let m = 0; m <= Math.min(ageMonths, 36); m += 3) {
-      sohLabels.push(m + '月');
-      sohData.push(+(100 - 0.15 * m - 0.005 * m * m).toFixed(2));
-    }
-    const sohHtml = lineChart(sohData, sohLabels, SEQ.g2) +
-      `<div class="legend"><span>当前车龄 <b>${ageMonths} 个月</b></span><span>当前 SOH <b>${sohData[sohData.length - 1]}%</b></span><span>质保门槛 <b>${esc(info.qsoh || '-')}</b></span></div>`;
+    // SOH 衰减走势：按累计里程 / 累计循环数分区间，每区间一个箱线图
+    const SOH_AXIS = { mileage: '累计里程', cycle: '累计循环数' };
+    const sohBoxHtml = () => boxPlot((d.sohBox || {})[state.sohAxis], parseFloat(info.qsoh));
+    const sohSeg = `<div class="seg" id="t3SohAxis">${Object.keys(SOH_AXIS).map(k =>
+      `<button data-x="${k}" class="${k === state.sohAxis ? 'on' : ''}">${SOH_AXIS[k]}</button>`).join('')}</div>`;
 
     const eventsHtml = renderTimeline(d.events);
 
@@ -5009,8 +5060,8 @@ const ThreeView = (() => {
       <!-- SOH + 质保台账 -->
       <div class="t3-grid2">
         <div class="t3-card">
-          <div class="chead"><div><div class="ctitle" title="识别拐点 · 近似口径">📉 SOH 衰减走势</div></div></div>
-          <div>${sohHtml}</div>
+          <div class="chead"><div><div class="ctitle" title="按累计里程 / 累计循环数分区间的 SOH 分布（箱线图）">📉 SOH 衰减走势</div></div>${sohSeg}</div>
+          <div id="t3SohBox">${sohBoxHtml()}</div>
         </div>
         <div class="t3-card">
           <div class="chead"><div><div class="ctitle" title="按电芯项目维护">🛡️ 质保台账</div></div></div>
@@ -5042,6 +5093,14 @@ const ThreeView = (() => {
       const b = e.target.closest('button[data-g]'); if (!b) return;
       state.gran = b.dataset.g;
       renderProject(host, d, oem);
+    });
+    // SOH 箱线图分桶维度切换（只重绘该图）
+    const sseg = document.getElementById('t3SohAxis');
+    if (sseg) sseg.addEventListener('click', e => {
+      const b = e.target.closest('button[data-x]'); if (!b) return;
+      state.sohAxis = b.dataset.x;
+      sseg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+      document.getElementById('t3SohBox').innerHTML = sohBoxHtml();
     });
     // 出货层级切换
     const lseg = document.getElementById('t3LevelSeg');
