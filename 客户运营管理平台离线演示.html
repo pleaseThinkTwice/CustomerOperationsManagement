@@ -4256,7 +4256,6 @@ const ThreeView = (() => {
     rank: 'alarm',         // alarm/closed/conn/overdue（客户视角项目排名）
     gran: 'month',         // month/year/d15（接入走势粒度）
     timeRange: { mode: 'all', start: '', end: '' },   // 全局时间筛选：3m/6m/12m/all/custom
-    level: 'Pack',         // Pack/Module/Cell（项目视角出货层级）
     sohAxis: 'mileage',    // mileage/cycle（项目视角 SOH 箱线图分桶维度）
     sohPn: '',             // ''=整体，否则为 PN（项目视角 SOH 箱线图范围）
     view: 'customer',      // customer/project/cell
@@ -4972,20 +4971,9 @@ const ThreeView = (() => {
     const closeRate = info.alarm ? (100 * (info.closed || 0) / info.alarm).toFixed(1) + '%' : '-';
     const connRate = info.packShip ? (100 * (info.conn || 0) / info.packShip).toFixed(1) + '%'
       : (info.connRate != null ? info.connRate + '%' : '-');
-    // 出货层级：Pack / Module / Cell（对齐原型，点击切换）
-    const LEVEL = { Pack: { key: 'packShip', unit: '包', icon: '📦', sub: '' },
-                    Module: { key: 'moduleShip', unit: '模组', icon: '🧱', sub: '' },
-                    Cell: { key: 'cellShip', unit: '颗', icon: '🔋', sub: '' } };
-    const lv = LEVEL[state.level] || LEVEL.Pack;
-    const lvVal = info[lv.key] || 0;
-    const lvSub = state.level === 'Pack' ? `模组 ${fmt(info.moduleShip)} · 电芯 ${fmt(info.cellShip)} 颗`
-      : state.level === 'Module' ? `${fmt(info.packShip)} 包`
-      : `${fmt(info.packShip)} 包`;
     const two = (a, b) => `${a}<span class="v2"> / ${b}</span>`;
-    const levelTabs = `<div class="seg" id="t3LevelSeg">${['Pack', 'Module', 'Cell'].map(k =>
-      `<button data-l="${k}" class="${k === state.level ? 'on' : ''}">${LEVEL[k].icon} ${k}</button>`).join('')}</div>`;
     const kpis = kpiCards([
-      { icon: lv.icon, label: `累计出货（${state.level}）`, val: wan(lvVal) + ' ' + lv.unit, sub: lvSub, cls: 'hl', tip: '出货条码累计' },
+      { icon: '📦', label: '累计出货（Pack）', val: wan(info.packShip || 0) + ' 包', sub: `模组 ${fmt(info.moduleShip)} · 电芯 ${fmt(info.cellShip)} 颗`, cls: 'hl', tip: '出货条码累计；Module / Cell 明细可从出货表拉取' },
       { icon: '📥', label: '累计接入', val: fmt(info.conn), sub: `接入率 ${connRate}`, tip: '接入率 = 接入 / 出货(Pack)' },
       missCard(info.packIdMiss, info.conn),
       { icon: '🗓️', label: '近15天接入', val: fmt(info.access15 != null ? info.access15 : '-'), tip: '近15天有接入记录的车辆' },
@@ -5064,8 +5052,7 @@ const ThreeView = (() => {
     host.innerHTML = `
       <!-- 信息条 -->
       ${infoStrip}
-      <!-- KPI + 出货层级切换 -->
-      <div style="display:flex;justify-content:flex-end;margin:-4px 0 10px;">${levelTabs}</div>
+      <!-- KPI -->
       <div class="t3-kpis">${kpis}</div>
       <!-- 接入走势 + 活跃/调表 -->
       <div class="t3-grid2">
@@ -5167,13 +5154,6 @@ const ThreeView = (() => {
       state.sohAxis = b.dataset.x;
       sseg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
       document.getElementById('t3SohBox').innerHTML = sohBoxHtml();
-    });
-    // 出货层级切换
-    const lseg = document.getElementById('t3LevelSeg');
-    if (lseg) lseg.addEventListener('click', e => {
-      const b = e.target.closest('button[data-l]'); if (!b) return;
-      state.level = b.dataset.l;
-      renderProject(host, d, oem);
     });
     return host;
   }
