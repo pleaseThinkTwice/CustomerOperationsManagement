@@ -4983,16 +4983,6 @@ const ThreeView = (() => {
     ]);
     const structCap = `${info.struct || '-'} · ${info.cap != null ? info.cap : ''}Ah`;
 
-    // 信息条
-    const infoStrip = `<div class="t3-strip">
-      <div class="it">项目状态<b><span class="pill g">量产</span></b></div>
-      <div class="it">SOP 时间<b>${esc(info.sop || '-')}</b></div>
-      <div class="it">电池结构<b>${esc(info.struct || '-')}</b></div>
-      <div class="it">单包电芯<b>${info.s ? info.s + ' 颗（串联）' : '-'}</b></div>
-      <div class="it">电芯容量<b>${esc(info.cap != null ? info.cap + ' Ah' : '-')}</b></div>
-      <div class="it">质保条款<b>${esc(info.qy || '-')} / ${esc(info.qkm || '-')} km / SOH ${esc(info.qsoh || '-')}</b></div>
-    </div>`;
-
     const tr = d.trend || {};
     // 接入走势三粒度（todo#2：参考客户视角，数据带 cell_cap 限制，均为实际接入量）
     const useD15 = state.gran === 'd15';
@@ -5051,7 +5041,6 @@ const ThreeView = (() => {
 
     host.innerHTML = `
       <!-- 信息条 -->
-      ${infoStrip}
       <!-- KPI -->
       <div class="t3-kpis">${kpis}</div>
       <!-- 接入走势 + 活跃/调表 -->
