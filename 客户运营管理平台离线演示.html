@@ -2101,7 +2101,9 @@ tbody tr:hover { background: var(--bg-card-hover); }
 <script>
         // 主题初始化（在页面渲染前设置，避免闪烁）
         (function() {
-            var saved = localStorage.getItem('theme') || 'dark';
+            // 在受限环境（如沙箱预览）里读不到 localStorage，退回深色主题，不影响后续脚本
+            var saved = 'dark';
+            try { saved = localStorage.getItem('theme') || 'dark'; } catch (e) {}
             document.documentElement.setAttribute('data-theme', saved);
         })();
     </script>
