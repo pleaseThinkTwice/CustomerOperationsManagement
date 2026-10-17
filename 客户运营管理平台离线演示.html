@@ -4419,8 +4419,7 @@ const ThreeView = (() => {
     const ref = isFinite(t) && t > ymin && t < ymax
       ? `<line x1="${padL}" y1="${Y(t)}" x2="${w - padR}" y2="${Y(t)}" stroke="var(--muted)" stroke-dasharray="5 4"/>` +
         `<text x="${padL + 6}" y="${Y(t) - 5}" class="tick">质保门槛 ${t}%</text>` : '';
-    return `<svg viewBox="0 0 ${w} ${h}" class="chart">${grid}${ref}${marks}</svg>` +
-      `<div class="legend lg-c"><span>箱体 = P25~P75</span><span>中线 = 中位数</span><span>须 = 最小~最大</span></div>`;
+    return `<svg viewBox="0 0 ${w} ${h}" class="chart">${grid}${ref}${marks}</svg>`;
   }
 
   // ---- SVG 柱状 ----
