@@ -2008,9 +2008,11 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .tick{font-size:10.5px;fill:var(--muted);}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px;}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+.legend.lg-c{justify-content:center;}   /* 柱状图图例：图下方居中 */
 .qpanel{display:flex;flex-direction:column;gap:10px;}
 .qtabs{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 .chead .qtabs{flex:1;margin-left:14px;}
+.qbox{border:1px solid var(--line-strong);border-radius:12px;background:var(--bg-input);padding:12px 14px;min-width:0;}   /* 质量分析：直方图 / 饼图各自成区 */
 .qinfo{font-size:12px;color:var(--muted);margin-left:auto;}
 .qinfo b{color:var(--text-primary);}
 .qsub{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px;}
@@ -4397,8 +4399,8 @@ const ThreeView = (() => {
       });
       bars += `<text x="${cx}" y="${h - 8}" text-anchor="middle" class="tick">${esc(lab)}</text>`;
     });
-    const legend = `<div class="legend"><span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sA.color};margin-right:4px;"></i>${esc(sA.name)}</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sB.color};margin-right:4px;"></i>${esc(sB.name)}</span></div>`;
-    return `${legend}<svg viewBox="0 0 ${w} ${h}" class="chart">${grid}${bars}</svg>`;
+    const legend = `<div class="legend lg-c"><span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sA.color};margin-right:4px;"></i>${esc(sA.name)}</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${sB.color};margin-right:4px;"></i>${esc(sB.name)}</span></div>`;
+    return `<svg viewBox="0 0 ${w} ${h}" class="chart">${grid}${bars}</svg>${legend}`;
   }
 
   // ---- SVG 环形 ----
@@ -4456,7 +4458,7 @@ const ThreeView = (() => {
       if (totals[i] > 0) bars += `<text x="${cx}" y="${yB - 5}" text-anchor="middle" class="tick">${totals[i] >= 10000 ? wan(totals[i]) : totals[i]}</text>`;
     });
     const legend = modes.map(m => `<span><i style="background:${modeColor(m)}"></i>${esc(m)}</span>`).join('');
-    return `<svg viewBox="0 0 ${w} ${h}" class="chart">${grid}${bars}</svg><div class="legend">${legend}</div>`;
+    return `<svg viewBox="0 0 ${w} ${h}" class="chart">${grid}${bars}</svg><div class="legend lg-c">${legend}</div>`;
   }
 
   // ---- KPI 卡 ----
@@ -4608,10 +4610,10 @@ const ThreeView = (() => {
     }<tr style="background:var(--bg-secondary)"><td><b>合计</b></td><td class="num"><b>${fmt(tot.alarm)}</b></td><td class="num"><b>${fmt(tot.closed)}</b></td><td class="num">${rate(tot.closed, tot.alarm)}</td><td class="num"><b>${fmt(tot.complaint)}</b></td><td class="num">100%</td></tr></tbody></table>`;
     container.innerHTML = `<div class="qpanel">
       <div class="t3-grid2 r21">
-        <div><div class="qsub">${meta.icon} ${esc(meta.label)}走势</div>${stackedBar(fq, m)}</div>
-        <div style="display:flex;flex-direction:column;">
+        <div class="qbox"><div class="qsub">${meta.icon} ${esc(meta.label)}走势</div>${stackedBar(fq, m)}</div>
+        <div class="qbox" style="display:flex;flex-direction:column;">
           <div class="qsub">${meta.icon} ${esc(meta.label)}占比</div>
-          <div style="flex:1;display:flex;align-items:center;">${donut(byMode)}</div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;">${donut(byMode)}</div>
         </div>
       </div>
       <div style="margin-top:12px"><div class="qsub">失效模式明细</div>${modeTable}</div>
@@ -4728,7 +4730,6 @@ const ThreeView = (() => {
           <div class="chead"><div><div class="ctitle">📈 接入走势</div></div>
             <div class="seg" id="t3Gran">${granTabs}</div></div>
           <div class="t3-trend">${trendHtml}</div>
-          <div class="legend"><span>${useD15 ? '近15天合计接入' : '最新一期接入'} <b>${fmt(useD15 ? (trendData.reduce((s, v) => s + (v || 0), 0)) : ((trendData && trendData[trendData.length - 1]) || 0))}</b></span></div>
         </div>
         <div class="t3-card">
           <div class="chead"><div><div class="ctitle" title="按电芯容量分组 · 双柱各标数量">📊 各容量出货 / 接入对比</div></div></div>
@@ -4893,7 +4894,6 @@ const ThreeView = (() => {
           <div class="chead"><div><div class="ctitle">📈 项目接入走势</div></div>
             ${granTabs}</div>
           <div class="t3-trend">${trendHtml}</div>
-          <div class="legend"><span>${useD15 ? '近15天合计接入' : '最新一期接入'} <b>${fmt(useD15 ? (trendData.reduce((s, v) => s + (v || 0), 0)) : ((trendData && trendData[trendData.length - 1]) || 0))}</b></span></div>
         </div>
         <div class="t3-card">
           <div class="chead"><div><div class="ctitle" title="近90天数据上报">🚗 活跃车辆 &amp; 里程调表</div></div></div>
