@@ -2287,20 +2287,21 @@ tbody tr:hover { background: var(--bg-card-hover); }
     return out;
   }
   var MONTH_LABELS = months(12);
+  var QUALITY_LABELS = months(48);   // 质量矩阵保留 4 年历史，便于演示长时间范围（>36 月按季度汇总）
   function randArr(n, base, spread) { var a = []; for (var i = 0; i < n; i++) a.push(Math.round((base || 0) + Math.random() * (spread || 20))); return a; }
   function fmtKpi() {
     return { cellShip: 1523400, packShip: 48920, conn: 39800, insured: 28600, active: 40200, alarm: 4320, closed: 3610, alarm7: 168, closed7: 142, todoDone: 12, todoAll: 18 };
   }
   function fmtProject() { return PROJECTS.map(function (p) { return Object.assign({}, p); }); }
   function makeQuality() {
-    var q = { labels: MONTH_LABELS, alarm: {}, closed: {}, complaint: {} };
+    var q = { labels: QUALITY_LABELS, alarm: {}, closed: {}, complaint: {} };
     // 结构：{ 模式: { 'YY-MM': 数量 } }，与真实接口一致（按月份标签取值）
-    function byLabel(arr) { var o = {}; MONTH_LABELS.forEach(function (l, k) { o[l] = arr[k]; }); return o; }
+    function byLabel(arr) { var o = {}; QUALITY_LABELS.forEach(function (l, k) { o[l] = arr[k]; }); return o; }
     MODES.forEach(function (m, i) {
-      var alarm = randArr(12, 8 + i * 3, 6);
+      var alarm = randArr(QUALITY_LABELS.length, 8 + i * 3, 6);
       q.alarm[m] = byLabel(alarm);
       q.closed[m] = byLabel(alarm.map(function (v) { return Math.round(v * 0.8); }));
-      q.complaint[m] = byLabel(randArr(12, 1, 3));
+      q.complaint[m] = byLabel(randArr(QUALITY_LABELS.length, 1, 3));
     });
     return q;
   }
@@ -4442,14 +4443,45 @@ const ThreeView = (() => {
   }
 
   // ---- 堆叠柱（月×模式）----
-  function stackedBar(fq, metric) {
-    const mx = (fq && fq[metric]) || {};
+  // 横轴密度：≤12 期单行「YY-MM」；13~36 期两行（上=月份数字，下=年份，仅年份起点标注 + 年分隔线）；
+  // >36 期自动按季度汇总（增量求和、累积取季末值），横轴同为两行（上=Q1~Q4，下=年份）。
+  // 每期标签都显示，不旋转、不隔行。
+  function quarterize(labels, mx, modes, acc) {
+    const keys = [], pos = {};
+    labels.forEach((lb, i) => {
+      const [yy, mm] = String(lb).split('-');
+      const k = yy + 'Q' + Math.ceil((+mm || 1) / 3);
+      if (!(k in pos)) { pos[k] = keys.length; keys.push({ key: k, yy, q: 'Q' + Math.ceil((+mm || 1) / 3), from: lb, to: lb, idx: [] }); }
+      const g = keys[pos[k]]; g.to = lb; g.idx.push(i);
+    });
+    const out = {};
+    modes.forEach(m => {
+      const row = mx[m] || [];
+      out[m] = keys.map(g => acc ? (row[g.idx[g.idx.length - 1]] || 0) : g.idx.reduce((s, i) => s + (row[i] || 0), 0));
+    });
+    return { keys, mx: out };
+  }
+  function stackedBar(fq, metric, acc = state.qacc) {
+    let mx = (fq && fq[metric]) || {};
     const modes = Object.keys(mx).filter(m => (mx[m] || {}).hasOwnProperty('__vals') || Object.values(mx[m] || {}).some(v => v > 0));
-    const labels = (fq && fq.labels) || [];
-    if (!labels.length || !modes.length) return '<div class="t3-empty">该指标暂无数据</div>';
-    const w = 600, h = 220, padL = 52, padR = 14, padT = 18, padB = 30;
+    const rawLabels = (fq && fq.labels) || [];
+    if (!rawLabels.length || !modes.length) return '<div class="t3-empty">该指标暂无数据</div>';
+    // 横轴分组：每期 {top: 上行文字, yy: 年份, tip: 悬停名称}
+    let cols;
+    const byQuarter = rawLabels.length > 36;
+    if (byQuarter) {
+      const qz = quarterize(rawLabels, mx, modes, acc);
+      mx = qz.mx;
+      cols = qz.keys.map(g => ({ top: g.q, yy: g.yy, tip: `20${g.yy} ${g.q}（${g.from}~${g.to}）` }));
+    } else {
+      cols = rawLabels.map(lb => { const [yy, mm] = String(lb).split('-'); return { top: String(+mm || mm), yy, tip: lb, full: lb }; });
+    }
+    const twoRow = byQuarter || cols.length > 12;
+    const n = cols.length;
+    const w = 600, h = twoRow ? 232 : 220, padL = 52, padR = 14, padT = byQuarter ? 24 : 18, padB = twoRow ? 42 : 30;
     const iw = w - padL - padR, ih = h - padT - padB;
-    const totals = labels.map((_, i) => modes.reduce((s, m) => s + ((mx[m] || {})[i] || 0), 0));
+    const slot = iw / n;
+    const totals = cols.map((_, i) => modes.reduce((s, m) => s + ((mx[m] || {})[i] || 0), 0));
     const max = niceMax(Math.max(...totals) * 1.15);   // 美观上限，刻度规整
     const stTicks = tickLabels(max);
     let grid = '';
@@ -4458,23 +4490,39 @@ const ThreeView = (() => {
       grid += `<line x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}" stroke="var(--grid)"/>` +
         `<text x="${padL - 8}" y="${y + 4}" text-anchor="end" class="tick">${stTicks[g]}</text>`;
     }
-    const bw = Math.min(38, iw / labels.length * 0.55);
+    const bw = Math.min(38, slot * 0.55);
+    const totLabel = v => v >= 10000 ? wan(v) : String(v);
+    // 柱顶合计：估算文字宽度（10.5px 字号约 6.2/字符），放不下时只在悬停提示里显示
+    const totFits = Math.max(...totals.map(v => totLabel(v).length)) * 6.2 + 4 <= slot;
     let bars = '';
-    labels.forEach((lb, i) => {
-      const cx = padL + iw * (i + 0.5) / labels.length;
+    cols.forEach((c, i) => {
+      const cx = padL + slot * (i + 0.5);
       let yB = padT + ih;
       modes.forEach(m => {
         const v = (mx[m] || {})[i]; if (!v) return;
         const bh = ih * v / max, y = yB - bh;
-        bars += `<rect x="${cx - bw / 2}" y="${y}" width="${bw}" height="${Math.max(bh, 0.5)}" fill="${modeColor(m)}" stroke="var(--bg-input)" stroke-width="1.5"><title>${esc(lb)} · ${esc(m)}：${fmt(v)}</title></rect>`;
+        bars += `<rect x="${cx - bw / 2}" y="${y}" width="${bw}" height="${Math.max(bh, 0.5)}" fill="${modeColor(m)}" stroke="var(--bg-input)" stroke-width="1.5"><title>${esc(c.tip)} · ${esc(m)}：${fmt(v)}（合计 ${fmt(totals[i])}）</title></rect>`;
         yB = y;
       });
-      // 月份标签全量显示（不旋转不隔行，用户要求复原），缩小字号缓解密集重叠
-      bars += `<text x="${cx}" y="${padT + ih + 14}" text-anchor="middle" class="tick" style="font-size:9px;">${esc(lb)}</text>`;
-      if (totals[i] > 0) bars += `<text x="${cx}" y="${yB - 5}" text-anchor="middle" class="tick">${totals[i] >= 10000 ? wan(totals[i]) : totals[i]}</text>`;
+      const yAx = padT + ih;
+      if (twoRow) {
+        bars += `<text x="${cx}" y="${yAx + 14}" text-anchor="middle" class="tick" style="font-size:9.5px;">${esc(c.top)}</text>`;
+        const newYear = i === 0 || cols[i - 1].yy !== c.yy;
+        if (newYear) {
+          if (i > 0) bars += `<line x1="${padL + slot * i}" y1="${yAx + 3}" x2="${padL + slot * i}" y2="${yAx + 34}" stroke="var(--grid)"/>`;
+          // 年份段太窄（如首段只有 1 期）时放不下「2024」，改写「'24」，再窄就省略，避免与下一年重叠
+          let span = 0; while (i + span < n && cols[i + span].yy === c.yy) span++;
+          const yTxt = span * slot >= 34 ? '20' + c.yy : span * slot >= 22 ? "'" + c.yy : '';
+          if (yTxt) bars += `<text x="${padL + slot * i + 4}" y="${yAx + 31}" class="tick" style="font-size:10px;font-weight:600;">${esc(yTxt)}</text>`;
+        }
+      } else {
+        bars += `<text x="${cx}" y="${yAx + 14}" text-anchor="middle" class="tick" style="font-size:9px;">${esc(c.full)}</text>`;
+      }
+      if (totals[i] > 0 && totFits) bars += `<text x="${cx}" y="${yB - 5}" text-anchor="middle" class="tick">${totLabel(totals[i])}</text>`;
     });
+    const note = byQuarter ? `<text x="${w - padR}" y="12" text-anchor="end" class="tick">共 ${rawLabels.length} 个月 · 已按季度汇总</text>` : '';
     const legend = modes.map(m => `<span><i style="background:${modeColor(m)}"></i>${esc(m)}</span>`).join('');
-    return `<svg viewBox="0 0 ${w} ${h}" class="chart">${grid}${bars}</svg><div class="legend lg-c">${legend}</div>`;
+    return `<svg viewBox="0 0 ${w} ${h}" class="chart">${note}${grid}${bars}</svg><div class="legend lg-c">${legend}</div>`;
   }
 
   // ---- KPI 卡 ----
