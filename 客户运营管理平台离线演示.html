@@ -2096,7 +2096,8 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .t3-inner-grid .t3-card{margin-bottom:0;box-shadow:none;}
 @media(max-width:1280px){.t3-inner-grid{grid-template-columns:1fr;}}
 .t3-tl-wrap{max-height:480px;overflow-y:auto;padding:2px 6px 0 9px;}
-.t3-tl-wrap.short{max-height:none;overflow:visible;}
+.t3-tl-wrap.ev{max-height:var(--ev-h,222px);transition:max-height .2s ease;}   /* 约 3 条 */
+.t3-tl-wrap.ev.expanded{max-height:740px;}   /* 约 10 条，超出继续滑动 */
 .t3-more{display:block;margin:2px 0 0 9px;border:0;background:none;color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;padding:4px 0;}
 .t3-more:hover{text-decoration:underline;}   /* 左侧留出圆点位置，避免被滚动容器裁掉 */
 .t3-tl-wrap::-webkit-scrollbar{width:6px;}
@@ -4694,26 +4695,19 @@ const ThreeView = (() => {
   }
 
   // ---- 时间线 ----
-  // 卡片上默认只放最近 3 条，「查看全部」弹出可滚动的长列表
-  const evStore = {};
-  const tlItems = list => list.map(e => `
+  // 关键处置事件：按日期倒序，框内滑动；默认可视约 3 条，「展开」后可视约 10 条（仍可继续滑动）
+  function renderTimeline(events) {
+    if (!events || !events.length) return '<div class="t3-empty">暂无关键处置事件</div>';
+    const list = events.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    const items = list.map(e => `
       <div class="t3-tl ${e.st || 'b'}">
         <div class="t3-tl-date">${esc(e.date || '')}</div>
         <div class="t3-tl-title">${esc(e.title || '')}</div>
         <div class="t3-tl-desc">${esc(e.desc || '')}</div>
       </div>`).join('');
-  function renderTimeline(events, key, title) {
-    if (!events || !events.length) return '<div class="t3-empty">暂无关键处置事件</div>';
-    const list = events.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
-    evStore[key] = { list, title: title || '关键处置事件' };
-    const more = list.length > 3 ? `<button class="t3-more" onclick="ThreeView.showEvents('${esc(key)}')">查看全部 ${list.length} 条 ›</button>` : '';
-    return `<div class="t3-tl-wrap short">${tlItems(list.slice(0, 3))}</div>${more}`;
-  }
-  function showEvents(key) {
-    const ev = evStore[key]; if (!ev) return;
-    Modal.open(`<h3>🚨 ${esc(ev.title)}（共 ${ev.list.length} 条）</h3>
-      <div class="t3-tl-wrap" style="max-height:60vh;margin-top:12px;">${tlItems(ev.list)}</div>
-      <div style="text-align:right;margin-top:12px;"><button class="btn btn-secondary" onclick="Modal.close()">关闭</button></div>`);
+    const more = list.length > 3
+      ? `<button class="t3-more" onclick="const w=this.previousElementSibling,on=w.classList.toggle('expanded');w.scrollTop=0;this.textContent=on?'收起 ▴':'展开（共 ${list.length} 条） ▾'">展开（共 ${list.length} 条） ▾</button>` : '';
+    return `<div class="t3-tl-wrap ev">${items}</div>${more}`;
   }
 
   // ---- 质量面板（预警/闭环/客诉 + 累积/增量 + 堆叠柱 + 甜甜圈 + 明细表）----
@@ -5022,7 +5016,7 @@ const ThreeView = (() => {
     const contacts = (d.contacts || []).map(c => `<div class="person"><div class="av">${esc((c.name || '?')[0])}</div><div><div>${esc(c.name || '')}</div><div class="role">${esc(c.role || '')}</div></div><div class="tel">${esc(c.tel || '')}</div></div>`).join('') || '<div class="t3-empty">暂无关键人</div>';
     const visits = (d.visits || []).map(v => `<div class="visit"><div class="dot" style="background:${v.st === 'r' ? 'var(--danger)' : v.st === 'o' ? 'var(--warn)' : 'var(--ok)'}"></div><div class="vt" title="${esc(v.t)}">${esc(v.t)}</div><div class="meta">${esc(v.who || '')} · <span class="pill ${v.st}">${esc(v.stTxt || '')}</span></div></div>`).join('') || '<div class="t3-empty">暂无拜访计划</div>';
     const meetings = (d.meetings || []).map(m => `<div class="meet"><div>${esc(m.t)}</div><div class="meta">${esc(m.m)}</div></div>`).join('') || '<div class="t3-empty">暂无会议</div>';
-    const events = renderTimeline(d.events, 'Cust');
+    const events = renderTimeline(d.events);
 
     host.innerHTML = `
       ${window.T3_EXTRA ? window.T3_EXTRA : ''}
@@ -5184,7 +5178,7 @@ const ThreeView = (() => {
     const sohSeg = `<div class="seg" id="t3SohAxis">${Object.keys(SOH_AXIS).map(k =>
       `<button data-x="${k}" class="${k === state.sohAxis ? 'on' : ''}">${SOH_AXIS[k]}</button>`).join('')}</div>`;
 
-    const eventsHtml = renderTimeline(d.events, 'Proj', '项目关键处置事件');
+    const eventsHtml = renderTimeline(d.events);
 
     host.innerHTML = `
       <!-- 信息条 -->
@@ -5352,7 +5346,7 @@ const ThreeView = (() => {
       <td class="num">${esc(r.soh || '—')}</td><td><span class="pill ${r.st || 'o'}">${esc(r.stTxt || '待核查')}</span></td></tr>`).join('')
       || '<tr><td colspan="7" class="t3-empty">暂无可追踪的异常电芯</td></tr>';
 
-    const eventsHtml = renderTimeline(d.events, 'Cell', '电芯批次关键处置事件');
+    const eventsHtml = renderTimeline(d.events);
 
     host.innerHTML = `
       <!-- 信息条 -->
@@ -5514,7 +5508,7 @@ const ThreeView = (() => {
   return {
     loadCustomer, loadProject, loadCell,
     renderCustomer, renderProject, renderCell,
-    gotoProject, gotoCell, gotoCustomer, showEvents, gotoRule,
+    gotoProject, gotoCell, gotoCustomer, gotoRule,
     setSwitch(fn) { onSwitch = fn; },
     setTimeRange(tr) { if (tr) state.timeRange = { mode: tr.mode || 'all', start: tr.start || '', end: tr.end || '' }; },
     getState() { return { view: state.view, oem: state.oem, cellCap: state.cellCap, timeRange: state.timeRange.mode || 'all' }; },
