@@ -1956,6 +1956,7 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .t3-kpi .lab{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);}
 .t3-kpi .val{font-size:23px;font-weight:800;margin-top:7px;letter-spacing:-.3px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .t3-kpi .val .v2{font-size:16px;font-weight:700;color:var(--ok);}   /* 「a / b」合并卡的第二个数 */
+.t3-kpi .val .vr{font-size:16px;font-weight:700;color:var(--muted);}   /* 「数（率）」卡的率，中性色 */
 .t3-kpi[title]{cursor:help;}
 .t3-kpi .sub{font-size:11px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .t3-kpi.hl .val{color:var(--accent);}
@@ -2292,7 +2293,7 @@ tbody tr:hover { background: var(--bg-card-hover); }
   var QUALITY_LABELS = months(48);   // 质量矩阵保留 4 年历史，便于演示长时间范围（>36 月按季度汇总）
   function randArr(n, base, spread) { var a = []; for (var i = 0; i < n; i++) a.push(Math.round((base || 0) + Math.random() * (spread || 20))); return a; }
   function fmtKpi() {
-    return { cellShip: 1523400, packShip: 48920, conn: 39800, insured: 28600, active: 40200, alarm: 4320, closed: 3610, alarm7: 168, closed7: 142, todoDone: 12, todoAll: 18 };
+    return { cellShip: 1523400, packShip: 48920, conn: 39800, insured: 28600, overdue: 186, active: 40200, alarm: 4320, closed: 3610, alarm7: 168, closed7: 142, todoDone: 12, todoAll: 18 };
   }
   function fmtProject() { return PROJECTS.map(function (p) { return Object.assign({}, p); }); }
   function makeQuality() {
@@ -4528,6 +4529,11 @@ const ThreeView = (() => {
   }
 
   // ---- KPI 卡 ----
+  // 过保数(率)：「1,944（0.38%）」，率 = 过保数 / 累计出货(Pack)
+  function overdueVal(n, base) {
+    if (n == null) return '-';
+    return `${fmt(n)}<span class="vr">（${base ? (100 * n / base).toFixed(2) : '0.00'}%）</span>`;
+  }
   function kpiCards(list) {
     // k.tip：口径说明放在悬停提示里，卡片上只留数字
     return list.map(k => `<div class="t3-kpi ${k.cls || ''}"${k.tip ? ` title="${esc(k.tip)}"` : ''}><div class="lab">${k.icon} ${esc(k.label)}</div><div class="val">${k.val}</div><div class="sub">${esc(k.sub || '')}</div></div>`).join('');
@@ -4731,7 +4737,7 @@ const ThreeView = (() => {
     const kpis = kpiCards([
       { icon: '🚗', label: '累计出货', val: wan(k.cellShip) + ' 颗', sub: `${fmt(k.packShip)} 包`, cls: 'hl', tip: '电芯出货累计，历史累计，不随时间筛选' },
       { icon: '📦', label: '累计接入', val: fmt(k.conn), tip: '历史累计，不随时间筛选' },
-      { icon: '🛡️', label: '已进保车辆', val: fmt(k.insured), tip: '当前质保状态（时点值）' },
+      { icon: '⏳', label: '过保数(率)', val: overdueVal(k.overdue, k.packShip), tip: '过保 = 超出质保条款；过保率 = 过保数 / 累计出货(Pack)' },
       { icon: '⚡', label: '活跃车辆', val: fmt(k.active), sub: '近90天', tip: '近90天有数据上报的车辆' },
       { icon: '⚠️', label: '预警外发 / 已闭环', val: two(fmt(k.alarm), fmt(k.closed)), sub: `闭环率 ${closeRate}`, cls: 'bad', tip: '历史累计' },
       { icon: '📊', label: '近7天预警 / 闭环', val: two(k.alarm7 || 0, k.closed7 || 0), cls: 'bad' },
@@ -4909,7 +4915,7 @@ const ThreeView = (() => {
       { icon: lv.icon, label: `累计出货（${state.level}）`, val: wan(lvVal) + ' ' + lv.unit, sub: lvSub, cls: 'hl', tip: '出货条码累计' },
       { icon: '📥', label: '累计接入', val: fmt(info.conn), sub: `接入率 ${connRate}`, tip: '接入率 = 接入 / 出货(Pack)' },
       { icon: '🗓️', label: '近15天接入', val: fmt(info.access15 != null ? info.access15 : '-'), tip: '近15天有接入记录的车辆' },
-      { icon: '🛡️', label: '已进保 / 过保', val: two(info.insured == null ? '-' : fmt(info.insured), fmt(info.overdue)), sub: `过保率 ${info.packShip ? (100 * (info.overdue || 0) / info.packShip).toFixed(2) : 0}%`, tip: '过保 = 超出质保条款' },
+      { icon: '⏳', label: '过保数(率)', val: overdueVal(info.overdue, info.packShip), tip: '过保 = 超出质保条款；过保率 = 过保数 / 累计出货(Pack)' },
       { icon: '⚠️', label: '预警外发 / 已闭环', val: two(fmt(info.alarm), fmt(info.closed)), sub: `闭环率 ${closeRate}`, cls: 'bad', tip: '历史累计' },
       { icon: '📊', label: '近7天预警 / 闭环', val: two(info.alarm7 || 0, info.closed7 || 0), cls: 'bad' },
     ]);
