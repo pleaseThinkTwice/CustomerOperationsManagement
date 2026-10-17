@@ -234,6 +234,7 @@ body {
 .main-content {
     margin-left: var(--sidebar-width);
     flex: 1;
+    min-width: 0;          /* 宽表格不再把整页撑出横向滚动，改为表格容器内滚动 */
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -1934,7 +1935,7 @@ tbody tr:hover { background: var(--bg-card-hover); }
 /* 骨架屏：数据回来前先占好版面，避免整页跳动 */
 .t3-skel{padding:0;}
 .t3-skel .sk{border-radius:14px;background:linear-gradient(90deg,var(--panel) 25%,var(--bg-card-hover) 50%,var(--panel) 75%);background-size:200% 100%;animation:t3sk 1.2s ease-in-out infinite;border:1px solid var(--line);}
-.t3-skel .sk-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:14px;}
+.t3-skel .sk-kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:14px;}
 .t3-skel .sk-kpis .sk{height:92px;}
 .t3-skel .sk-row{display:grid;grid-template-columns:1.25fr 1fr;gap:14px;margin-bottom:14px;}
 .t3-skel .sk-row .sk{height:260px;}
@@ -1949,11 +1950,12 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .p1-toolbar select{width:auto;min-width:150px;max-width:240px;height:34px;padding:4px 10px;font-size:13px;}
 .p1-toolbar .p1-sep{width:1px;height:22px;background:var(--line-strong);}
 .t3-empty{border:1.5px dashed var(--line);border-radius:12px;padding:18px;text-align:center;color:var(--muted);font-size:13px;}
-.t3-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:14px;}
+.t3-kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:14px;}
 @media(max-width:1280px){.t3-kpis{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:640px){.t3-kpis{grid-template-columns:repeat(2,1fr);}}
-.t3-kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);}
-.t3-kpi .lab{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);}
+.tblwrap{overflow-x:auto;}
+.t3-kpi{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);}
+.t3-kpi .lab{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .t3-kpi .val{font-size:23px;font-weight:800;margin-top:7px;letter-spacing:-.3px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .t3-kpi .val .v2{font-size:16px;font-weight:700;color:var(--ok);}   /* 「a / b」合并卡的第二个数 */
 .t3-kpi .val .vr{font-size:16px;font-weight:700;color:var(--muted);}   /* 「数（率）」卡的率，中性色 */
@@ -2008,6 +2010,7 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .t3-tbl td{padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:middle;}
 /* 对齐规则：文本/编号列与数值列(.num，等宽数字)均左对齐；状态/操作列(.ctr)居中；表头与该列内容同向 */
 .t3-tbl .ctr{text-align:center;}
+.t3-tbl.dense th,.t3-tbl.dense td{padding-left:9px;padding-right:9px;}   /* 列多的表收紧左右留白，尽量一屏放下 */
 .t3-tbl tbody tr:hover{background:var(--bg-secondary);}
 .t3-tbl .num{text-align:left;font-variant-numeric:tabular-nums;}
 .t3-tbl .lk{color:var(--accent);cursor:pointer;font-weight:600;}
@@ -2275,10 +2278,10 @@ tbody tr:hover { background: var(--bg-card-hover); }
     { oem: 'NIO',  oem_ch: '蔚来汽车',     name_cn: '蔚来',     level: 'A级', relationship_status: '稳定合作' },
   ];
   var PROJECTS = [
-    { name: '153Ah 铁锂', cap: 153, struct: '1P204S', sop: '2025-06', pack: 20240, conn: 15300, connRate: 75.6, overdue: 12, alarm: 320, closed: 240, alarm7: 28 },
-    { name: '100Ah 方壳', cap: 100, struct: '1P96S',  sop: '2024-10', pack: 12800, conn: 11200, connRate: 87.5, overdue: 8,  alarm: 180, closed: 150, alarm7: 15 },
-    { name: '75Ah 刀片',  cap: 75,  struct: '1P120S', sop: '2023-05', pack: 9800,  conn: 8300,  connRate: 84.7, overdue: 5,  alarm: 96,  closed: 88,  alarm7: 6 },
-    { name: '50Ah 圆柱',  cap: 50,  struct: '2P90S',  sop: '2023-01', pack: 6100,  conn: 5000,  connRate: 82.0, overdue: 3,  alarm: 54,  closed: 49,  alarm7: 4 },
+    { name: '153Ah 铁锂', cap: 153, struct: '1P204S', sop: '2025-06', pack: 20240, conn: 15300, connRate: 75.6, overdue: 12, alarm: 320, closed: 240, packIdMiss: 214, alarm7: 28 },
+    { name: '100Ah 方壳', cap: 100, struct: '1P96S',  sop: '2024-10', pack: 12800, conn: 11200, connRate: 87.5, overdue: 8,  alarm: 180, closed: 150, packIdMiss: 96, alarm7: 15 },
+    { name: '75Ah 刀片',  cap: 75,  struct: '1P120S', sop: '2023-05', pack: 9800,  conn: 8300,  connRate: 84.7, overdue: 5,  alarm: 96,  closed: 88,  packIdMiss: 141, alarm7: 6 },
+    { name: '50Ah 圆柱',  cap: 50,  struct: '2P90S',  sop: '2023-01', pack: 6100,  conn: 5000,  connRate: 82.0, overdue: 3,  alarm: 54,  closed: 49,  packIdMiss: 60, alarm7: 4 },
   ];
   var MODES = ['绝缘故障', 'SOC 一致性', '容量衰减', '自放电异常', '压差报警', '热失控预警'];
   function months(n) {
@@ -2293,7 +2296,7 @@ tbody tr:hover { background: var(--bg-card-hover); }
   var QUALITY_LABELS = months(48);   // 质量矩阵保留 4 年历史，便于演示长时间范围（>36 月按季度汇总）
   function randArr(n, base, spread) { var a = []; for (var i = 0; i < n; i++) a.push(Math.round((base || 0) + Math.random() * (spread || 20))); return a; }
   function fmtKpi() {
-    return { cellShip: 1523400, packShip: 48920, conn: 39800, insured: 28600, overdue: 186, active: 40200, alarm: 4320, closed: 3610, alarm7: 168, closed7: 142, todoDone: 12, todoAll: 18 };
+    return { cellShip: 1523400, packShip: 48920, conn: 39800, packIdMiss: 511, insured: 28600, overdue: 186, active: 40200, alarm: 4320, closed: 3610, alarm7: 168, closed7: 142, todoDone: 12, todoAll: 18 };
   }
   function fmtProject() { return PROJECTS.map(function (p) { return Object.assign({}, p); }); }
   function makeQuality() {
@@ -2320,9 +2323,9 @@ tbody tr:hover { background: var(--bg-card-hover); }
     if (view === 'project') {
       return {
         view: 'project', oem: q.oem || OEM, cellCap: q.cell_cap || '153',
-        info: { packShip: 20240, moduleShip: 8096, cellShip: 827000, conn: 15300, access15: 312, connRate: 75.6, insured: 11000, overdue: 12, alarm: 320, closed: 240, alarm7: 28, closed7: 22, struct: '1P204S', cap: q.cell_cap || 153, s: 204, sop: '2025-06', qy: '8年', qkm: '30万', qsoh: '80' },
+        info: { packShip: 20240, moduleShip: 8096, cellShip: 827000, conn: 15300, packIdMiss: 214, access15: 312, connRate: 75.6, insured: 11000, overdue: 12, alarm: 320, closed: 240, alarm7: 28, closed7: 22, struct: '1P204S', cap: q.cell_cap || 153, s: 204, sop: '2025-06', qy: '8年', qkm: '30万', qsoh: '80' },
         trend: makeTrend(),
-        cars: [{ name: '小米SU7', vehicle_model: 'SU7', struct: '1P204S', conn: 9600, overdue: 7, alarm: 180 }, { name: '小米YU7', vehicle_model: 'YU7', struct: '1P204S', conn: 5700, overdue: 5, alarm: 140 }],
+        cars: [{ name: '小米SU7', vehicle_model: 'SU7', struct: '1P204S', conn: 9600, packIdMiss: 130, overdue: 7, alarm: 180 }, { name: '小米YU7', vehicle_model: 'YU7', struct: '1P204S', conn: 5700, packIdMiss: 84, overdue: 5, alarm: 140 }],
         warranty: [{ vehicle_model: '小米SU7', pn: 'XR153-01', years: 8, mileage: 300000, soh: 80 }],
         modesDetail: MODES.map(function (m) { return { name: m, count: Math.round(Math.random() * 40 + 5) }; }),
         modes: MODES.map(function (m) { return { name: m, count: Math.round(Math.random() * 60 + 10) }; }),
@@ -2333,8 +2336,8 @@ tbody tr:hover { background: var(--bg-card-hover); }
     if (view === 'cell') {
       return {
         view: 'cell', cellCap: q.cell_cap || '153',
-        rows: CUSTOMERS.map(function (c, i) { return { oem: c.oem, cap: q.cell_cap || 153, pack: 8000 + i * 1000, cell: 30000 + i * 5000, conn: 6000 + i * 800, year: 3000 + i * 400, alarm: 40 + i * 8, closed: 30 + i * 6 }; }),
-        info: { pack: 48920, cell: 1523400, conn: 39800, alarm: 4320, closed: 3610, ppm: 18, year: 21800, custCount: 5 },
+        rows: CUSTOMERS.map(function (c, i) { return { oem: c.oem, cap: q.cell_cap || 153, pack: 8000 + i * 1000, cell: 30000 + i * 5000, conn: 6000 + i * 800, packIdMiss: 60 + i * 12, year: 3000 + i * 400, alarm: 40 + i * 8, closed: 30 + i * 6 }; }),
+        info: { pack: 48920, cell: 1523400, conn: 39800, packIdMiss: 420, alarm: 4320, closed: 3610, ppm: 18, year: 21800, custCount: 5 },
         modes: MODES.map(function (m) { return { name: m, count: Math.round(Math.random() * 100 + 20) }; }),
         outgoingModes: MODES.map(function (m) { return { name: m, count: Math.round(Math.random() * 90 + 15) }; }),
         batches: PROJECTS.map(function (p, i) { return { cust: OEM, batch: 'B2309' + (i + 1) + 'A', plant: '宁德基地', qty: 8000 + i * 2000, failed: 2 + i, ppm: Math.round((2 + i) / (8000 + i * 2000) * 1e6), status: i === 0 ? '预警中' : '关注' }; }),
@@ -4529,6 +4532,15 @@ const ThreeView = (() => {
   }
 
   // ---- KPI 卡 ----
+  // pack_id 缺失率 = 接入车辆中 pack_id 缺失数 / 接入数
+  function missRate(miss, conn) { return miss == null || !conn ? '-' : (100 * miss / conn).toFixed(2) + '%'; }
+  function missCard(miss, conn) {
+    return { icon: '🆔', label: 'pack_id缺失率', val: missRate(miss, conn), sub: miss == null ? '' : `缺失 ${fmt(miss)} / 接入 ${fmt(conn)}`, tip: 'pack_id 缺失率 = 接入车辆中 pack_id 缺失数 / 接入数' };
+  }
+  function missTd(miss, conn, bold) {
+    const v = esc(missRate(miss, conn));
+    return `<td class="num" title="缺失 ${fmt(miss)} / 接入 ${fmt(conn)}">${bold ? `<b>${v}</b>` : v}</td>`;
+  }
   // 过保数(率)：「1,944（0.38%）」，率 = 过保数 / 累计出货(Pack)
   function overdueVal(n, base) {
     if (n == null) return '-';
@@ -4737,6 +4749,7 @@ const ThreeView = (() => {
     const kpis = kpiCards([
       { icon: '🚗', label: '累计出货', val: wan(k.cellShip) + ' 颗', sub: `${fmt(k.packShip)} 包`, cls: 'hl', tip: '电芯出货累计，历史累计，不随时间筛选' },
       { icon: '📦', label: '累计接入', val: fmt(k.conn), tip: '历史累计，不随时间筛选' },
+      missCard(k.packIdMiss, k.conn),
       { icon: '⏳', label: '过保数(率)', val: overdueVal(k.overdue, k.packShip), tip: '过保 = 超出质保条款；过保率 = 过保数 / 累计出货(Pack)' },
       { icon: '⚡', label: '活跃车辆', val: fmt(k.active), sub: '近90天', tip: '近90天有数据上报的车辆' },
       { icon: '⚠️', label: '预警外发 / 已闭环', val: two(fmt(k.alarm), fmt(k.closed)), sub: `闭环率 ${closeRate}`, cls: 'bad', tip: '历史累计' },
@@ -4760,11 +4773,11 @@ const ThreeView = (() => {
       return `<tr style="cursor:pointer" onclick="ThreeView.gotoProject('${esc(oem)}','${esc(p.cap)}')">
         <td><b>${esc(p.name)}</b></td><td class="num">${esc(p.cap)}</td><td>${esc(p.struct || '-')}</td>
         <td><span class="pill g">量产</span></td><td>${esc(p.sop || '-')}</td>
-        <td class="num">${fmt(p.pack)}</td><td class="num">${fmt(p.conn)}</td><td class="num">${esc(connRate)}</td>
+        <td class="num">${fmt(p.pack)}</td><td class="num">${fmt(p.conn)}</td><td class="num">${esc(connRate)}</td>${missTd(p.packIdMiss, p.conn)}
         <td class="num">${fmt(p.overdue)}（${esc(odRate)}）</td><td class="num">${fmt(p.alarm)}</td>
         <td class="num">${fmt(p.closed)}（${esc(clRate)}）</td>
         <td><span class="lk">进入项目视角 →</span></td></tr>`;
-    }).join('') || '<tr><td colspan="12" class="t3-empty">暂无电芯项目数据</td></tr>';
+    }).join('') || '<tr><td colspan="13" class="t3-empty">暂无电芯项目数据</td></tr>';
 
     // 失效模式汇总（响应时间筛选 + 累积/增量）
     const fq = filterQuality(d.quality || { labels: [], alarm: {}, closed: {}, complaint: {} });
@@ -4846,8 +4859,8 @@ const ThreeView = (() => {
       <!-- 项目列表 -->
       <div class="t3-card">
         <div class="chead"><div><div class="ctitle" title="一行 = 一款电芯（容量 × 结构），点击行进入项目视角">🗂️ 电芯项目</div></div></div>
-        <div class="tblwrap"><table class="t3-tbl">${colg(12, 7, 8, 7, 7, 10, 7, 7, 9, 7, 9, 10)}<thead>
-          <tr><th>电芯项目</th><th class="num">容量(Ah)</th><th>电池结构</th><th class="ctr">状态</th><th>SOP</th><th class="num">累计出货(Pack)</th><th class="num">接入数</th><th class="num">接入率</th><th class="num">过保数(率)</th><th class="num">预警外发</th><th class="num">已闭环(率)</th><th class="ctr">操作</th></tr>
+        <div class="tblwrap"><table class="t3-tbl dense">${colg(11, 6, 7, 6, 7, 9, 7, 6, 8, 8, 7, 9, 9)}<thead>
+          <tr><th>电芯项目</th><th class="num">容量(Ah)</th><th>电池结构</th><th class="ctr">状态</th><th>SOP</th><th class="num">累计出货(Pack)</th><th class="num">接入数</th><th class="num">接入率</th><th class="num">pack_id缺失率</th><th class="num">过保数(率)</th><th class="num">预警外发</th><th class="num">已闭环(率)</th><th class="ctr">操作</th></tr>
         </thead><tbody>${projRows}</tbody></table></div>
       </div>
       <!-- 关键人 / 拜访 / 会议：每块都能直接新增或跳到对应页面 -->
@@ -4914,6 +4927,7 @@ const ThreeView = (() => {
     const kpis = kpiCards([
       { icon: lv.icon, label: `累计出货（${state.level}）`, val: wan(lvVal) + ' ' + lv.unit, sub: lvSub, cls: 'hl', tip: '出货条码累计' },
       { icon: '📥', label: '累计接入', val: fmt(info.conn), sub: `接入率 ${connRate}`, tip: '接入率 = 接入 / 出货(Pack)' },
+      missCard(info.packIdMiss, info.conn),
       { icon: '🗓️', label: '近15天接入', val: fmt(info.access15 != null ? info.access15 : '-'), tip: '近15天有接入记录的车辆' },
       { icon: '⏳', label: '过保数(率)', val: overdueVal(info.overdue, info.packShip), tip: '过保 = 超出质保条款；过保率 = 过保数 / 累计出货(Pack)' },
       { icon: '⚠️', label: '预警外发 / 已闭环', val: two(fmt(info.alarm), fmt(info.closed)), sub: `闭环率 ${closeRate}`, cls: 'bad', tip: '历史累计' },
@@ -4945,9 +4959,9 @@ const ThreeView = (() => {
       const pct = info.packShip ? (100 * (c.conn || 0) / info.packShip).toFixed(1) + '%' : '-';
       const apct = info.alarm && c.alarm ? (100 * (c.alarm || 0) / info.alarm).toFixed(1) + '%' : '-';
       return `<tr><td><b>${esc(c.name || c.vehicle_model || '-')}</b></td><td>${esc(c.struct || '-')}</td>
-        <td class="num">${fmt(c.conn)}</td><td class="num">${esc(pct)}</td>
+        <td class="num">${fmt(c.conn)}</td><td class="num">${esc(pct)}</td>${missTd(c.packIdMiss, c.conn)}
         <td class="num">${fmt(c.overdue)}</td><td class="num">${fmt(c.alarm)}</td><td class="num">${esc(apct)}</td></tr>`;
-    }).join('') || '<tr><td colspan="7" class="t3-empty">暂无适用车型明细</td></tr>';
+    }).join('') || '<tr><td colspan="8" class="t3-empty">暂无适用车型明细</td></tr>';
 
     // 质保台账
     const wRows = (d.warranty || []).map(w => {
@@ -5006,7 +5020,7 @@ const ThreeView = (() => {
       <!-- 适用车型 -->
       <div class="t3-card">
         <div class="chead"><div><div class="ctitle" title="该电芯项目下所有车型">🚗 适用车型明细</div></div></div>
-        <div class="tblwrap"><table class="t3-tbl">${colg(18, 17, 13, 13, 13, 13, 13)}<thead><tr><th>车型</th><th>电池结构</th><th class="num">接入</th><th class="num">占比</th><th class="num">过保数</th><th class="num">预警外发</th><th class="num">预警占比</th></tr></thead><tbody>${carRows}</tbody></table></div>
+        <div class="tblwrap"><table class="t3-tbl">${colg(16, 15, 12, 11, 12, 11, 12, 11)}<thead><tr><th>车型</th><th>电池结构</th><th class="num">接入</th><th class="num">占比</th><th class="num">pack_id缺失率</th><th class="num">过保数</th><th class="num">预警外发</th><th class="num">预警占比</th></tr></thead><tbody>${carRows}</tbody></table></div>
       </div>
       <!-- 项目关键处置事件 -->
       <div class="t3-card">
@@ -5050,6 +5064,7 @@ const ThreeView = (() => {
     const kpis = kpiCards([
       { icon: '🔋', label: '电芯累计出货', val: wan(info.cell) + ' 颗', sub: `${fmt(info.pack)} 包 · ${info.custCount || 0} 客户`, cls: 'hl' },
       { icon: '📥', label: '接入电芯数', val: wan(info.conn) + ' 辆', tip: '已装车并接入' },
+      missCard(info.packIdMiss, info.conn),
       { icon: '⚠️', label: '失效电芯数', val: fmt(info.alarm), cls: 'bad', tip: '关联预警外发' },
       { icon: '✅', label: '市场已闭环', val: fmt(info.closed), sub: `闭环率 ${closeRate}`, cls: 'ok' },
       { icon: '📉', label: '失效率（ppm）', val: info.ppm != null ? info.ppm : '0', cls: (info.ppm || 0) > 20 ? 'bad' : '', tip: '失效 / 出货 × 10⁶' },
@@ -5064,13 +5079,13 @@ const ThreeView = (() => {
       return `<tr style="cursor:pointer" onclick="ThreeView.gotoProject('${esc(r.oem)}','${esc(r.cap || d.cellCap)}')">
         <td><b>${esc(r.oem)}</b></td>
         <td class="num">${fmt(r.pack)}</td><td class="num">${fmt(r.cell)}</td><td class="num">${fmt(r.conn)}</td>
-        <td class="num">${fmt(r.year)}</td><td class="num">${fmt(r.alarm)}</td>
+        <td class="num">${fmt(r.year)}</td>${missTd(r.packIdMiss, r.conn)}<td class="num">${fmt(r.alarm)}</td>
         <td class="num">${fmt(r.closed)}（${esc(rClRate)}）</td><td class="num"><b>${esc(rPpm)}</b></td><td class="num">${esc(pct)}</td>
         <td><span class="lk">进入项目视角 →</span></td></tr>`;
-    }).join('') || '<tr><td colspan="10" class="t3-empty">暂无用该容量的客户</td></tr>';
+    }).join('') || '<tr><td colspan="11" class="t3-empty">暂无用该容量的客户</td></tr>';
     const sumRow = `<tr style="background:var(--bg-secondary)"><td><b>合计</b></td>
       <td class="num"><b>${fmt(info.pack)}</b></td><td class="num"><b>${fmt(info.cell)}</b></td><td class="num"><b>${fmt(info.conn)}</b></td>
-      <td class="num"><b>${fmt(info.year)}</b></td><td class="num"><b>${fmt(info.alarm)}</b></td>
+      <td class="num"><b>${fmt(info.year)}</b></td>${missTd(info.packIdMiss, info.conn, true)}<td class="num"><b>${fmt(info.alarm)}</b></td>
       <td class="num"><b>${fmt(info.closed)}（${esc(closeRate)}）</b></td><td class="num"><b>${esc(info.ppm != null ? info.ppm : '0')}</b></td><td class="num">100%</td><td>-</td></tr>`;
 
 
@@ -5116,8 +5131,8 @@ const ThreeView = (() => {
       <!-- 跨客户对比 -->
       <div class="t3-card">
         <div class="chead"><div><div class="ctitle" title="同一颗电芯，不同客户的质量差异一目了然">🏢 跨客户对比（该电芯所有客户）</div></div></div>
-        <div class="tblwrap"><table class="t3-tbl">${colg(10, 10, 10, 9, 9, 9, 12, 8, 9, 14)}<thead><tr>
-          <th>客户</th><th class="num">出货(Pack)</th><th class="num">出货(Cell)</th><th class="num">接入数</th><th class="num">今年接入</th>
+        <div class="tblwrap"><table class="t3-tbl">${colg(9, 9, 10, 8, 8, 9, 8, 11, 7, 8, 13)}<thead><tr>
+          <th>客户</th><th class="num">出货(Pack)</th><th class="num">出货(Cell)</th><th class="num">接入数</th><th class="num">今年接入</th><th class="num">pack_id缺失率</th>
           <th class="num">预警外发</th><th class="num">已闭环(率)</th><th class="num">ppm</th><th class="num">出货占比</th><th class="ctr">操作</th>
         </tr></thead><tbody>${custRows}${sumRow}</tbody></table></div>
       </div>
@@ -5174,7 +5189,7 @@ const ThreeView = (() => {
   // ==========================================================================
   // 骨架屏（保留 t3-loading 类：下载页面据此判断「尚未加载完成」）
   function skeleton(tip) {
-    const k = '<div class="sk"></div>'.repeat(6);
+    const k = '<div class="sk"></div>'.repeat(7);
     return `<div class="t3-loading t3-skel"><div class="sk-tip">${esc(tip)}</div>
       <div class="sk-kpis">${k}</div>
       <div class="sk-row"><div class="sk"></div><div class="sk"></div></div>
