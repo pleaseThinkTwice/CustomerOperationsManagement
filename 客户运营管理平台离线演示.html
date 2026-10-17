@@ -5049,7 +5049,10 @@ const ThreeView = (() => {
     if (state.sohPn && !sohPns.includes(state.sohPn)) state.sohPn = '';
     const sohBoxHtml = () => {
       const src = state.sohPn ? (sohSrc.byPn || {})[state.sohPn] : sohSrc;
-      return boxPlot((src || {})[state.sohAxis], parseFloat(info.qsoh), 900);
+      // 质保门槛：选 PN 取该 PN 质保台账的 SOH；整体仅当各 PN 门槛一致时显示，否则不画
+      const ws = (d.warranty || []).filter(w => w.soh != null && (!state.sohPn || w.pn === state.sohPn));
+      const thrs = [...new Set(ws.map(w => +w.soh))];
+      return boxPlot((src || {})[state.sohAxis], thrs.length === 1 ? thrs[0] : NaN, 900);
     };
     const sohPnSel = `<span class="p1-fgrp"><span class="p1-flab">PN</span><select id="t3SohPn"><option value="">整体</option>${
       sohPns.map(pn => `<option value="${esc(pn)}"${pn === state.sohPn ? ' selected' : ''}>${esc(pn)}</option>`).join('')}</select></span>`;
@@ -5142,6 +5145,7 @@ const ThreeView = (() => {
       }
       Object.assign(rec, vals);
       carEdit = -1; redrawCars();
+      document.getElementById('t3SohBox').innerHTML = sohBoxHtml();   // 质保 SOH 变了，门槛线同步
       Toast.show('质保条款已保存', 'success');
     });
     if (carTbl) carTbl.addEventListener('keydown', e => {
