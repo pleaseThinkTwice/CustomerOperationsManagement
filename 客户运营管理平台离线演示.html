@@ -1946,8 +1946,10 @@ tbody tr:hover { background: var(--bg-card-hover); }
 @media(max-width:640px){.t3-kpis{grid-template-columns:repeat(2,1fr);}}
 .t3-kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);}
 .t3-kpi .lab{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);}
-.t3-kpi .val{font-size:23px;font-weight:800;margin-top:7px;letter-spacing:-.3px;font-variant-numeric:tabular-nums;}
-.t3-kpi .sub{font-size:11px;color:var(--muted);margin-top:4px;}
+.t3-kpi .val{font-size:23px;font-weight:800;margin-top:7px;letter-spacing:-.3px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.t3-kpi .val .v2{font-size:16px;font-weight:700;color:var(--ok);}   /* 「a / b」合并卡的第二个数 */
+.t3-kpi[title]{cursor:help;}
+.t3-kpi .sub{font-size:11px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .t3-kpi.hl .val{color:var(--accent);}
 .t3-kpi.bad .val{color:var(--danger);}
 .t3-kpi.ok .val{color:var(--ok);}
@@ -1955,6 +1957,32 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .t3-card .chead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
 .t3-card .ctitle{font-weight:700;font-size:14px;}
 .t3-card .csub{font-size:12px;color:var(--muted);}
+.t3-card .ctitle[title]{cursor:help;}
+.t3-card .chead .acts{display:flex;gap:6px;align-items:center;}
+.t3-people{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+@media(max-width:1100px){.t3-people{grid-template-columns:1fr;}}
+.dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px;}
+.dm-grid .t3-card{margin-bottom:0;box-shadow:none;background:var(--bg-input);}
+/* ===== 可搜索下拉（SearchSelect）：模糊匹配 + 正则 ===== */
+.ss{position:relative;display:inline-flex;}
+.ss-trigger{display:inline-flex;align-items:center;gap:8px;min-width:150px;max-width:260px;height:34px;padding:0 10px;border:1px solid var(--border-card);border-radius:10px;background:var(--bg-input);color:var(--text-primary);font-size:13px;cursor:pointer;font-family:inherit;}
+.ss-trigger:hover,.ss.open .ss-trigger{border-color:var(--accent);}
+.ss-trigger .tx{flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ss-trigger .tx.ph{color:var(--text-muted);}
+.ss-trigger .ar{color:var(--text-muted);font-size:10px;}
+.ss-panel{position:fixed;z-index:3500;width:300px;background:var(--bg-secondary);border:1px solid var(--line-strong);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.35);display:flex;flex-direction:column;max-height:360px;}
+.ss-search{display:flex;gap:6px;padding:8px;border-bottom:1px solid var(--line);}
+.ss-search input{flex:1;height:30px;padding:4px 8px;font-size:12.5px;}
+.ss-re{flex:none;width:34px;height:30px;border:1px solid var(--border-card);border-radius:8px;background:var(--bg-input);color:var(--text-muted);font-family:var(--font-mono);font-size:12px;cursor:pointer;}
+.ss-re.on{background:var(--brand-soft);color:var(--accent);border-color:var(--accent);}
+.ss-list{overflow-y:auto;padding:4px;flex:1;}
+.ss-opt{padding:7px 10px;border-radius:7px;font-size:13px;color:var(--text-primary);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ss-opt.act{background:var(--bg-card-hover);}
+.ss-opt.sel{color:var(--accent);font-weight:700;}
+.ss-opt mark{background:var(--warn-soft);color:var(--warn);border-radius:3px;padding:0 1px;}
+.ss-foot{padding:6px 10px;border-top:1px solid var(--line);font-size:11px;color:var(--text-muted);display:flex;justify-content:space-between;gap:8px;}
+.ss-foot .err{color:var(--danger);}
+.ss-empty{padding:14px;text-align:center;font-size:12px;color:var(--text-muted);}
 .t3-grid2{display:grid;grid-template-columns:1.25fr 1fr;gap:14px;}
 .t3-grid2.equal{grid-template-columns:1fr 1fr;}
 .t3-grid2.r21{grid-template-columns:2fr 1fr;}   /* 左 2/3 + 右 1/3（质量面板：堆叠走势大图 + donut 占比小图） */
@@ -1964,7 +1992,9 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .chart circle.t3-dot{cursor:pointer;transition:r .12s;}
 .chart circle.t3-dot:hover{r:5.5;}
 /* 单图表下载按钮：默认半透明，图表容器 hover 时显现，不抢视觉 */
-.t3-svgdl{position:absolute;top:4px;right:4px;z-index:6;padding:1px 8px;font-size:11px;opacity:.35;transition:opacity .15s;}
+.t3-svgdl{position:absolute;top:4px;right:4px;z-index:6;padding:1px 8px;font-size:11px;opacity:0;pointer-events:none;transition:opacity .15s;}
+*:hover > .t3-svgdl{opacity:.85;pointer-events:auto;}   /* 鼠标移到图上才出现，不压坐标轴 */
+.t3-svgdl:hover{opacity:1;}
 .t3-svgdl:hover{opacity:1;}
 .t3-tbl{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap;}
 .t3-tbl th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);}
@@ -1987,6 +2017,8 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .qinfo b{color:var(--text-primary);}
 .qsub{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px;}
 .visit{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:13px;}
+.visit .vt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.visit .meta{flex:none;white-space:nowrap;}
 .visit:last-child{border-bottom:0;}
 .visit .dot{width:9px;height:9px;border-radius:50%;flex:none;}
 .visit .meta{margin-left:auto;font-size:12px;color:var(--muted);}
@@ -2019,7 +2051,7 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .t3-inner-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;}
 .t3-inner-grid .t3-card{margin-bottom:0;box-shadow:none;}
 @media(max-width:1280px){.t3-inner-grid{grid-template-columns:1fr;}}
-.t3-tl-wrap{max-height:480px;overflow-y:auto;padding-right:6px;}
+.t3-tl-wrap{max-height:480px;overflow-y:auto;padding:2px 6px 0 9px;}   /* 左侧留出圆点位置，避免被滚动容器裁掉 */
 .t3-tl-wrap::-webkit-scrollbar{width:6px;}
 .t3-tl-wrap::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
 /* 三视角顶栏（对齐原型 vswitch / 时间筛选 / 面包屑） */
@@ -3936,6 +3968,216 @@ window.TabEditor = {
     },
 };
 
+
+// ============ 可搜索下拉（SearchSelect）============
+// 给原生 <select> 套一层可搜索的下拉：原生 select 仍是值的来源（隐藏不删），
+// 选中后写回 select.value 并派发 change，原有 onchange 逻辑不用改。
+// 搜索：默认模糊匹配（空格分词，每个词按「连续子串 → 按顺序出现的字符」匹配，大小写不敏感）；
+//       点「.*」或输入 /正则/标志 进入正则匹配，正则无效时提示，不过滤。
+const SearchSelect = {
+    _open: null,   // 当前展开的实例
+
+    enhance(sel, opts) {
+        if (!sel || sel._ss) return sel && sel._ss;
+        opts = opts || {};
+        const wrap = document.createElement('span');
+        wrap.className = 'ss';
+        wrap.innerHTML = `<button type="button" class="ss-trigger"><span class="tx"></span><span class="ar">▾</span></button>`;
+        sel.parentNode.insertBefore(wrap, sel.nextSibling);
+        sel.style.display = 'none';
+        if (opts.minWidth) wrap.querySelector('.ss-trigger').style.minWidth = opts.minWidth;
+        const inst = { sel, wrap, trigger: wrap.querySelector('.ss-trigger'), regex: false, q: '', active: 0 };
+        sel._ss = inst;
+        inst.trigger.onclick = (e) => { e.stopPropagation(); this._open === inst ? this.close() : this.open(inst); };
+
+        // 代码里直接改 sel.value / selectedIndex 时同步显示文字
+        const proto = HTMLSelectElement.prototype;
+        ['value', 'selectedIndex'].forEach(k => {
+            const d = Object.getOwnPropertyDescriptor(proto, k);
+            Object.defineProperty(sel, k, {
+                configurable: true,
+                get() { return d.get.call(this); },
+                set(v) { d.set.call(this, v); SearchSelect._label(inst); },
+            });
+        });
+        // 选项被重新填充（innerHTML）时同步
+        new MutationObserver(() => this._label(inst)).observe(sel, { childList: true, subtree: true });
+        sel.addEventListener('change', () => this._label(inst));
+        this._label(inst);
+        return inst;
+    },
+
+    _label(inst) {
+        const o = inst.sel.options[inst.sel.selectedIndex];
+        const tx = inst.trigger.querySelector('.tx');
+        const text = o ? o.textContent : '';
+        tx.textContent = text || '请选择';
+        tx.classList.toggle('ph', !o || !o.value);
+        inst.trigger.title = text;
+    },
+
+    open(inst) {
+        this.close();
+        this._open = inst;
+        inst.wrap.classList.add('open');
+        const p = document.createElement('div');
+        p.className = 'ss-panel';
+        p.innerHTML = `<div class="ss-search">
+                <input type="text" placeholder="搜索，支持模糊匹配 / 正则 /^SH/i" autocomplete="off">
+                <button type="button" class="ss-re ${inst.regex ? 'on' : ''}" title="正则匹配">.*</button>
+            </div>
+            <div class="ss-list"></div>
+            <div class="ss-foot"><span class="cnt"></span><span class="err"></span></div>`;
+        document.body.appendChild(p);
+        inst.panel = p;
+        const r = inst.trigger.getBoundingClientRect();
+        p.style.width = Math.max(r.width, 280) + 'px';
+        p.style.left = Math.min(r.left, window.innerWidth - Math.max(r.width, 280) - 8) + 'px';
+        const below = window.innerHeight - r.bottom;
+        if (below < 300 && r.top > below) p.style.bottom = (window.innerHeight - r.top + 4) + 'px';
+        else p.style.top = (r.bottom + 4) + 'px';
+        const input = p.querySelector('input');
+        input.value = inst.q;
+        input.oninput = () => { inst.q = input.value; inst.active = 0; this._render(inst); };
+        input.onkeydown = (e) => this._key(inst, e);
+        p.querySelector('.ss-re').onclick = () => {
+            inst.regex = !inst.regex;
+            p.querySelector('.ss-re').classList.toggle('on', inst.regex);
+            inst.active = 0; this._render(inst); input.focus();
+        };
+        p.addEventListener('mousedown', e => e.stopPropagation());
+        this._render(inst, true);
+        input.focus();
+        input.select();
+    },
+
+    close() {
+        const inst = this._open;
+        if (!inst) return;
+        if (inst.panel) inst.panel.remove();
+        inst.panel = null;
+        inst.wrap.classList.remove('open');
+        this._open = null;
+    },
+
+    // 返回 null = 不匹配；否则返回 { score, html }（html 已转义并高亮命中部分）
+    _match(text, q, re) {
+        const esc = Utils.esc;
+        if (re) {
+            const m = text.match(re);
+            if (!m) return null;
+            const i = m.index, j = i + m[0].length;
+            return { score: i, html: esc(text.slice(0, i)) + (j > i ? `<mark>${esc(text.slice(i, j))}</mark>` : '') + esc(text.slice(j)) };
+        }
+        const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+        if (!words.length) return { score: 0, html: esc(text) };
+        const lower = text.toLowerCase();
+        const hit = new Array(text.length).fill(false);
+        let score = 0;
+        for (const w of words) {
+            const i = lower.indexOf(w);
+            if (i >= 0) {                       // 连续子串：越靠前分越高
+                for (let k = i; k < i + w.length; k++) hit[k] = true;
+                score += i;
+                continue;
+            }
+            let pos = 0, first = -1;            // 字符按顺序出现即可（如 sv 命中 SHEV，北京 也可写成 北 京）；不支持拼音
+            for (const ch of w) {
+                const k = lower.indexOf(ch, pos);
+                if (k < 0) return null;
+                if (first < 0) first = k;
+                hit[k] = true;
+                pos = k + 1;
+            }
+            score += 100 + (pos - first);       // 字符越分散分越低
+        }
+        let html = '', open = false;
+        for (let k = 0; k < text.length; k++) {
+            if (hit[k] && !open) { html += '<mark>'; open = true; }
+            if (!hit[k] && open) { html += '</mark>'; open = false; }
+            html += esc(text[k]);
+        }
+        if (open) html += '</mark>';
+        return { score, html };
+    },
+
+    _regex(inst) {
+        let src = inst.q, flags = 'i';
+        const m = /^\/(.*)\/([a-z]*)$/.exec(src);
+        if (m) { src = m[1]; flags = m[2] || ''; }
+        else if (!inst.regex) return { re: null };
+        if (!src) return { re: null };
+        try { return { re: new RegExp(src, flags.replace(/g/g, '')) }; }
+        catch (e) { return { err: '正则无效：' + e.message }; }
+    },
+
+    _render(inst, scrollToSel) {
+        const p = inst.panel;
+        if (!p) return;
+        const list = p.querySelector('.ss-list');
+        const { re, err } = this._regex(inst);
+        p.querySelector('.err').textContent = err || '';
+        const q = err ? '' : inst.q.trim();
+        const items = [];
+        Array.from(inst.sel.options).forEach((o, idx) => {
+            if (!o.value && q) return;   // 搜索时不显示「请选择」类占位项
+            const text = o.textContent;
+            const r = re ? (this._match(text, '', re) || this._match(o.value, '', re) && { score: 50, html: Utils.esc(text) })
+                         : this._match(text, q, null);
+            if (r) items.push({ idx, o, ...r });
+        });
+        if (q && !re) items.sort((a, b) => a.score - b.score);
+        inst.items = items;
+        if (inst.active >= items.length) inst.active = Math.max(0, items.length - 1);
+        if (scrollToSel) {
+            const k = items.findIndex(it => it.idx === inst.sel.selectedIndex);
+            if (k >= 0) inst.active = k;
+        }
+        list.innerHTML = items.length
+            ? items.map((it, k) => `<div class="ss-opt ${k === inst.active ? 'act' : ''} ${it.idx === inst.sel.selectedIndex ? 'sel' : ''}" data-k="${k}" title="${Utils.esc(it.o.textContent)}">${it.html}</div>`).join('')
+            : '<div class="ss-empty">没有匹配项</div>';
+        list.querySelectorAll('.ss-opt').forEach(el => {
+            el.onmousemove = () => { if (inst.active !== +el.dataset.k) { inst.active = +el.dataset.k; this._hl(inst); } };
+            el.onclick = () => this._pick(inst, +el.dataset.k);
+        });
+        p.querySelector('.cnt').textContent = `${items.length} 项${re ? ' · 正则' : (q ? ' · 模糊' : '')}`;
+        this._hl(inst);
+    },
+
+    _hl(inst) {
+        const list = inst.panel && inst.panel.querySelector('.ss-list');
+        if (!list) return;
+        list.querySelectorAll('.ss-opt').forEach(el => el.classList.toggle('act', +el.dataset.k === inst.active));
+        const a = list.querySelector('.ss-opt.act');
+        if (a) a.scrollIntoView({ block: 'nearest' });
+    },
+
+    _key(inst, e) {
+        const n = (inst.items || []).length;
+        if (e.key === 'ArrowDown') { e.preventDefault(); if (n) { inst.active = (inst.active + 1) % n; this._hl(inst); } }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); if (n) { inst.active = (inst.active - 1 + n) % n; this._hl(inst); } }
+        else if (e.key === 'Enter') { e.preventDefault(); if (n) this._pick(inst, inst.active); }
+        else if (e.key === 'Escape') { e.preventDefault(); this.close(); inst.trigger.focus(); }
+    },
+
+    _pick(inst, k) {
+        const it = (inst.items || [])[k];
+        if (!it) return;
+        const changed = inst.sel.selectedIndex !== it.idx;
+        inst.sel.selectedIndex = it.idx;
+        inst.q = '';
+        this.close();
+        if (changed) inst.sel.dispatchEvent(new Event('change', { bubbles: true }));
+    },
+};
+document.addEventListener('mousedown', () => SearchSelect.close());
+window.addEventListener('resize', () => SearchSelect.close());
+document.addEventListener('scroll', (e) => {
+    // 面板内部列表滚动不关闭，页面滚动时关闭（面板是 fixed 定位，不跟随）
+    if (SearchSelect._open && SearchSelect._open.panel && SearchSelect._open.panel.contains(e.target)) return;
+    SearchSelect.close();
+}, true);
+window.SearchSelect = SearchSelect;
 </script>
 
 <!-- /static/js/pages/dashboard_three.js -->
@@ -4205,7 +4447,8 @@ const ThreeView = (() => {
 
   // ---- KPI 卡 ----
   function kpiCards(list) {
-    return list.map(k => `<div class="t3-kpi ${k.cls || ''}"><div class="lab">${k.icon} ${esc(k.label)}</div><div class="val">${k.val}</div><div class="sub">${esc(k.sub || '')}</div></div>`).join('');
+    // k.tip：口径说明放在悬停提示里，卡片上只留数字
+    return list.map(k => `<div class="t3-kpi ${k.cls || ''}"${k.tip ? ` title="${esc(k.tip)}"` : ''}><div class="lab">${k.icon} ${esc(k.label)}</div><div class="val">${k.val}</div><div class="sub">${esc(k.sub || '')}</div></div>`).join('');
   }
 
   // ---- 排名条 ----
@@ -4324,43 +4567,43 @@ const ThreeView = (() => {
     const m = state.qmetric, meta = QMETA[m];
     const byMode = metricByMode(fq, m);
     const total = byMode.reduce((s, x) => s + x.value, 0);
-    // donut 用全量：预警外发口径直接取 outgoingModes（Doris 历史外发聚合，与客户/项目
-    // 视角占比 donut 同一份源数据；分布查询会丢弃无月份行导致少 ~1%），闭环/客诉为本地
-    // 近似按月摊布，全量求和即本地总量。
-    const byModeAll = (m === 'alarm' && outgoingModes && outgoingModes.length)
-      ? outgoingModes.map(x => ({ label: x.name, value: x.count, color: modeColor(x.name) }))
-        .filter(x => x.value > 0).sort((a, b) => b.value - a.value)
-      : metricByMode(q, m);
-    const totalAll = byModeAll.reduce((s, x) => s + x.value, 0);
+    // 环形图、明细表、区间合计统一按当前时间范围统计，避免同一张卡上两个总数对不上
     const accLabel = state.qacc ? '累积量' : '月增量';
     const metricTabs = Object.keys(QMETA).map(k => `<button data-qm="${k}" class="${k === m ? 'on' : ''}">${QMETA[k].icon} ${QMETA[k].label}</button>`).join('');
     const accTabs = `<button data-qa="0" class="${!state.qacc ? 'on' : ''}">月增量</button><button data-qa="1" class="${state.qacc ? 'on' : ''}">累积量</button>`;
     const labels = fq.labels || [];
     const range = labels.length ? `${labels[0]} ~ ${labels[labels.length - 1]}` : '-';
-    const modeTable = `<table class="t3-tbl"><thead><tr><th>失效模式</th><th class="num">${esc(meta.label)}（${esc(accLabel)}）</th><th class="num">占比</th><th class="num">涉及月份</th></tr></thead><tbody>${
-      byMode.map(x => {
-        const months = labels.filter((_, i) => (fq[m][x.label] || [])[i] > 0).length;
-        return `<tr><td><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${esc(x.color)};margin-right:7px"></i><b>${esc(x.label)}</b></td><td class="num"><b>${fmt(x.value)}</b></td><td class="num">${total ? (100 * x.value / total).toFixed(1) : 0}%</td><td class="num">${months} 个月</td></tr>`;
-      }).join('')
-    }<tr style="background:var(--bg-secondary)"><td><b>合计</b></td><td class="num"><b>${fmt(total)}</b></td><td class="num">100%</td><td class="num">${labels.length} 个月</td></tr></tbody></table>`;
+    // 明细：预警 / 闭环 / 闭环率 / 客诉 一张表（原「客户重点失效模式」并入这里）
+    const sumOf = (metric, mode) => {
+      const arr = (fq[metric] || {})[mode] || [];
+      return state.qacc ? (arr[arr.length - 1] || 0) : arr.reduce((a, v) => a + v, 0);
+    };
+    const allModes = Array.from(new Set([].concat(Object.keys(fq.alarm || {}), Object.keys(fq.closed || {}), Object.keys(fq.complaint || {}))));
+    const rows = allModes.map(mode => ({ mode, alarm: sumOf('alarm', mode), closed: sumOf('closed', mode), complaint: sumOf('complaint', mode) }))
+      .filter(r => r.alarm || r.closed || r.complaint)
+      .sort((a, b) => b[m] - a[m]);
+    const tot = rows.reduce((t, r) => ({ alarm: t.alarm + r.alarm, closed: t.closed + r.closed, complaint: t.complaint + r.complaint }), { alarm: 0, closed: 0, complaint: 0 });
+    const rate = (c, a) => a ? (100 * c / a).toFixed(1) + '%' : '-';
+    const share = v => tot[m] ? (100 * v / tot[m]).toFixed(1) + '%' : '-';
+    const modeTable = `<table class="t3-tbl"><thead><tr><th>失效模式</th><th class="num">⚠️ 预警外发</th><th class="num">✅ 闭环</th><th class="num">闭环率</th><th class="num">📣 客诉</th><th class="num">${esc(meta.label)}占比</th></tr></thead><tbody>${
+      rows.map(r => `<tr><td><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${modeColor(r.mode)};margin-right:7px"></i><b>${esc(r.mode)}</b></td>
+        <td class="num"><b>${fmt(r.alarm)}</b></td><td class="num">${fmt(r.closed)}</td><td class="num">${rate(r.closed, r.alarm)}</td>
+        <td class="num">${fmt(r.complaint)}</td><td class="num">${share(r[m])}</td></tr>`).join('')
+    }<tr style="background:var(--bg-secondary)"><td><b>合计</b></td><td class="num"><b>${fmt(tot.alarm)}</b></td><td class="num"><b>${fmt(tot.closed)}</b></td><td class="num">${rate(tot.closed, tot.alarm)}</td><td class="num"><b>${fmt(tot.complaint)}</b></td><td class="num">100%</td></tr></tbody></table>`;
     container.innerHTML = `<div class="qpanel">
       <div class="qtabs">
         <div class="seg" id="t3QM${key}">${metricTabs}</div>
         <div class="seg" id="t3QA${key}">${accTabs}</div>
-        <span class="qinfo">区间 ${esc(range)} · ${esc(accLabel)} · 全量共 <b>${fmt(totalAll)}</b>${esc(meta.unit)}</span>
+        <span class="qinfo">${esc(range)} · ${esc(meta.label)}合计 <b>${fmt(total)}</b>${esc(meta.unit)}</span>
       </div>
-      ${key === 'Proj'
-        ? `<div>
-            <div class="qsub">${meta.icon} ${esc(meta.label)}走势（按月×失效模式堆叠 · 近${labels.length}个月）</div>${stackedBar(fq, m)}
-          </div>`
-        : `<div class="t3-grid2 r21">
-            <div><div class="qsub">${meta.icon} ${esc(meta.label)}走势（按月×失效模式堆叠 · 近${labels.length}个月）</div>${stackedBar(fq, m)}</div>
-            <div style="display:flex;flex-direction:column;">
-              <div class="qsub">${meta.icon} ${esc(meta.label)}按失效模式 · 全量</div>
-              <div style="flex:1;display:flex;align-items:center;">${donut(byModeAll)}</div>
-            </div>
-          </div>`}
-      <div style="margin-top:12px"><div class="qsub">${meta.icon} ${esc(meta.label)}明细（by 失效模式 · 随时间筛选）</div>${modeTable}</div>
+      <div class="t3-grid2 r21">
+        <div><div class="qsub">${meta.icon} ${esc(meta.label)}走势</div>${stackedBar(fq, m)}</div>
+        <div style="display:flex;flex-direction:column;">
+          <div class="qsub">${meta.icon} ${esc(meta.label)}占比</div>
+          <div style="flex:1;display:flex;align-items:center;">${donut(byMode)}</div>
+        </div>
+      </div>
+      <div style="margin-top:12px"><div class="qsub">失效模式明细</div>${modeTable}</div>
     </div>`;
     const qm = document.getElementById('t3QM' + key);
     const qa = document.getElementById('t3QA' + key);
@@ -4386,13 +4629,14 @@ const ThreeView = (() => {
     state.view = 'customer'; state.current = d; state.oem = oem; state.cellCap = d.cellCap || state.cellCap;
     const k = d.kpi || {};
     const closeRate = k.alarm ? (100 * (k.closed || 0) / k.alarm).toFixed(1) + '%' : '-';
+    const two = (a, b) => `${a}<span class="v2"> / ${b}</span>`;
     const kpis = kpiCards([
-      { icon: '🚗', label: '累计出货数量', val: wan(k.cellShip) + ' 颗', sub: `电芯出货累计 · ${fmt(k.packShip)} 包`, cls: 'hl' },
-      { icon: '📦', label: '累计接入数', val: fmt(k.conn), sub: '历史累计 · 不随时间筛选' },
-      { icon: '🛡️', label: '已进保车辆数', val: fmt(k.insured), sub: '当前质保状态(时点值)' },
-      { icon: '⚡', label: '活跃车辆', val: fmt(k.active), sub: '近90天数据上报(≈接入)' },
-      { icon: '⚠️', label: '累计预警外发 / 已闭环', val: `${fmt(k.alarm)} / ${fmt(k.closed)}`, sub: `闭环率 ${esc(closeRate)} · 历史累计`, cls: 'bad' },
-      { icon: '📊', label: '近7天预警 / 闭环', val: `${k.alarm7 || 0} / ${k.closed7 || 0}`, sub: '预警 / 已闭环', cls: 'bad' },
+      { icon: '🚗', label: '累计出货', val: wan(k.cellShip) + ' 颗', sub: `${fmt(k.packShip)} 包`, cls: 'hl', tip: '电芯出货累计，历史累计，不随时间筛选' },
+      { icon: '📦', label: '累计接入', val: fmt(k.conn), tip: '历史累计，不随时间筛选' },
+      { icon: '🛡️', label: '已进保车辆', val: fmt(k.insured), tip: '当前质保状态（时点值）' },
+      { icon: '⚡', label: '活跃车辆', val: fmt(k.active), sub: '近90天', tip: '近90天有数据上报的车辆' },
+      { icon: '⚠️', label: '预警外发 / 已闭环', val: two(fmt(k.alarm), fmt(k.closed)), sub: `闭环率 ${closeRate}`, cls: 'bad', tip: '历史累计' },
+      { icon: '📊', label: '近7天预警 / 闭环', val: two(k.alarm7 || 0, k.closed7 || 0), cls: 'bad' },
     ]);
 
     const tr = d.trend || {};
@@ -4402,8 +4646,6 @@ const ThreeView = (() => {
     const trendData = useD15 ? (tr.days_data || []) : useYear ? (tr.year_data || []) : (tr.data || []);
     const trendLabels = useD15 ? (tr.days_labels || []) : useYear ? (tr.year_labels || []) : (tr.labels || []);
     const trendHtml = lineChart(trendData, trendLabels, '#2f6bff');
-    const trendSub = useD15 ? '近15天 · 逐日接入（增量）'
-      : useYear ? '按年 · 年度实际接入（增量）' : '按月 · 月度实际接入（增量）';
     const granTabs = `<button data-g="month" class="${(!useD15 && !useYear) ? 'on' : ''}">by 月</button><button data-g="year" class="${useYear ? 'on' : ''}">by 年</button><button data-g="d15" class="${useD15 ? 'on' : ''}">近15天</button>`;
 
     // 项目列表（点击行 → 进入项目视角）
@@ -4456,7 +4698,7 @@ const ThreeView = (() => {
 
     // 关系区
     const contacts = (d.contacts || []).map(c => `<div class="person"><div class="av">${esc((c.name || '?')[0])}</div><div><div>${esc(c.name || '')}</div><div class="role">${esc(c.role || '')}</div></div><div class="tel">${esc(c.tel || '')}</div></div>`).join('') || '<div class="t3-empty">暂无关键人</div>';
-    const visits = (d.visits || []).map(v => `<div class="visit"><div class="dot" style="background:${v.st === 'r' ? 'var(--danger)' : v.st === 'o' ? 'var(--warn)' : 'var(--ok)'}"></div><div>${esc(v.t)}</div><div class="meta">${esc(v.who || '')} · <span class="pill ${v.st}">${esc(v.stTxt || '')}</span></div></div>`).join('') || '<div class="t3-empty">暂无拜访计划</div>';
+    const visits = (d.visits || []).map(v => `<div class="visit"><div class="dot" style="background:${v.st === 'r' ? 'var(--danger)' : v.st === 'o' ? 'var(--warn)' : 'var(--ok)'}"></div><div class="vt" title="${esc(v.t)}">${esc(v.t)}</div><div class="meta">${esc(v.who || '')} · <span class="pill ${v.st}">${esc(v.stTxt || '')}</span></div></div>`).join('') || '<div class="t3-empty">暂无拜访计划</div>';
     const meetings = (d.meetings || []).map(m => `<div class="meet"><div>${esc(m.t)}</div><div class="meta">${esc(m.m)}</div></div>`).join('') || '<div class="t3-empty">暂无会议</div>';
     const events = renderTimeline(d.events);
 
@@ -4467,13 +4709,13 @@ const ThreeView = (() => {
       <!-- 接入走势（左）+ 各容量出货/接入对比（右）并排 -->
       <div class="t3-grid2">
         <div class="t3-card">
-          <div class="chead"><div><div class="ctitle">📈 接入走势</div><div class="csub">${esc(trendSub)}</div></div>
+          <div class="chead"><div><div class="ctitle">📈 接入走势</div></div>
             <div class="seg" id="t3Gran">${granTabs}</div></div>
           <div class="t3-trend">${trendHtml}</div>
           <div class="legend"><span>${useD15 ? '近15天合计接入' : '最新一期接入'} <b>${fmt(useD15 ? (trendData.reduce((s, v) => s + (v || 0), 0)) : ((trendData && trendData[trendData.length - 1]) || 0))}</b></span></div>
         </div>
         <div class="t3-card">
-          <div class="chead"><div><div class="ctitle">📊 各容量出货 / 接入对比</div><div class="csub">按电芯容量分组 · 双柱各标数量</div></div></div>
+          <div class="chead"><div><div class="ctitle" title="按电芯容量分组 · 双柱各标数量">📊 各容量出货 / 接入对比</div></div></div>
           <div>${groupedBarChart(
             (d.projects || []).map(p => String(p.cap || p.name || '')),
             { name: '出货(Pack)', color: '#2f6bff', data: (d.projects || []).map(p => p.pack || 0) },
@@ -4483,39 +4725,44 @@ const ThreeView = (() => {
       </div>
       <!-- 质量分析（整行放大，与项目/电芯视角一致，todo 任务#6） -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle">📊 质量分析（预警 / 闭环 / 客诉）</div><div class="csub">by 失效模式 · 累积/增量 + 时间筛选</div></div></div>
+        <div class="chead"><div><div class="ctitle" title="by 失效模式 · 累积/增量 + 时间筛选">📊 质量分析（预警 / 闭环 / 客诉）</div></div></div>
         <div id="t3CustQuality"></div>
       </div>
-      <div class="t3-grid2">
+      <div class="t3-grid2 equal">
         <div class="t3-card">
-          <div class="chead"><div><div class="ctitle">🏆 项目预警 / 接入 / 过保 排名</div><div class="csub">定位哪个项目拖后腿</div></div>
+          <div class="chead"><div><div class="ctitle" title="定位哪个项目拖后腿">🏆 项目排名</div></div>
             <div class="seg" id="t3RankSeg">${Object.keys(rankMeta).map(k => `<button data-r="${k}" class="${k === state.rank ? 'on' : ''}">${rankMeta[k].label}</button>`).join('')}</div></div>
           <div id="t3Ranking">${renderRanking(rankItems, rm.color)}</div>
         </div>
         <div class="t3-card">
-          <div class="chead"><div><div class="ctitle">⚠️ 客户重点失效模式</div><div class="csub">历史外发聚合 · 关联闭环（占比图见上方质量分析卡，不在本页重复展示）</div></div></div>
-          <div class="tblwrap"><table class="t3-tbl"><thead><tr><th>失效模式</th><th class="num">⚠️ 预警（${esc(accLabel)}）</th><th class="num">✅ 闭环</th><th class="num">闭环率</th><th class="num">📣 客诉</th><th>处理措施</th></tr></thead><tbody>${modeRowsHtml || '<tr><td colspan="6" class="t3-empty">暂无失效模式数据</td></tr>'}</tbody></table></div>
+          <div class="chead"><div><div class="ctitle" title="召回 / OTA / 停线 / 批量预警 / 索赔 / 质量会">🚨 关键处置事件</div></div>
+            <div class="acts"><button class="btn btn-sm btn-secondary" onclick="Page1.addEvent('${esc(oem)}','')">＋ 录入</button></div></div>
+          <div id="t3CustEvents">${events}</div>
         </div>
       </div>
       <!-- 项目列表 -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle">🗂️ 电芯项目列表（该客户全部电芯产品）</div><div class="csub">一行=一款电芯(容量×结构) · 点击行进入<b>项目视角</b></div></div></div>
+        <div class="chead"><div><div class="ctitle" title="一行 = 一款电芯（容量 × 结构），点击行进入项目视角">🗂️ 电芯项目</div></div></div>
         <div class="tblwrap"><table class="t3-tbl"><thead>
           <tr><th>电芯项目</th><th class="num">容量(Ah)</th><th>电池结构</th><th>状态</th><th>SOP</th><th class="num">累计出货(Pack)</th><th class="num">接入数</th><th class="num">接入率</th><th class="num">过保数(率)</th><th class="num">预警外发</th><th class="num">已闭环(率)</th><th>操作</th></tr>
         </thead><tbody>${projRows}</tbody></table></div>
       </div>
-      <div class="t3-grid2">
+      <!-- 关键人 / 拜访 / 会议：每块都能直接新增或跳到对应页面 -->
+      <div class="t3-people">
         <div class="t3-card">
-          <div class="chead"><div><div class="ctitle">🚨 关键处置事件时间线</div><div class="csub">召回 / OTA / 停线 / 批量预警 / 索赔 / 质量会</div></div></div>
-          <div id="t3CustEvents">${events}</div>
+          <div class="chead"><div><div class="ctitle">👥 关键人</div></div>
+            <div class="acts"><button class="btn btn-sm btn-secondary" onclick="Page1.showAddPersonModal()">＋ 新增</button><button class="btn btn-sm btn-secondary" onclick="App.navigate('page2')">全部 →</button></div></div>
+          <div id="t3Contacts">${contacts}</div>
         </div>
         <div class="t3-card">
-          <div class="chead"><div><div class="ctitle">👥 外部关键人 / 内部 PQM</div></div></div>
-          <div id="t3Contacts">${contacts}</div>
-          <div class="t3-inner-grid">
-            <div class="t3-card"><div class="chead"><div><div class="ctitle">📅 拜访计划</div><div class="csub">三色状态</div></div></div><div id="t3Visits">${visits}</div></div>
-            <div class="t3-card"><div class="chead"><div><div class="ctitle">📝 近期会议</div></div></div><div id="t3Meetings">${meetings}</div></div>
-          </div>
+          <div class="chead"><div><div class="ctitle" title="绿=已完成 · 橙=进行中 · 红=待拜访">📅 拜访计划</div></div>
+            <div class="acts"><button class="btn btn-sm btn-secondary" onclick="Page1.showAddVisitModal()">＋ 新增</button><button class="btn btn-sm btn-secondary" onclick="App.navigate('page2')">全部 →</button></div></div>
+          <div id="t3Visits">${visits}</div>
+        </div>
+        <div class="t3-card">
+          <div class="chead"><div><div class="ctitle">📝 近期会议</div></div>
+            <div class="acts"><button class="btn btn-sm btn-secondary" onclick="Page1.showAddMeetingModal()">＋ 新增</button><button class="btn btn-sm btn-secondary" onclick="App.navigate('page3')">全部 →</button></div></div>
+          <div id="t3Meetings">${meetings}</div>
         </div>
       </div>
       `;
@@ -4556,17 +4803,18 @@ const ThreeView = (() => {
     const lv = LEVEL[state.level] || LEVEL.Pack;
     const lvVal = info[lv.key] || 0;
     const lvSub = state.level === 'Pack' ? `模组 ${fmt(info.moduleShip)} · 电芯 ${fmt(info.cellShip)} 颗`
-      : state.level === 'Module' ? '该结构 Module 层出货条码数'
-      : `= ${fmt(info.packShip)} 包 × 电芯/包（出货条码累计）`;
+      : state.level === 'Module' ? `${fmt(info.packShip)} 包`
+      : `${fmt(info.packShip)} 包`;
+    const two = (a, b) => `${a}<span class="v2"> / ${b}</span>`;
     const levelTabs = `<div class="seg" id="t3LevelSeg">${['Pack', 'Module', 'Cell'].map(k =>
       `<button data-l="${k}" class="${k === state.level ? 'on' : ''}">${LEVEL[k].icon} ${k}</button>`).join('')}</div>`;
     const kpis = kpiCards([
-      { icon: lv.icon, label: `累计出货（${state.level}）`, val: wan(lvVal) + ' ' + lv.unit, sub: lvSub, cls: 'hl' },
-      { icon: '📥', label: '累计接入', val: fmt(info.conn), sub: `接入率 ${esc(connRate)}（接入 / 出货 Pack）` },
-      { icon: '🗓️', label: '近15天接入', val: fmt(info.access15 != null ? info.access15 : '-'), sub: '近15天有接入记录的车辆' },
-      { icon: '🛡️', label: '已进保 / 过保', val: `${info.insured == null ? '-' : fmt(info.insured)} / ${fmt(info.overdue)}`, sub: `过保率 ${info.packShip ? (100 * (info.overdue || 0) / info.packShip).toFixed(2) : 0}%（超出质保条款）` },
-      { icon: '⚠️', label: '累计预警外发 / 已闭环', val: `${fmt(info.alarm)} / ${fmt(info.closed)}`, sub: `闭环率 ${esc(closeRate)} · 历史累计`, cls: 'bad' },
-      { icon: '📊', label: '近7天预警 / 闭环', val: `${info.alarm7 || 0} / ${info.closed7 || 0}`, sub: '预警 / 已闭环', cls: 'bad' },
+      { icon: lv.icon, label: `累计出货（${state.level}）`, val: wan(lvVal) + ' ' + lv.unit, sub: lvSub, cls: 'hl', tip: '出货条码累计' },
+      { icon: '📥', label: '累计接入', val: fmt(info.conn), sub: `接入率 ${connRate}`, tip: '接入率 = 接入 / 出货(Pack)' },
+      { icon: '🗓️', label: '近15天接入', val: fmt(info.access15 != null ? info.access15 : '-'), tip: '近15天有接入记录的车辆' },
+      { icon: '🛡️', label: '已进保 / 过保', val: two(info.insured == null ? '-' : fmt(info.insured), fmt(info.overdue)), sub: `过保率 ${info.packShip ? (100 * (info.overdue || 0) / info.packShip).toFixed(2) : 0}%`, tip: '过保 = 超出质保条款' },
+      { icon: '⚠️', label: '预警外发 / 已闭环', val: two(fmt(info.alarm), fmt(info.closed)), sub: `闭环率 ${closeRate}`, cls: 'bad', tip: '历史累计' },
+      { icon: '📊', label: '近7天预警 / 闭环', val: two(info.alarm7 || 0, info.closed7 || 0), cls: 'bad' },
     ]);
     const structCap = `${info.struct || '-'} · ${info.cap != null ? info.cap : ''}Ah`;
 
@@ -4587,12 +4835,7 @@ const ThreeView = (() => {
     const trendData = useD15 ? (tr.days_data || []) : useYear ? (tr.year_data || []) : (tr.data || []);
     const trendLabels = useD15 ? (tr.days_labels || []) : useYear ? (tr.year_labels || []) : (tr.labels || []);
     const trendHtml = lineChart(trendData, trendLabels, '#7c3aed');
-    const trendSub = useD15 ? '近15天 · 逐日接入（增量）'
-      : useYear ? '按年 · 年度实际接入（增量）' : '按月 · 月度实际接入（增量）';
     const granTabs = `<div class="seg" id="t3Gran"><button data-g="month" class="${(!useD15 && !useYear) ? 'on' : ''}">by 月</button><button data-g="year" class="${useYear ? 'on' : ''}">by 年</button><button data-g="d15" class="${useD15 ? 'on' : ''}">近15天</button></div>`;
-    // 失效模式占比 donut：全量 Doris 外发聚合（与客户视角/质量面板 donut 同一份源数据）
-    const donutItems = (d.outgoingModes || []).filter(m => (m.count || 0) > 0).map(m => ({ label: m.name, value: m.count, color: modeColor(m.name) }));
-    const donutHtml = donutItems.length ? donut(donutItems) : '<div class="t3-empty">该项目暂无失效模式数据</div>';
 
     // 适用车型明细
     const carRows = (d.cars || []).map(c => {
@@ -4610,12 +4853,6 @@ const ThreeView = (() => {
         <td>${stint(w.years, w.mileage, w.soh)}</td></tr>`;
     }).join('') || '<tr><td colspan="3" class="t3-empty">暂无质保台账，可在质保配置维护</td></tr>';
 
-    // 失效模式明细
-    const modeDetailRows = (d.modesDetail && d.modesDetail.length ? d.modesDetail : d.modes || []).map(m => `
-      <tr><td><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${modeColor(m.name)};margin-right:7px"></i><b>${esc(m.name)}</b></td>
-      <td class="num"><b>${fmt(m.count != null ? m.count : m.alarm)}</b></td>
-      <td>-</td><td>-</td></tr>`).join('') || '<tr><td colspan="4" class="t3-empty">暂无失效模式记录</td></tr>';
-
     // SOH 衰减走势（演示近似，标示口径）
     const sohData = []; const sohLabels = [];
     const ageMonths = Math.max(1, Math.min(48, Math.round(((new Date('2026-09-15') - new Date((info.sop || '2024-01') + '-01')) / (30 * 24 * 3600 * 1000)) || 20)));
@@ -4624,7 +4861,7 @@ const ThreeView = (() => {
       sohData.push(+(100 - 0.15 * m - 0.005 * m * m).toFixed(2));
     }
     const sohHtml = lineChart(sohData, sohLabels, '#10b981') +
-      `<div class="legend"><span>当前车龄 <b>${ageMonths} 个月</b></span><span>当前 SOH <b>${sohData[sohData.length - 1]}%</b></span><span>质保门槛 <b>${esc(info.qsoh || '-')}</b></span><span style="color:var(--accent)">口径：演示近似</span></div>`;
+      `<div class="legend"><span>当前车龄 <b>${ageMonths} 个月</b></span><span>当前 SOH <b>${sohData[sohData.length - 1]}%</b></span><span>质保门槛 <b>${esc(info.qsoh || '-')}</b></span></div>`;
 
     const eventsHtml = renderTimeline(d.events);
 
@@ -4632,60 +4869,47 @@ const ThreeView = (() => {
       <!-- 信息条 -->
       ${infoStrip}
       <!-- KPI + 出货层级切换 -->
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
-        <div style="font-size:13px;color:var(--muted);font-weight:700;">累计出货（${esc(oem)} · ${esc(state.cellCap)}Ah）</div>
-        ${levelTabs}
-      </div>
+      <div style="display:flex;justify-content:flex-end;margin:-4px 0 10px;">${levelTabs}</div>
       <div class="t3-kpis">${kpis}</div>
-      <!-- 接入走势 + 失效占比 -->
+      <!-- 接入走势 + 活跃/调表 -->
       <div class="t3-grid2">
         <div class="t3-card">
-          <div class="chead"><div><div class="ctitle">📈 项目接入走势</div><div class="csub">${esc(trendSub)} · 限 ${esc(state.cellCap)}Ah</div></div>
+          <div class="chead"><div><div class="ctitle">📈 项目接入走势</div></div>
             ${granTabs}</div>
           <div class="t3-trend">${trendHtml}</div>
           <div class="legend"><span>${useD15 ? '近15天合计接入' : '最新一期接入'} <b>${fmt(useD15 ? (trendData.reduce((s, v) => s + (v || 0), 0)) : ((trendData && trendData[trendData.length - 1]) || 0))}</b></span></div>
         </div>
-        <div class="t3-card" style="display:flex;flex-direction:column;">
-          <div class="chead"><div><div class="ctitle">🍩 项目失效模式占比</div><div class="csub">按外发数量 · 全量</div></div></div>
-          <div style="flex:1;display:flex;align-items:center;">${donutHtml}</div>
+        <div class="t3-card">
+          <div class="chead"><div><div class="ctitle" title="近90天数据上报">🚗 活跃车辆 &amp; 里程调表</div></div></div>
+          <div class="t3-kpi" style="box-shadow:none;border:0;padding:4px 0"><div class="val" style="font-size:26px">${fmt(d.active != null ? d.active : info.conn)} <span style="font-size:13px;color:var(--muted);font-weight:500">辆活跃</span></div><div class="sub">近90天</div></div>
+          <div class="t3-kpi ${d.mileage ? 'bad' : ''}" style="box-shadow:none;border:0;padding:4px 0"><div class="val" style="font-size:26px">${fmt(d.mileage || 0)} <span style="font-size:13px;color:var(--muted);font-weight:500">辆疑似</span></div><div class="sub">里程调表</div></div>
         </div>
       </div>
-      <!-- 项目质量分析 -->
+      <!-- 项目质量分析（失效模式占比、明细都在这里，不再单独成卡） -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle">📊 项目质量分析（预警 / 闭环 / 客诉）</div><div class="csub">by 失效模式 · 累积/增量 + 时间筛选</div></div></div>
+        <div class="chead"><div><div class="ctitle" title="by 失效模式 · 累积/增量 + 时间筛选">📊 项目质量分析（预警 / 闭环 / 客诉）</div></div></div>
         <div id="t3ProjQuality"></div>
       </div>
-      <!-- SOH + 活跃 -->
+      <!-- SOH + 质保台账 -->
       <div class="t3-grid2">
         <div class="t3-card">
-          <div class="chead"><div><div class="ctitle">📉 SOH 衰减走势</div><div class="csub">识别拐点 · 近似口径</div></div></div>
+          <div class="chead"><div><div class="ctitle" title="识别拐点 · 近似口径">📉 SOH 衰减走势</div></div></div>
           <div>${sohHtml}</div>
         </div>
         <div class="t3-card">
-          <div class="chead"><div><div class="ctitle">🚗 活跃车辆 &amp; 里程调表</div><div class="csub">近90天数据上报</div></div></div>
-          <div class="t3-kpi" style="box-shadow:none;border:0;padding:4px 0"><div class="val" style="font-size:26px">${fmt(d.active != null ? d.active : info.conn)} <span style="font-size:13px;color:var(--muted);font-weight:500">辆活跃</span></div><div class="sub">${esc(oem)} · ${esc(state.cellCap)}Ah · 近90天</div></div>
-          <div class="t3-kpi ${d.mileage ? 'bad' : ''}" style="box-shadow:none;border:0;padding:4px 0"><div class="val" style="font-size:26px">${fmt(d.mileage || 0)} <span style="font-size:13px;color:var(--muted);font-weight:500">辆疑似</span></div><div class="sub">里程调表 · 口径近似</div></div>
+          <div class="chead"><div><div class="ctitle" title="按电芯项目维护">🛡️ 质保台账</div></div></div>
+          <div class="tblwrap"><table class="t3-tbl"><thead><tr><th>车型</th><th>PN</th><th>质保条款</th></tr></thead><tbody>${wRows}</tbody></table></div>
         </div>
-      </div>
-      <!-- 失效模式明细 -->
-      <div class="t3-card">
-        <div class="chead"><div><div class="ctitle">⚠️ 项目失效模式明细</div><div class="csub">预警逻辑 / 不外发规则可编辑</div></div></div>
-        <div class="tblwrap"><table class="t3-tbl"><thead><tr><th>预警模式</th><th class="num">外发数量</th><th>不外发</th><th>处理措施</th></tr></thead><tbody>${modeDetailRows}</tbody></table></div>
-      </div>
-      <!-- 质保台账 -->
-      <div class="t3-card">
-        <div class="chead"><div><div class="ctitle">🛡️ 质保台账</div><div class="csub">按电芯项目维护</div></div></div>
-        <div class="tblwrap"><table class="t3-tbl"><thead><tr><th>车型</th><th>PN</th><th>质保条款</th></tr></thead><tbody>${wRows}</tbody></table></div>
       </div>
       <!-- 适用车型 -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle">🚗 适用车型明细</div><div class="csub">该电芯项目下所有车型</div></div></div>
+        <div class="chead"><div><div class="ctitle" title="该电芯项目下所有车型">🚗 适用车型明细</div></div></div>
         <div class="tblwrap"><table class="t3-tbl"><thead><tr><th>车型</th><th>电池结构</th><th class="num">接入</th><th class="num">占比</th><th class="num">过保数</th><th class="num">预警外发</th><th class="num">预警占比</th></tr></thead><tbody>${carRows}</tbody></table></div>
       </div>
       <!-- 项目关键处置事件 -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle">🚨 项目关键处置事件</div><div class="csub">OTA / 工艺变更 / 投诉 / 索赔 / 停线 / SOP 节点</div></div>
-          <div style="display:flex;gap:8px"><button class="btn btn-sm btn-secondary">＋ 录入事件</button></div></div>
+        <div class="chead"><div><div class="ctitle" title="OTA / 工艺变更 / 投诉 / 索赔 / 停线 / SOP 节点">🚨 项目关键处置事件</div></div>
+          <div class="acts"><button class="btn btn-sm btn-secondary" onclick="Page1.addEvent('${esc(oem)}','${esc(state.cellCap)}')">＋ 录入</button></div></div>
         <div id="t3ProjEvents">${eventsHtml}</div>
       </div>
       <div style="text-align:right;margin-top:6px;">
@@ -4722,12 +4946,12 @@ const ThreeView = (() => {
     const info = d.info || {};
     const closeRate = info.alarm ? (100 * (info.closed || 0) / info.alarm).toFixed(1) + '%' : '-';
     const kpis = kpiCards([
-      { icon: '🔋', label: '电芯累计出货', val: wan(info.cell) + ' 颗', sub: `= ${fmt(info.pack)} 包 · ${info.custCount || 0} 客户`, cls: 'hl' },
-      { icon: '📥', label: '接入电芯数', val: wan(info.conn) + ' 辆', sub: '已装车并接入' },
-      { icon: '⚠️', label: '失效电芯数', val: fmt(info.alarm), sub: '关联预警外发', cls: 'bad' },
-      { icon: '✅', label: '市场已闭环', val: fmt(info.closed), sub: `闭环率 ${esc(closeRate)}`, cls: 'ok' },
-      { icon: '📉', label: '失效率（ppm）', val: info.ppm != null ? info.ppm : '0', sub: '失效 / 出货 × 10⁶', cls: (info.ppm || 0) > 20 ? 'bad' : '' },
-      { icon: '📊', label: '今年接入', val: fmt(info.year), sub: '跨客户合计' },
+      { icon: '🔋', label: '电芯累计出货', val: wan(info.cell) + ' 颗', sub: `${fmt(info.pack)} 包 · ${info.custCount || 0} 客户`, cls: 'hl' },
+      { icon: '📥', label: '接入电芯数', val: wan(info.conn) + ' 辆', tip: '已装车并接入' },
+      { icon: '⚠️', label: '失效电芯数', val: fmt(info.alarm), cls: 'bad', tip: '关联预警外发' },
+      { icon: '✅', label: '市场已闭环', val: fmt(info.closed), sub: `闭环率 ${closeRate}`, cls: 'ok' },
+      { icon: '📉', label: '失效率（ppm）', val: info.ppm != null ? info.ppm : '0', cls: (info.ppm || 0) > 20 ? 'bad' : '', tip: '失效 / 出货 × 10⁶' },
+      { icon: '📊', label: '今年接入', val: fmt(info.year), tip: '跨客户合计' },
     ]);
 
     // 跨客户对比表
@@ -4747,19 +4971,16 @@ const ThreeView = (() => {
       <td class="num"><b>${fmt(info.year)}</b></td><td class="num"><b>${fmt(info.alarm)}</b></td>
       <td class="num"><b>${fmt(info.closed)}（${esc(closeRate)}）</b></td><td class="num"><b>${esc(info.ppm != null ? info.ppm : '0')}</b></td><td class="num">100%</td><td>-</td></tr>`;
 
-    // 失效占比 donut
-    const donutItems = (d.modes || []).filter(m => (m.count || 0) > 0).map(m => ({ label: m.name, value: m.count, color: modeColor(m.name) }));
-    const donutHtml = donutItems.length ? donut(donutItems) : '<div class="t3-empty">暂无失效数据</div>';
 
     // SOH 分布（近似口径）
     const sohLabels = ['<90', '90~92', '92~94', '94~96', '96~98', '98~100'];
     const sohData = [0.1, 0.6, 3.1, 9.8, 34.5, 51.9];
-    const sohHtml = barChart(sohData, sohLabels, '#10b981', ' %') + '<div class="legend"><span>横轴：SOH 区间（%）</span><span>纵轴：占比（%）</span><span>口径：近似</span></div>';
+    const sohHtml = barChart(sohData, sohLabels, '#10b981', ' %');
 
     // ppm 走势（近似）
     const ppmData = [12.1, 13.8, 15.2, 17.6, 19.4, 21.8, 23.1, 22.4, 20.9, Number(info.ppm || 0)];
     const ppmLabels = ['25-12', '26-01', '26-02', '26-03', '26-04', '26-05', '26-06', '26-07', '26-08', '26-09'];
-    const ppmHtml = lineChart(ppmData, ppmLabels, '#ef4444') + '<div class="legend"><span>按月 ppm（百万分比）</span><span>口径：近似</span></div>';
+    const ppmHtml = lineChart(ppmData, ppmLabels, '#ef4444');
 
     // 批次出货柱状 + 批次表
     const batches = d.batches || [];
@@ -4792,56 +5013,46 @@ const ThreeView = (() => {
       <div class="t3-kpis">${kpis}</div>
       <!-- 跨客户对比 -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle">🏢 跨客户对比（该电芯所有客户）</div><div class="csub">同一颗电芯，不同客户的质量差异一目了然</div></div></div>
+        <div class="chead"><div><div class="ctitle" title="同一颗电芯，不同客户的质量差异一目了然">🏢 跨客户对比（该电芯所有客户）</div></div></div>
         <div class="tblwrap"><table class="t3-tbl"><thead><tr>
           <th>客户</th><th class="num">出货(Pack)</th><th class="num">出货(Cell)</th><th class="num">接入数</th><th class="num">今年接入</th>
           <th class="num">预警外发</th><th class="num">已闭环(率)</th><th class="num">ppm</th><th class="num">出货占比</th><th>操作</th>
         </tr></thead><tbody>${custRows}${sumRow}</tbody></table></div>
       </div>
-      <!-- SOH 分布 + 失效占比 -->
+      <!-- SOH 分布 + 失效率走势（失效模式占比在质量分析里，不再单独成卡） -->
       <div class="t3-grid2 equal">
         <div class="t3-card">
-          <div class="chead"><div><div class="ctitle">📶 SOH 分布</div><div class="csub">接入电芯 SOH 直方图</div></div></div>
+          <div class="chead"><div><div class="ctitle" title="接入电芯 SOH 直方图 · 横轴 SOH 区间(%) · 纵轴占比(%)">📶 SOH 分布</div></div></div>
           <div>${sohHtml}</div>
         </div>
         <div class="t3-card">
-          <div class="chead"><div><div class="ctitle">🍩 电芯失效模式占比</div><div class="csub">按失效颗数 · 全量</div></div></div>
-          <div>${donutHtml}</div>
+          <div class="chead"><div><div class="ctitle" title="按月 · ppm（失效 / 出货 × 10⁶）">📉 电芯失效率走势</div></div></div>
+          <div>${ppmHtml}</div>
         </div>
       </div>
       <!-- 电芯质量分析 -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle">📊 电芯质量分析（预警 / 闭环 / 客诉）</div><div class="csub">跨客户聚合 · 累积/增量 + 时间筛选</div></div></div>
+        <div class="chead"><div><div class="ctitle" title="跨客户聚合 · 累积/增量 + 时间筛选">📊 电芯质量分析（预警 / 闭环 / 客诉）</div></div></div>
         <div id="t3CellQuality"></div>
       </div>
-      <!-- ppm + 批次柱状 -->
-      <div class="t3-grid2 equal">
-        <div class="t3-card">
-          <div class="chead"><div><div class="ctitle">📉 电芯失效率走势</div><div class="csub">按月 · ppm</div></div></div>
-          <div>${ppmHtml}</div>
-        </div>
-        <div class="t3-card">
-          <div class="chead"><div><div class="ctitle">📦 批次出货对比</div><div class="csub">柱状 · 按批次</div></div></div>
-          <div>${batchBarHtml}</div>
-        </div>
-      </div>
-      <!-- 批次追溯 -->
+      <!-- 批次追溯：出货柱状 + 明细 -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle">🗃️ 电芯批次追溯</div><div class="csub">批次 → 预警 → 车辆 · 近似口径</div></div></div>
-        <div class="tblwrap"><table class="t3-tbl"><thead><tr>
+        <div class="chead"><div><div class="ctitle" title="批次 → 预警 → 车辆 · 近似口径">🗃️ 电芯批次追溯</div></div></div>
+        <div style="max-width:760px;">${batchBarHtml}</div>
+        <div class="tblwrap" style="margin-top:8px;"><table class="t3-tbl"><thead><tr>
           <th>客户</th><th>批次号</th><th>电芯基地</th><th class="num">出货颗数</th><th class="num">失效颗数</th><th class="num">失效率(ppm)</th><th>状态</th>
         </tr></thead><tbody>${batchRows}</tbody></table></div>
       </div>
       <!-- 异常电芯明细 -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle">🔎 异常电芯明细（高风险）</div><div class="csub">关联预警闭环工单</div></div></div>
+        <div class="chead"><div><div class="ctitle" title="关联预警闭环工单">🔎 异常电芯明细（高风险）</div></div></div>
         <div class="tblwrap"><table class="t3-tbl"><thead><tr>
           <th>客户</th><th>VIN</th><th>电池包号</th><th>电芯位号</th><th>失效模式</th><th class="num">SOH</th><th>预警状态</th>
         </tr></thead><tbody>${riskRows}</tbody></table></div>
       </div>
       <!-- 电芯批次关键处置事件 -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle">🚨 电芯批次关键处置事件</div><div class="csub">批次隔离 / 换电 / 召回 / 索赔批次</div></div></div>
+        <div class="chead"><div><div class="ctitle" title="批次隔离 / 换电 / 召回 / 索赔批次">🚨 电芯批次关键处置事件</div></div></div>
         <div id="t3CellEvents">${eventsHtml}</div>
       </div>
       <div style="text-align:right;margin-top:6px;">
@@ -4976,6 +5187,9 @@ const Page1 = {
             this._view = 'customer';
             this._initCapOutsideClick();
             this._mountViewDock();        // 右侧悬停视图面板（参考 TB 视图管理）
+            // 筛选下拉支持模糊搜索 / 正则
+            ['p1Customer', 'p1ProjCust', 'p1ProjCap', 'p1CellProduct'].forEach(id =>
+                SearchSelect.enhance(document.getElementById(id), { minWidth: id.includes('Cap') || id === 'p1CellProduct' ? '130px' : '190px' }));
         }
         this.bindEvents();
         // 三视角内部跳转（项目行下钻 / 电芯下钻 / 返回）交由 page1 承接
@@ -5020,7 +5234,7 @@ const Page1 = {
                 <span class="p1-fgrp" id="p1FilterP" style="display:none;">
                     <span class="p1-flab">客户</span>
                     <select id="p1ProjCust">${Utils.customerOptions(selected_oem)}</select>
-                    <span class="p1-flab" title="该客户电量项目（一款电芯可含多个车型）">项目容量</span>
+                    <span class="p1-flab" title="该客户电量项目（一款电芯可含多个车型）">容量</span>
                     <select id="p1ProjCap"><option value="">选择项目(容量)...</option></select>
                 </span>
                 <!-- 电芯视角：跨客户看同一容量电芯 -->
@@ -5037,7 +5251,7 @@ const Page1 = {
                     </div>
                 </div>
                 <!-- 下载页面：当前看板导出为独立 HTML（给客户看）；视图管理在页面右侧悬停面板 -->
-                <button class="btn btn-sm btn-primary" style="margin-left:auto;" title="把当前看板导出为独立 HTML 文件（自带样式与图表，无需登录即可查看），可直接发给客户" onclick="Page1.downloadPage()">⬇ 下载页面</button>
+                <button class="btn btn-sm btn-primary" style="margin-left:auto;" title="下载页面：把当前看板导出为独立 HTML 文件（自带样式与图表，无需登录即可查看），可直接发给客户" onclick="Page1.downloadPage()">⬇ 下载</button>
             </div>
             <div id="p1Dashboard">
                 <div class="empty-state">
@@ -8217,29 +8431,24 @@ const DashboardModules = {
     },
 
     render() {
-        const items = (this.mods || []).map((m, i) => `
-            <div class="card" style="margin-bottom:16px;">
-                <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
-                    <span>${Utils.esc(m.title || '未命名模块')} <span class="badge badge-info" style="font-size:10px;">${this.typeLabel(m.display_type)}</span></span>
-                    <span>
+        const items = (this.mods || []).map(m => `
+            <div class="t3-card">
+                <div class="chead"><div><div class="ctitle">${Utils.esc(m.title || '未命名模块')} <span class="badge badge-info" style="font-size:10px;">${this.typeLabel(m.display_type)}</span></div></div>
+                    <div class="acts">
                         <button class="btn btn-sm btn-secondary dm-edit" data-id="${m.id}">编辑</button>
                         <button class="btn btn-sm btn-danger dm-del" data-id="${m.id}">删除</button>
-                    </span>
-                </div>
-                <div style="margin-top:8px;">${this.renderContent(m)}</div>
+                    </div></div>
+                <div>${this.renderContent(m)}</div>
             </div>`).join('');
         return `
-        <div class="card" style="margin-bottom:16px;">
-            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <span>自定义模块（可配置展示）</span>
-                <span style="display:flex;gap:8px;">
+        <div class="t3-card">
+            <div class="chead"><div><div class="ctitle" title="用自然语言让 AI 生成图表，或手动添加柱状 / 折线 / 饼图 / 表格 / 数字模块">🧩 自定义模块</div></div>
+                <div class="acts">
                     <button class="btn btn-sm btn-secondary" id="dmAiAdd">&#9889; AI 生成</button>
-                    <button class="btn btn-sm btn-primary" id="dmAdd">+ 添加模块</button>
-                </span>
-            </div>
-            <p style="font-size:12px;color:var(--text-muted);margin:0;">用自然语言让 AI 生成图表，或手动添加模块，选择柱状/折线/饼图/表格/数字展示。</p>
-        </div>
-        <div id="dmList">${items || '<div class="empty-state" style="padding:20px;">暂无自定义模块，点击「添加模块」或「AI生成」开始配置</div>'}</div>`;
+                    <button class="btn btn-sm btn-primary" id="dmAdd">＋ 添加模块</button>
+                </div></div>
+            <div id="dmList">${items ? `<div class="dm-grid">${items}</div>` : '<div class="t3-empty">还没有自定义模块</div>'}</div>
+        </div>`;
     },
 
     typeLabel(t) {
