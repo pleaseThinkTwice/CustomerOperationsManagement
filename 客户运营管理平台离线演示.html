@@ -4681,7 +4681,7 @@ const ThreeView = (() => {
     const tot = rows.reduce((t, r) => ({ alarm: t.alarm + r.alarm, closed: t.closed + r.closed, complaint: t.complaint + r.complaint }), { alarm: 0, closed: 0, complaint: 0 });
     const rate = (c, a) => a ? (100 * c / a).toFixed(1) + '%' : '-';
     const share = v => tot.alarm ? (100 * v / tot.alarm).toFixed(1) + '%' : '-';
-    const modeTable = `<table class="t3-tbl">${colg('', 14, 14, 14, 14, 14)}<thead><tr><th>失效模式</th><th class="num">⚠️ 预警外发</th><th class="num">✅ 闭环</th><th class="num">闭环率</th><th class="num">📣 客诉</th><th class="num">预警占比</th></tr></thead><tbody>${
+    const modeTable = `<table class="t3-tbl" style="table-layout:fixed">${colg(...Array(6).fill(100 / 6))}<thead><tr><th>失效模式</th><th class="num">⚠️ 预警外发</th><th class="num">✅ 闭环</th><th class="num">闭环率</th><th class="num">📣 客诉</th><th class="num">预警占比</th></tr></thead><tbody>${
       rows.map(r => `<tr><td><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${modeColor(r.mode)};margin-right:7px"></i><b>${esc(r.mode)}</b></td>
         <td class="num"><b>${fmt(r.alarm)}</b></td><td class="num">${fmt(r.closed)}</td><td class="num">${rate(r.closed, r.alarm)}</td>
         <td class="num">${fmt(r.complaint)}</td><td class="num">${share(r.alarm)}</td></tr>`).join('')
