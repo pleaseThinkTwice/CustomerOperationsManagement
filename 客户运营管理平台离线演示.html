@@ -1963,24 +1963,21 @@ tbody tr:hover { background: var(--bg-card-hover); }
 @media(max-width:1100px){.t3-people{grid-template-columns:1fr;}}
 .dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px;}
 .dm-grid .t3-card{margin-bottom:0;box-shadow:none;background:var(--bg-input);}
-/* ===== 可搜索下拉（SearchSelect）：模糊匹配 + 正则 ===== */
-.ss{position:relative;display:inline-flex;}
-.ss-trigger{display:inline-flex;align-items:center;gap:8px;min-width:150px;max-width:260px;height:34px;padding:0 10px;border:1px solid var(--border-card);border-radius:10px;background:var(--bg-input);color:var(--text-primary);font-size:13px;cursor:pointer;font-family:inherit;}
-.ss-trigger:hover,.ss.open .ss-trigger{border-color:var(--accent);}
-.ss-trigger .tx{flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.ss-trigger .tx.ph{color:var(--text-muted);}
-.ss-trigger .ar{color:var(--text-muted);font-size:10px;}
-.ss-panel{position:fixed;z-index:3500;width:300px;background:var(--bg-secondary);border:1px solid var(--line-strong);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.35);display:flex;flex-direction:column;max-height:360px;}
-.ss-search{display:flex;gap:6px;padding:8px;border-bottom:1px solid var(--line);}
-.ss-search input{flex:1;height:30px;padding:4px 8px;font-size:12.5px;}
-.ss-re{flex:none;width:34px;height:30px;border:1px solid var(--border-card);border-radius:8px;background:var(--bg-input);color:var(--text-muted);font-family:var(--font-mono);font-size:12px;cursor:pointer;}
-.ss-re.on{background:var(--brand-soft);color:var(--accent);border-color:var(--accent);}
+/* ===== 可搜索下拉（SearchSelect）：下拉框本身可输入，模糊匹配 + /正则/ ===== */
+.ss{position:relative;display:inline-flex;align-items:center;min-width:150px;max-width:260px;height:34px;border:1px solid var(--border-card);border-radius:10px;background:var(--bg-input);}
+.ss:hover,.ss.open{border-color:var(--accent);}
+.ss.open{box-shadow:0 0 0 3px var(--ring);}
+.ss .ss-input{flex:1;min-width:0;width:100%;height:100%;border:0;background:transparent;box-shadow:none;padding:0 4px 0 10px;font-size:13px;color:var(--text-primary);cursor:pointer;text-overflow:ellipsis;}
+.ss .ss-input:focus{border:0;box-shadow:none;cursor:text;}
+.ss .ss-input.ph{color:var(--text-muted);}
+.ss .ss-ar{flex:none;padding:0 10px 0 4px;color:var(--text-muted);font-size:10px;cursor:pointer;user-select:none;}
+.ss-panel{position:fixed;z-index:3500;background:var(--bg-secondary);border:1px solid var(--line-strong);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.35);display:flex;flex-direction:column;max-height:320px;}
 .ss-list{overflow-y:auto;padding:4px;flex:1;}
 .ss-opt{padding:7px 10px;border-radius:7px;font-size:13px;color:var(--text-primary);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ss-opt.act{background:var(--bg-card-hover);}
 .ss-opt.sel{color:var(--accent);font-weight:700;}
 .ss-opt mark{background:var(--warn-soft);color:var(--warn);border-radius:3px;padding:0 1px;}
-.ss-foot{padding:6px 10px;border-top:1px solid var(--line);font-size:11px;color:var(--text-muted);display:flex;justify-content:space-between;gap:8px;}
+.ss-foot{padding:5px 10px;border-top:1px solid var(--line);font-size:11px;color:var(--text-muted);display:flex;justify-content:space-between;gap:8px;}
 .ss-foot .err{color:var(--danger);}
 .ss-empty{padding:14px;text-align:center;font-size:12px;color:var(--text-muted);}
 .t3-grid2{display:grid;grid-template-columns:1.25fr 1fr;gap:14px;}
@@ -3972,10 +3969,10 @@ window.TabEditor = {
 
 
 // ============ 可搜索下拉（SearchSelect）============
-// 给原生 <select> 套一层可搜索的下拉：原生 select 仍是值的来源（隐藏不删），
-// 选中后写回 select.value 并派发 change，原有 onchange 逻辑不用改。
-// 搜索：默认模糊匹配（空格分词，每个词按「连续子串 → 按顺序出现的字符」匹配，大小写不敏感）；
-//       点「.*」或输入 /正则/标志 进入正则匹配，正则无效时提示，不过滤。
+// 把原生 <select> 换成可直接输入的下拉框：框里显示当前选项，点击后可直接打字过滤，不额外弹搜索框。
+// 原生 select 仍是值的来源（隐藏不删），选中后写回 select.value 并派发 change，原有 onchange 逻辑不用改。
+// 匹配：默认模糊（空格分词，每个词按「连续子串 → 字符按顺序出现」匹配，大小写不敏感）；
+//       输入 /正则/标志 时按正则匹配，正则写错时提示，不过滤。
 const SearchSelect = {
     _open: null,   // 当前展开的实例
 
@@ -3984,13 +3981,29 @@ const SearchSelect = {
         opts = opts || {};
         const wrap = document.createElement('span');
         wrap.className = 'ss';
-        wrap.innerHTML = `<button type="button" class="ss-trigger"><span class="tx"></span><span class="ar">▾</span></button>`;
+        wrap.innerHTML = `<input type="text" class="ss-input" autocomplete="off" spellcheck="false"><span class="ss-ar">▾</span>`;
         sel.parentNode.insertBefore(wrap, sel.nextSibling);
         sel.style.display = 'none';
-        if (opts.minWidth) wrap.querySelector('.ss-trigger').style.minWidth = opts.minWidth;
-        const inst = { sel, wrap, trigger: wrap.querySelector('.ss-trigger'), regex: false, q: '', active: 0 };
+        if (opts.minWidth) wrap.style.minWidth = opts.minWidth;
+        const input = wrap.querySelector('.ss-input');
+        const inst = { sel, wrap, input, q: '', active: 0 };
         sel._ss = inst;
-        inst.trigger.onclick = (e) => { e.stopPropagation(); this._open === inst ? this.close() : this.open(inst); };
+
+        wrap.addEventListener('mousedown', e => e.stopPropagation());   // 点框本身不触发「点外面关闭」
+        input.addEventListener('focus', () => { if (this._open !== inst) this.open(inst); });
+        input.addEventListener('click', () => { if (this._open !== inst) this.open(inst); });
+        input.addEventListener('input', () => {
+            if (this._open !== inst) this.open(inst, true);
+            inst.q = input.value; inst.active = 0; this._render(inst);
+        });
+        input.addEventListener('keydown', e => this._key(inst, e));
+        input.addEventListener('blur', () => setTimeout(() => {
+            // 焦点离开且没点到选项：收起并恢复当前选项文字
+            if (this._open === inst && document.activeElement !== input && !(inst.panel && inst.panel.contains(document.activeElement))) this.close();
+        }, 150));
+        wrap.querySelector('.ss-ar').onclick = () => {
+            if (this._open === inst) { this.close(); input.blur(); } else input.focus();
+        };
 
         // 代码里直接改 sel.value / selectedIndex 时同步显示文字
         const proto = HTMLSelectElement.prototype;
@@ -4003,54 +4016,47 @@ const SearchSelect = {
             });
         });
         // 选项被重新填充（innerHTML）时同步
-        new MutationObserver(() => this._label(inst)).observe(sel, { childList: true, subtree: true });
+        new MutationObserver(() => this._open === inst ? this._render(inst) : this._label(inst)).observe(sel, { childList: true, subtree: true });
         sel.addEventListener('change', () => this._label(inst));
         this._label(inst);
         return inst;
     },
 
-    _label(inst) {
+    _text(inst) {
         const o = inst.sel.options[inst.sel.selectedIndex];
-        const tx = inst.trigger.querySelector('.tx');
-        const text = o ? o.textContent : '';
-        tx.textContent = text || '请选择';
-        tx.classList.toggle('ph', !o || !o.value);
-        inst.trigger.title = text;
+        return o && o.value ? o.textContent : '';
     },
 
-    open(inst) {
+    _label(inst) {
+        if (this._open === inst) return;   // 正在输入时不覆盖
+        const o = inst.sel.options[inst.sel.selectedIndex];
+        const text = this._text(inst);
+        inst.input.value = text;
+        inst.input.placeholder = (o && !o.value ? o.textContent : '') || '请选择';
+        inst.input.title = text;
+    },
+
+    open(inst, typing) {
         this.close();
         this._open = inst;
+        inst.q = '';
         inst.wrap.classList.add('open');
         const p = document.createElement('div');
         p.className = 'ss-panel';
-        p.innerHTML = `<div class="ss-search">
-                <input type="text" placeholder="搜索，支持模糊匹配 / 正则 /^SH/i" autocomplete="off">
-                <button type="button" class="ss-re ${inst.regex ? 'on' : ''}" title="正则匹配">.*</button>
-            </div>
-            <div class="ss-list"></div>
-            <div class="ss-foot"><span class="cnt"></span><span class="err"></span></div>`;
+        p.innerHTML = `<div class="ss-list"></div><div class="ss-foot"><span class="cnt"></span><span class="err"></span></div>`;
+        p.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });   // 点选项时输入框不失焦
         document.body.appendChild(p);
         inst.panel = p;
-        const r = inst.trigger.getBoundingClientRect();
-        p.style.width = Math.max(r.width, 280) + 'px';
-        p.style.left = Math.min(r.left, window.innerWidth - Math.max(r.width, 280) - 8) + 'px';
+        const r = inst.wrap.getBoundingClientRect();
+        const w = Math.max(r.width, 240);
+        p.style.width = w + 'px';
+        p.style.left = Math.min(r.left, window.innerWidth - w - 8) + 'px';
         const below = window.innerHeight - r.bottom;
-        if (below < 300 && r.top > below) p.style.bottom = (window.innerHeight - r.top + 4) + 'px';
+        if (below < 260 && r.top > below) p.style.bottom = (window.innerHeight - r.top + 4) + 'px';
         else p.style.top = (r.bottom + 4) + 'px';
-        const input = p.querySelector('input');
-        input.value = inst.q;
-        input.oninput = () => { inst.q = input.value; inst.active = 0; this._render(inst); };
-        input.onkeydown = (e) => this._key(inst, e);
-        p.querySelector('.ss-re').onclick = () => {
-            inst.regex = !inst.regex;
-            p.querySelector('.ss-re').classList.toggle('on', inst.regex);
-            inst.active = 0; this._render(inst); input.focus();
-        };
-        p.addEventListener('mousedown', e => e.stopPropagation());
+        // 展开时整段选中当前文字：直接打字即替换为搜索词，不打字则保持原值
+        if (!typing) { inst.input.select(); inst.input.placeholder = this._text(inst) || inst.input.placeholder; }
         this._render(inst, true);
-        input.focus();
-        input.select();
     },
 
     close() {
@@ -4059,7 +4065,9 @@ const SearchSelect = {
         if (inst.panel) inst.panel.remove();
         inst.panel = null;
         inst.wrap.classList.remove('open');
+        inst.q = '';
         this._open = null;
+        this._label(inst);
     },
 
     // 返回 null = 不匹配；否则返回 { score, html }（html 已转义并高亮命中部分）
@@ -4083,7 +4091,7 @@ const SearchSelect = {
                 score += i;
                 continue;
             }
-            let pos = 0, first = -1;            // 字符按顺序出现即可（如 sv 命中 SHEV，北京 也可写成 北 京）；不支持拼音
+            let pos = 0, first = -1;            // 字符按顺序出现即可（如 sv 命中 SHEV）；不支持拼音
             for (const ch of w) {
                 const k = lower.indexOf(ch, pos);
                 if (k < 0) return null;
@@ -4103,13 +4111,11 @@ const SearchSelect = {
         return { score, html };
     },
 
-    _regex(inst) {
-        let src = inst.q, flags = 'i';
-        const m = /^\/(.*)\/([a-z]*)$/.exec(src);
-        if (m) { src = m[1]; flags = m[2] || ''; }
-        else if (!inst.regex) return { re: null };
-        if (!src) return { re: null };
-        try { return { re: new RegExp(src, flags.replace(/g/g, '')) }; }
+    // 输入形如 /pattern/flags 时按正则匹配
+    _regex(q) {
+        const m = /^\/(.+)\/([a-z]*)$/.exec(q);
+        if (!m) return { re: null };
+        try { return { re: new RegExp(m[1], (m[2] || 'i').replace(/g/g, '')) }; }
         catch (e) { return { err: '正则无效：' + e.message }; }
     },
 
@@ -4117,18 +4123,19 @@ const SearchSelect = {
         const p = inst.panel;
         if (!p) return;
         const list = p.querySelector('.ss-list');
-        const { re, err } = this._regex(inst);
+        const q = inst.q.trim();
+        const { re, err } = this._regex(q);
         p.querySelector('.err').textContent = err || '';
-        const q = err ? '' : inst.q.trim();
+        const fq = err ? '' : q;
         const items = [];
         Array.from(inst.sel.options).forEach((o, idx) => {
-            if (!o.value && q) return;   // 搜索时不显示「请选择」类占位项
+            if (!o.value) return;   // 「请选择」类占位项不进列表
             const text = o.textContent;
-            const r = re ? (this._match(text, '', re) || this._match(o.value, '', re) && { score: 50, html: Utils.esc(text) })
-                         : this._match(text, q, null);
+            const r = re ? (this._match(text, '', re) || (this._match(o.value, '', re) && { score: 50, html: Utils.esc(text) }))
+                         : this._match(text, fq, null);
             if (r) items.push({ idx, o, ...r });
         });
-        if (q && !re) items.sort((a, b) => a.score - b.score);
+        if (fq && !re) items.sort((a, b) => a.score - b.score);
         inst.items = items;
         if (inst.active >= items.length) inst.active = Math.max(0, items.length - 1);
         if (scrollToSel) {
@@ -4142,7 +4149,7 @@ const SearchSelect = {
             el.onmousemove = () => { if (inst.active !== +el.dataset.k) { inst.active = +el.dataset.k; this._hl(inst); } };
             el.onclick = () => this._pick(inst, +el.dataset.k);
         });
-        p.querySelector('.cnt').textContent = `${items.length} 项${re ? ' · 正则' : (q ? ' · 模糊' : '')}`;
+        p.querySelector('.cnt').textContent = `${items.length} 项${re ? ' · 正则' : (fq ? ' · 模糊' : ' · 可输入搜索，/正则/')}`;
         this._hl(inst);
     },
 
@@ -4155,20 +4162,24 @@ const SearchSelect = {
     },
 
     _key(inst, e) {
+        if (this._open !== inst) {
+            if (e.key === 'ArrowDown' || e.key === 'Enter') { e.preventDefault(); this.open(inst); }
+            return;
+        }
         const n = (inst.items || []).length;
         if (e.key === 'ArrowDown') { e.preventDefault(); if (n) { inst.active = (inst.active + 1) % n; this._hl(inst); } }
         else if (e.key === 'ArrowUp') { e.preventDefault(); if (n) { inst.active = (inst.active - 1 + n) % n; this._hl(inst); } }
         else if (e.key === 'Enter') { e.preventDefault(); if (n) this._pick(inst, inst.active); }
-        else if (e.key === 'Escape') { e.preventDefault(); this.close(); inst.trigger.focus(); }
+        else if (e.key === 'Escape' || e.key === 'Tab') { this.close(); if (e.key === 'Escape') inst.input.blur(); }
     },
 
     _pick(inst, k) {
         const it = (inst.items || [])[k];
         if (!it) return;
         const changed = inst.sel.selectedIndex !== it.idx;
-        inst.sel.selectedIndex = it.idx;
-        inst.q = '';
         this.close();
+        inst.sel.selectedIndex = it.idx;
+        inst.input.blur();
         if (changed) inst.sel.dispatchEvent(new Event('change', { bubbles: true }));
     },
 };
