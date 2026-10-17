@@ -1964,7 +1964,7 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .p1-toolbar .p1-sep{width:1px;height:22px;background:var(--line-strong);}
 .t3-empty{border:1.5px dashed var(--line);border-radius:12px;padding:18px;text-align:center;color:var(--muted);font-size:13px;}
 .t3-kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:12px;margin-bottom:14px;}
-@media(max-width:1280px){.t3-kpis{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:1280px){.t3-kpis{grid-template-columns:repeat(4,1fr);}}   /* 7 张卡：4 + 3 */
 @media(max-width:640px){.t3-kpis{grid-template-columns:repeat(2,1fr);}}
 .tblwrap{overflow-x:auto;}
 .t3-kpi{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);}
@@ -2022,6 +2022,7 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .t3-tbl th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--line);text-transform:none;letter-spacing:0;vertical-align:middle;}
 .t3-tbl td{padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:middle;}
 /* 对齐规则：文本/编号列与数值列(.num，等宽数字)均左对齐；状态/操作列(.ctr)居中；表头与该列内容同向 */
+#page12 .table-wrapper th,#page12 .table-wrapper td{white-space:nowrap;}   /* 合同表外层可横向滚动，单元格不再逐字折行 */
 .t3-tbl .ctr{text-align:center;}
 .t3-tbl tr.t3-sum{background:var(--bg-secondary);}
 .t3-tbl th.t3-sortable{cursor:pointer;user-select:none;}
@@ -2585,7 +2586,10 @@ tbody tr:hover { background: var(--bg-card-hover); }
     if (u === '/api/stage_summary') return json([{ id: 1, name_cn: '小米汽车', summary_date: '2026-09-15', failure_mode: '绝缘故障', dispatch_count: 12, reduced_breakdown: 3, is_milestone: false, milestone_note: '' }]);
 
     // 合同
-    if (u === '/api/contracts/stats') return json([{ status: '生效中', amount: 125000000 }, { status: '履行中', amount: 8500000 }]);
+    if (u === '/api/contracts/stats') return json({ total: 2, total_amount: 133500000,
+      by_status: [{ label: '执行中', value: 2 }, { label: '已完结', value: 0 }],
+      by_type: [{ label: '主合同', value: 125000000 }, { label: '补充协议', value: 8500000 }],
+      by_oem: [{ label: OEM, value: 133500000 }] });
     if (u === '/api/contracts' && method === 'GET') return json(dummyContracts());
     if (u === '/api/contracts' && method === 'POST') return json({ id: 99 });
     if (/^\/api\/contracts\/\d+/.test(u)) return json({ success: true });
@@ -2662,7 +2666,7 @@ tbody tr:hover { background: var(--bg-card-hover); }
 
     // 项目日志
     if (u === '/api/devlogs/todo') return json([]);
-    if (u === '/api/devlogs/stats') return json({});
+    if (u === '/api/devlogs/stats') return json({ total: 0, overdue: 0, by_status: [], by_owner: {} });
     if (u === '/api/devlogs/tree') return json([]);
     if (/^\/api\/devlogs/.test(u)) return method === 'GET' ? json([]) : json({ success: true, id: 9 });
 
@@ -4359,17 +4363,20 @@ const ThreeView = (() => {
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const wan = n => {
     const v = Number(n) || 0;
-    return v >= 10000 ? (v / 10000).toFixed(1).replace(/\.0$/, '') + '万' : fmt(v);
+    // 保留两位小数再去掉末尾 0：20,240 → 2.02万（原一位小数会显示成「2万」，误差 1%）
+    return v >= 10000 ? (v / 10000).toFixed(2).replace(/\.?0+$/, '') + '万' : fmt(v);
   };
   // 纵坐标「美观刻度」：把上限向上取整到 1/2/2.5/5 × 10^n，刻度均匀规整。
   // 例如 max=8325 → 上限 10000，5 线刻度 0/2500/5000/7500/10000；max=15000→20000，0/5千/1万/1.5万/2万。
   function niceMax(v) {
     v = (Number(v) || 0);
     if (v <= 0) return 10;
-    const exp = Math.pow(10, Math.floor(Math.log10(v)));
-    const f = v / exp;                       // 1≤f<10
-    const m = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
-    return m * exp;
+    // 先取「好看的」等分步长再 ×4，保证 4 段刻度都是整数（原做法 2.5万/4 会出现 6,250、1.88万）
+    const raw = v / 4;
+    const exp = Math.pow(10, Math.floor(Math.log10(raw)));
+    const f = raw / exp;                     // 1≤f<10
+    const m = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(x => f <= x + 1e-9);
+    return 4 * m * exp;
   }
   // 按美观上限生成 0..n 的 5 等分刻度标签
   function tickLabels(max) {
@@ -4435,14 +4442,17 @@ const ThreeView = (() => {
   function lineChart(data, labels, color, opts) {
     if (!data || !data.length) return '<div class="t3-empty">暂无趋势数据</div>';
     opts = opts || {};
-    const w = 600, h = 200, padL = 52, padR = 14, padT = 16, padB = 26;
+    // opts.w：画布宽度按卡片实际宽度给（半宽卡更窄），保证缩放后刻度文字仍清晰
+    const w = opts.w || 600, h = 200, padL = 52, padR = 14, padT = 16, padB = 26;
     const iw = w - padL - padR, ih = h - padT - padB;
     const rawMax = Math.max(...data), rawMin = Math.min(...data);
     let min = 0, max = niceMax(rawMax);
     if (opts.fromZero !== true && rawMax > 0 && rawMin > rawMax * 0.4 && (rawMax - rawMin) < rawMax * 0.6) {
-      const step = niceStep((rawMax - rawMin) / 3);
+      // 截断纵轴：4 段等分且每段是整步长（避免 13.75 / 17.5 这类刻度）
+      let step = niceStep((rawMax - rawMin) / 3);
       min = Math.max(0, Math.floor((rawMin - step * 0.2) / step) * step);
-      max = Math.max(rawMax, Math.ceil((rawMax + step * 0.2) / step) * step);
+      while (min + 4 * step < rawMax + step * 0.1) { step = niceStep(step * 1.01); min = Math.max(0, Math.floor((rawMin - step * 0.2) / step) * step); }
+      max = min + 4 * step;
     }
     const xs = data.map((_, i) => padL + iw * i / (data.length - 1 || 1));
     const ys = data.map(v => padT + ih * (1 - (v - min) / ((max - min) || 1)));
@@ -4501,9 +4511,9 @@ const ThreeView = (() => {
   }
 
   // ---- SVG 柱状 ----
-  function barChart(data, labels, color, unit = '') {
+  function barChart(data, labels, color, unit = '', w = 600) {
     if (!data || !data.length) return '<div class="t3-empty">暂无数据</div>';
-    const w = 600, h = 200, padL = 52, padR = 14, padT = 18, padB = 26;
+    const h = 200, padL = 52, padR = 14, padT = 18, padB = 26;
     const iw = w - padL - padR, ih = h - padT - padB;
     const max = niceMax(Math.max(...data) * 1.15);   // 美观上限，刻度规整
     const bw = Math.min(38, iw / data.length * 0.55);
@@ -4518,16 +4528,16 @@ const ThreeView = (() => {
       const cx = padL + iw * (i + 0.5) / data.length;
       const bh = ih * v / max, y = padT + ih - bh;
       return `<rect x="${cx - bw / 2}" y="${y}" width="${bw}" height="${Math.max(bh, 1.5)}" rx="4" fill="${color}" opacity=".88"><title>${esc(labels[i])}：${fmt(v)}${esc(unit)}</title></rect>` +
-        `<text x="${cx}" y="${y - 5}" text-anchor="middle" class="tick">${v >= 10000 ? wan(v) : v}</text>` +
+        `<text x="${cx}" y="${y - 5}" text-anchor="middle" class="tick">${Number.isInteger(v) ? wan(v) : v}</text>` +
         `<text x="${cx}" y="${h - 7}" text-anchor="middle" class="tick">${esc(labels[i])}</text>`;
     }).join('');
     return `<svg viewBox="0 0 ${w} ${h}" class="chart">${grid}${bars}</svg>`;
   }
 
   // ---- SVG 分组柱状图（双序列并排，todo 任务#5：各容量出货/接入对比） ----
-  function groupedBarChart(labels, sA, sB) {
+  function groupedBarChart(labels, sA, sB, w = 620) {
     if (!labels || !labels.length) return '<div class="t3-empty">暂无数据</div>';
-    const w = 620, h = 210, padL = 52, padR = 14, padT = 18, padB = 30;
+    const h = 210, padL = 52, padR = 14, padT = 18, padB = 30;
     const iw = w - padL - padR, ih = h - padT - padB;
     const max = niceMax(Math.max(...sA.data, ...sB.data, 1) * 1.15);
     const n = labels.length;
@@ -4550,7 +4560,7 @@ const ThreeView = (() => {
         bars += `<rect x="${x - bw / 2}" y="${y}" width="${bw}" height="${Math.max(bh, 1.5)}" rx="3" fill="${s.color}"><title>${esc(lab)} · ${esc(s.name)}：${fmt(v)}</title></rect>`;
         // 每根柱各自标注数量（0 不标；字号小、颜色随柱，与柱错开避免重叠）
         if (v > 0) {
-          bars += `<text x="${x}" y="${y - 4}" text-anchor="middle" class="tick" style="font-size:8.5px;">${v >= 10000 ? wan(v) : v}</text>`;
+          bars += `<text x="${x}" y="${y - 4}" text-anchor="middle" class="tick" style="font-size:10px;">${Number.isInteger(v) ? wan(v) : v}</text>`;
         }
       });
       bars += `<text x="${cx}" y="${h - 8}" text-anchor="middle" class="tick">${esc(lab)}</text>`;
@@ -4968,7 +4978,7 @@ const ThreeView = (() => {
     const useYear = state.gran === 'year';
     const trendData = useD15 ? (tr.days_data || []) : useYear ? (tr.year_data || []) : (tr.data || []);
     const trendLabels = useD15 ? (tr.days_labels || []) : useYear ? (tr.year_labels || []) : (tr.labels || []);
-    const trendHtml = lineChart(trendData, trendLabels, SEQ.b2);
+    const trendHtml = lineChart(trendData, trendLabels, SEQ.b2, { w: 560 });
     const granTabs = `<button data-g="month" class="${(!useD15 && !useYear) ? 'on' : ''}">by 月</button><button data-g="year" class="${useYear ? 'on' : ''}">by 年</button><button data-g="d15" class="${useD15 ? 'on' : ''}">近15天</button>`;
 
     // 项目列表（点击行 → 进入项目视角）
@@ -5041,7 +5051,7 @@ const ThreeView = (() => {
           <div>${groupedBarChart(
             (d.projects || []).map(p => String(p.cap || p.name || '')),
             { name: '出货(Pack)', color: SEQ.b2, data: (d.projects || []).map(p => p.pack || 0) },
-            { name: '接入车辆', color: SEQ.g2, data: (d.projects || []).map(p => p.conn || 0) }
+            { name: '接入车辆', color: SEQ.g2, data: (d.projects || []).map(p => p.conn || 0) }, 480
           )}</div>
         </div>
       </div>
@@ -5136,7 +5146,7 @@ const ThreeView = (() => {
     const useYear = state.gran === 'year';
     const trendData = useD15 ? (tr.days_data || []) : useYear ? (tr.year_data || []) : (tr.data || []);
     const trendLabels = useD15 ? (tr.days_labels || []) : useYear ? (tr.year_labels || []) : (tr.labels || []);
-    const trendHtml = lineChart(trendData, trendLabels, SEQ.b2);
+    const trendHtml = lineChart(trendData, trendLabels, SEQ.b2, { w: 720 });
     const granTabs = `<div class="seg" id="t3Gran"><button data-g="month" class="${(!useD15 && !useYear) ? 'on' : ''}">by 月</button><button data-g="year" class="${useYear ? 'on' : ''}">by 年</button><button data-g="d15" class="${useD15 ? 'on' : ''}">近15天</button></div>`;
 
     // 适用车型 & 质保：车型明细与质保台账按车型合并；质保条款拆成 年限/里程/SOH 三列，可逐行编辑
@@ -5328,17 +5338,17 @@ const ThreeView = (() => {
     // SOH 分布（近似口径）
     const sohLabels = ['<90', '90~92', '92~94', '94~96', '96~98', '98~100'];
     const sohData = [0.1, 0.6, 3.1, 9.8, 34.5, 51.9];
-    const sohHtml = barChart(sohData, sohLabels, SEQ.g2, ' %');
+    const sohHtml = barChart(sohData, sohLabels, SEQ.g2, ' %', 520);
 
     // ppm 走势（近似）
     const ppmData = [12.1, 13.8, 15.2, 17.6, 19.4, 21.8, 23.1, 22.4, 20.9, Number(info.ppm || 0)];
     const ppmLabels = ['25-12', '26-01', '26-02', '26-03', '26-04', '26-05', '26-06', '26-07', '26-08', '26-09'];
-    const ppmHtml = lineChart(ppmData, ppmLabels, SEQ.b2);
+    const ppmHtml = lineChart(ppmData, ppmLabels, SEQ.b2, { w: 520 });
 
     // 批次出货柱状 + 批次表
     const batches = d.batches || [];
     const batchBarHtml = batches.length
-      ? barChart(batches.map(b => b.qty), batches.map(b => b.batch.slice(-5) + '·' + b.cust[0]), SEQ.b2, ' 颗')
+      ? barChart(batches.map(b => b.qty), batches.map(b => b.batch), SEQ.b2, ' 颗', 760)
       : '<div class="t3-empty">暂无批次数据</div>';
     const batchRows = batches.map(b => `
       <tr><td><b>${esc(b.cust)}</b></td><td><b>${esc(b.batch)}</b></td><td>${esc(b.plant)}</td>
@@ -14722,7 +14732,7 @@ const PageContract = {
         const tiles = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
             <div class="card stat-card" style="padding:16px 17px;position:relative;">
                 <div class="tile-icon brand" style="position:absolute;right:14px;top:14px;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:16px;background:rgba(100,210,255,0.12);color:var(--accent);">📋</div>
-                <div class="stat-label">合同总数</div><div class="stat-value" style="margin-top:8px;">${s.total}</div>
+                <div class="stat-label">合同总数</div><div class="stat-value" style="margin-top:8px;">${s.total || 0}</div>
             </div>
             <div class="card stat-card" style="padding:16px 17px;position:relative;">
                 <div class="tile-icon info" style="position:absolute;right:14px;top:14px;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:16px;background:rgba(116,192,252,0.12);color:var(--info);">💰</div>
@@ -14774,7 +14784,7 @@ const PageContract = {
         const maxVal = Math.max(...data.map(d => d.value), 1);
         const bars = data.map(d => {
             const h = Math.round(d.value / maxVal * 100);
-            const lbl = d.value >= 10000 ? (d.value / 10000).toFixed(1) + '万' : String(d.value);
+            const lbl = d.value >= 1e8 ? (d.value / 1e8).toFixed(2).replace(/\.?0+$/, '') + '亿' : d.value >= 10000 ? (d.value / 10000).toFixed(1).replace(/\.0$/, '') + '万' : String(d.value);
             return `<div class="bar" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end;">
                 <div class="col" style="width:100%;max-width:30px;height:${h}%;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,var(--accent),color-mix(in srgb,var(--accent) 55%,transparent));position:relative;">
                     <span style="position:absolute;top:-16px;left:0;right:0;text-align:center;font-size:10px;font-weight:700;">${lbl}</span>
@@ -15117,11 +15127,11 @@ const PageDevlog = {
         const u = this._todo || [];
         const todoOpen = u.filter(x => ['待完善','进行中','待讨论'].includes(x.status)).length;
         box.innerHTML = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:12px;">`
-            + this._tile('📋', '总记录', s.total, 'var(--accent)', 'rgba(100,210,255,.12)')
+            + this._tile('📋', '总记录', s.total || 0, 'var(--accent)', 'rgba(100,210,255,.12)')
             + this._tile('⬜', '大/子任务待办', st['待办'] || 0, 'var(--warning)', 'rgba(255,169,77,.12)')
             + this._tile('▶', '进行中', st['进行中'] || 0, 'var(--info)', 'rgba(116,192,252,.12)')
             + this._tile('✅', '已完成', st['已完成'] || 0, 'var(--success)', 'rgba(37,211,102,.12)')
-            + this._tile('⚠', '已逾期', s.overdue, 'var(--danger)', 'rgba(255,107,107,.12)')
+            + this._tile('⚠', '已逾期', s.overdue || 0, 'var(--danger)', 'rgba(255,107,107,.12)')
             + this._tile('✏', '待完善', todoOpen, 'var(--warning)', 'rgba(255,215,120,.12)')
             + this._tile('👤', '责任人', Object.keys(s.by_owner || {}).length, 'var(--text-secondary)', 'rgba(150,200,255,.10)')
             + `</div>`;
