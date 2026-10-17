@@ -64,6 +64,7 @@
     --info-soft: rgba(116, 192, 252, 0.14);
     --font-mono: "Consolas", "JetBrains Mono", ui-monospace, monospace;
     --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --grid: rgba(139, 164, 196, 0.14);   /* 图表网格线 */
 }
 
 /* ---- 浅色主题 ---- */
@@ -116,6 +117,7 @@
     --danger-soft: rgba(229, 62, 62, 0.12);
     --info-soft: rgba(49, 130, 206, 0.12);
     --font-mono: "Consolas", "JetBrains Mono", ui-monospace, monospace;
+    --grid: rgba(26, 35, 50, 0.08);
 }
 
 * {
@@ -1921,8 +1923,27 @@ tbody tr:hover { background: var(--bg-card-hover); }
 
 /* ================= 三视角首页（对齐「首页功能设计-三视角原型.html」） ================= */
 .t3-loading{padding:40px;text-align:center;color:var(--muted);}
+/* 骨架屏：数据回来前先占好版面，避免整页跳动 */
+.t3-skel{padding:0;}
+.t3-skel .sk{border-radius:14px;background:linear-gradient(90deg,var(--panel) 25%,var(--bg-card-hover) 50%,var(--panel) 75%);background-size:200% 100%;animation:t3sk 1.2s ease-in-out infinite;border:1px solid var(--line);}
+.t3-skel .sk-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:14px;}
+.t3-skel .sk-kpis .sk{height:92px;}
+.t3-skel .sk-row{display:grid;grid-template-columns:1.25fr 1fr;gap:14px;margin-bottom:14px;}
+.t3-skel .sk-row .sk{height:260px;}
+.t3-skel .sk-full{height:220px;margin-bottom:14px;}
+.t3-skel .sk-tip{font-size:12px;color:var(--muted);margin:0 0 10px 2px;}
+@keyframes t3sk{0%{background-position:100% 0;}100%{background-position:-100% 0;}}
+@media(max-width:1100px){.t3-skel .sk-kpis{grid-template-columns:repeat(3,1fr);}}
+/* 首页一行筛选条：视角 | 客户 | 容量 | 时间 …… 下载 */
+.p1-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px 0;}
+.p1-toolbar .p1-fgrp{display:inline-flex;align-items:center;gap:8px;}
+.p1-toolbar .p1-flab{font-size:12px;color:var(--text-muted);font-weight:700;white-space:nowrap;}
+.p1-toolbar select{width:auto;min-width:150px;max-width:240px;height:34px;padding:4px 10px;font-size:13px;}
+.p1-toolbar .p1-sep{width:1px;height:22px;background:var(--line-strong);}
 .t3-empty{border:1.5px dashed var(--line);border-radius:12px;padding:18px;text-align:center;color:var(--muted);font-size:13px;}
-.t3-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:12px;margin-bottom:14px;}
+.t3-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:14px;}
+@media(max-width:1280px){.t3-kpis{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:640px){.t3-kpis{grid-template-columns:repeat(2,1fr);}}
 .t3-kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);}
 .t3-kpi .lab{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);}
 .t3-kpi .val{font-size:23px;font-weight:800;margin-top:7px;letter-spacing:-.3px;font-variant-numeric:tabular-nums;}
@@ -1995,7 +2016,9 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .t3-strip{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
 .t3-strip .it{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 13px;font-size:12px;color:var(--muted);box-shadow:var(--shadow);}
 .t3-strip .it b{color:var(--text-primary);margin-left:5px;font-size:12.5px;}
-.t3-inner-grid{display:grid;grid-template-columns:1fr;gap:4px;margin-top:12px;}
+.t3-inner-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;}
+.t3-inner-grid .t3-card{margin-bottom:0;box-shadow:none;}
+@media(max-width:1280px){.t3-inner-grid{grid-template-columns:1fr;}}
 .t3-tl-wrap{max-height:480px;overflow-y:auto;padding-right:6px;}
 .t3-tl-wrap::-webkit-scrollbar{width:6px;}
 .t3-tl-wrap::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
@@ -2226,10 +2249,13 @@ tbody tr:hover { background: var(--bg-card-hover); }
   function fmtProject() { return PROJECTS.map(function (p) { return Object.assign({}, p); }); }
   function makeQuality() {
     var q = { labels: MONTH_LABELS, alarm: {}, closed: {}, complaint: {} };
+    // 结构：{ 模式: { 'YY-MM': 数量 } }，与真实接口一致（按月份标签取值）
+    function byLabel(arr) { var o = {}; MONTH_LABELS.forEach(function (l, k) { o[l] = arr[k]; }); return o; }
     MODES.forEach(function (m, i) {
-      q.alarm[m] = randArr(12, 8 + i * 3, 6);
-      q.closed[m] = q.alarm[m].map(function (v) { return Math.round(v * 0.8); });
-      q.complaint[m] = randArr(12, 1, 3);
+      var alarm = randArr(12, 8 + i * 3, 6);
+      q.alarm[m] = byLabel(alarm);
+      q.closed[m] = byLabel(alarm.map(function (v) { return Math.round(v * 0.8); }));
+      q.complaint[m] = byLabel(randArr(12, 1, 3));
     });
     return q;
   }
@@ -4212,7 +4238,9 @@ const ThreeView = (() => {
   function metricByMode(fq, metric) {
     const mx = (fq && fq[metric]) || {};
     return Object.keys(mx).map(m => {
-      const arr = (fq.labels || []).map(l => (mx[m] && mx[m][l]) || 0);
+      // 过滤后的矩阵(fq)按下标存数组，原始矩阵(q)按月份标签存对象，两种都要支持
+      const row = mx[m] || {};
+      const arr = Array.isArray(row) ? row : (fq.labels || []).map(l => row[l] || 0);
       return { label: m, value: arr.reduce((s, v) => s + v, 0), color: modeColor(m) };
     }).filter(x => x.value > 0).sort((a, b) => b.value - a.value);
   }
@@ -4363,10 +4391,8 @@ const ThreeView = (() => {
       { icon: '📦', label: '累计接入数', val: fmt(k.conn), sub: '历史累计 · 不随时间筛选' },
       { icon: '🛡️', label: '已进保车辆数', val: fmt(k.insured), sub: '当前质保状态(时点值)' },
       { icon: '⚡', label: '活跃车辆', val: fmt(k.active), sub: '近90天数据上报(≈接入)' },
-      { icon: '⚠️', label: '累计预警外发', val: fmt(k.alarm), sub: '历史外发累计', cls: 'bad' },
-      { icon: '✅', label: '市场已闭环', val: fmt(k.closed), sub: `闭环率 ${esc(closeRate)}`, cls: 'ok' },
-      { icon: '📊', label: '近7天预警/闭环', val: `${k.alarm7 || 0} / ${k.closed7 || 0}`, sub: '预警 / 已闭环', cls: 'bad' },
-      { icon: '📋', label: '待办完成率', val: (k.todoAll ? Math.round((k.todoDone || 0) / k.todoAll * 100) : 0) + '%', sub: `已完成 ${k.todoDone || 0} / 共 ${k.todoAll || 0}`, cls: 'ok' },
+      { icon: '⚠️', label: '累计预警外发 / 已闭环', val: `${fmt(k.alarm)} / ${fmt(k.closed)}`, sub: `闭环率 ${esc(closeRate)} · 历史累计`, cls: 'bad' },
+      { icon: '📊', label: '近7天预警 / 闭环', val: `${k.alarm7 || 0} / ${k.closed7 || 0}`, sub: '预警 / 已闭环', cls: 'bad' },
     ]);
 
     const tr = d.trend || {};
@@ -4460,13 +4486,6 @@ const ThreeView = (() => {
         <div class="chead"><div><div class="ctitle">📊 质量分析（预警 / 闭环 / 客诉）</div><div class="csub">by 失效模式 · 累积/增量 + 时间筛选</div></div></div>
         <div id="t3CustQuality"></div>
       </div>
-      <!-- 项目列表 -->
-      <div class="t3-card">
-        <div class="chead"><div><div class="ctitle">🗂️ 电芯项目列表（该客户全部电芯产品）</div><div class="csub">一行=一款电芯(容量×结构) · 点击行进入<b>项目视角</b></div></div></div>
-        <div class="tblwrap"><table class="t3-tbl"><thead>
-          <tr><th>电芯项目</th><th class="num">容量(Ah)</th><th>电池结构</th><th>状态</th><th>SOP</th><th class="num">累计出货(Pack)</th><th class="num">接入数</th><th class="num">接入率</th><th class="num">过保数(率)</th><th class="num">预警外发</th><th class="num">已闭环(率)</th><th>操作</th></tr>
-        </thead><tbody>${projRows}</tbody></table></div>
-      </div>
       <div class="t3-grid2">
         <div class="t3-card">
           <div class="chead"><div><div class="ctitle">🏆 项目预警 / 接入 / 过保 排名</div><div class="csub">定位哪个项目拖后腿</div></div>
@@ -4478,6 +4497,13 @@ const ThreeView = (() => {
           <div class="tblwrap"><table class="t3-tbl"><thead><tr><th>失效模式</th><th class="num">⚠️ 预警（${esc(accLabel)}）</th><th class="num">✅ 闭环</th><th class="num">闭环率</th><th class="num">📣 客诉</th><th>处理措施</th></tr></thead><tbody>${modeRowsHtml || '<tr><td colspan="6" class="t3-empty">暂无失效模式数据</td></tr>'}</tbody></table></div>
         </div>
       </div>
+      <!-- 项目列表 -->
+      <div class="t3-card">
+        <div class="chead"><div><div class="ctitle">🗂️ 电芯项目列表（该客户全部电芯产品）</div><div class="csub">一行=一款电芯(容量×结构) · 点击行进入<b>项目视角</b></div></div></div>
+        <div class="tblwrap"><table class="t3-tbl"><thead>
+          <tr><th>电芯项目</th><th class="num">容量(Ah)</th><th>电池结构</th><th>状态</th><th>SOP</th><th class="num">累计出货(Pack)</th><th class="num">接入数</th><th class="num">接入率</th><th class="num">过保数(率)</th><th class="num">预警外发</th><th class="num">已闭环(率)</th><th>操作</th></tr>
+        </thead><tbody>${projRows}</tbody></table></div>
+      </div>
       <div class="t3-grid2">
         <div class="t3-card">
           <div class="chead"><div><div class="ctitle">🚨 关键处置事件时间线</div><div class="csub">召回 / OTA / 停线 / 批量预警 / 索赔 / 质量会</div></div></div>
@@ -4486,17 +4512,13 @@ const ThreeView = (() => {
         <div class="t3-card">
           <div class="chead"><div><div class="ctitle">👥 外部关键人 / 内部 PQM</div></div></div>
           <div id="t3Contacts">${contacts}</div>
-          <div class="t3-card-inner-grid">
+          <div class="t3-inner-grid">
             <div class="t3-card"><div class="chead"><div><div class="ctitle">📅 拜访计划</div><div class="csub">三色状态</div></div></div><div id="t3Visits">${visits}</div></div>
             <div class="t3-card"><div class="chead"><div><div class="ctitle">📝 近期会议</div></div></div><div id="t3Meetings">${meetings}</div></div>
           </div>
         </div>
       </div>
-      <div class="t3-card">
-        <div class="chead"><div><div class="ctitle">🧩 自定义模块（可配置展示）</div></div>
-          <div style="display:flex;gap:8px"><button class="btn btn-sm btn-secondary">⚡ AI 生成</button><button class="btn btn-sm btn-secondary">＋ 添加模块</button></div></div>
-        <div id="p1Modules"></div>
-      </div>`;
+      `;
 
     // 质量面板 + 交互绑定
     renderQualityPanel(document.getElementById('t3CustQuality'), d.quality || { labels: [], alarm: {}, closed: {}, complaint: {} }, 'Cust', d.outgoingModes);
@@ -4515,8 +4537,7 @@ const ThreeView = (() => {
       document.querySelectorAll('#t3RankSeg button').forEach(x => x.classList.toggle('on', x === b));
       renderCustomer(host, d, oem);
     });
-    // 自定义模块由 page1 负责初始化
-    if (window.DashboardModules) DashboardModules.init('p1Modules');
+    // 自定义模块在看板下方的 #p1Modules，由 page1 初始化一次（此处不再重复渲染）
   }
 
   // ==========================================================================
@@ -4541,14 +4562,11 @@ const ThreeView = (() => {
       `<button data-l="${k}" class="${k === state.level ? 'on' : ''}">${LEVEL[k].icon} ${k}</button>`).join('')}</div>`;
     const kpis = kpiCards([
       { icon: lv.icon, label: `累计出货（${state.level}）`, val: wan(lvVal) + ' ' + lv.unit, sub: lvSub, cls: 'hl' },
-      { icon: '📥', label: '累计接入', val: fmt(info.conn), sub: '接入台账（辆）' },
+      { icon: '📥', label: '累计接入', val: fmt(info.conn), sub: `接入率 ${esc(connRate)}（接入 / 出货 Pack）` },
       { icon: '🗓️', label: '近15天接入', val: fmt(info.access15 != null ? info.access15 : '-'), sub: '近15天有接入记录的车辆' },
-      { icon: '📈', label: '接入率', val: esc(connRate), sub: '接入 / 出货(Pack)' },
-      { icon: '🛡️', label: '已进保', val: info.insured == null ? '-' : fmt(info.insured), sub: '质保台账（无数据时显示-）' },
-      { icon: '⏳', label: '过保数(率)', val: `${fmt(info.overdue)}（${info.packShip ? (100 * (info.overdue || 0) / info.packShip).toFixed(2) : 0}%）`, sub: '超出质保条款' },
-      { icon: '⚠️', label: '累计预警外发', val: fmt(info.alarm), sub: '历史外发累计', cls: 'bad' },
-      { icon: '✅', label: '市场已闭环', val: fmt(info.closed), sub: `闭环率 ${esc(closeRate)}`, cls: 'ok' },
-      { icon: '📊', label: '近7天预警/闭环', val: `${info.alarm7 || 0} / ${info.closed7 || 0}`, sub: '预警 / 已闭环', cls: 'bad' },
+      { icon: '🛡️', label: '已进保 / 过保', val: `${info.insured == null ? '-' : fmt(info.insured)} / ${fmt(info.overdue)}`, sub: `过保率 ${info.packShip ? (100 * (info.overdue || 0) / info.packShip).toFixed(2) : 0}%（超出质保条款）` },
+      { icon: '⚠️', label: '累计预警外发 / 已闭环', val: `${fmt(info.alarm)} / ${fmt(info.closed)}`, sub: `闭环率 ${esc(closeRate)} · 历史累计`, cls: 'bad' },
+      { icon: '📊', label: '近7天预警 / 闭环', val: `${info.alarm7 || 0} / ${info.closed7 || 0}`, sub: '预警 / 已闭环', cls: 'bad' },
     ]);
     const structCap = `${info.struct || '-'} · ${info.cap != null ? info.cap : ''}Ah`;
 
@@ -4827,7 +4845,9 @@ const ThreeView = (() => {
         <div id="t3CellEvents">${eventsHtml}</div>
       </div>
       <div style="text-align:right;margin-top:6px;">
-        <button class="btn btn-secondary" onclick="ThreeView.gotoCustomer('${esc(state.oem)}')">← 返回项目视角</button>
+        ${state.oem
+          ? `<button class="btn btn-secondary" onclick="ThreeView.gotoProject('${esc(state.oem)}','${esc(state.cellCap)}')">← 返回项目视角（${esc(state.oem)} · ${esc(state.cellCap)}Ah）</button>`
+          : `<button class="btn btn-secondary" onclick="ThreeView.gotoCustomer('')">← 返回客户视角</button>`}
       </div>`;
 
     renderQualityPanel(document.getElementById('t3CellQuality'), d.quality || { labels: [], alarm: {}, closed: {}, complaint: {} }, 'Cell', d.outgoingModes);
@@ -4839,6 +4859,14 @@ const ThreeView = (() => {
   // ==========================================================================
   // 数据加载入口（供 page1 调用）
   // ==========================================================================
+  // 骨架屏（保留 t3-loading 类：下载页面据此判断「尚未加载完成」）
+  function skeleton(tip) {
+    const k = '<div class="sk"></div>'.repeat(6);
+    return `<div class="t3-loading t3-skel"><div class="sk-tip">${esc(tip)}</div>
+      <div class="sk-kpis">${k}</div>
+      <div class="sk-row"><div class="sk"></div><div class="sk"></div></div>
+      <div class="sk sk-full"></div></div>`;
+  }
   function base_q() {
     let q = '?';
     if (state.timeRange.mode && state.timeRange.mode !== 'all') q += `&time_range=${encodeURIComponent(state.timeRange.mode)}`;
@@ -4847,7 +4875,7 @@ const ThreeView = (() => {
   async function loadCustomer(host, oem, cellCap) {
     if (!host) return;
     state.oem = oem; state.cellCap = cellCap || '';
-    host.innerHTML = '<div class="t3-loading">正在加载客户视角看板…</div>';
+    host.innerHTML = skeleton('正在加载客户视角看板…');
     const q = `?view=customer&oem=${encodeURIComponent(oem)}` + (cellCap ? `&cell_cap=${encodeURIComponent(cellCap)}` : '');
     let d;
     try {
@@ -4863,7 +4891,7 @@ const ThreeView = (() => {
   async function loadProject(host, oem, cellCap) {
     if (!host) return;
     state.oem = oem; state.cellCap = cellCap;
-    host.innerHTML = '<div class="t3-loading">正在加载项目视角看板…</div>';
+    host.innerHTML = skeleton('正在加载项目视角看板…');
     const q = `?view=project&oem=${encodeURIComponent(oem)}&cell_cap=${encodeURIComponent(cellCap)}`;
     let d;
     try {
@@ -4879,7 +4907,7 @@ const ThreeView = (() => {
   async function loadCell(host, cellCap) {
     if (!host) return;
     state.cellCap = cellCap;
-    host.innerHTML = '<div class="t3-loading">正在加载电芯视角看板（跨客户聚合，请稍候）…</div>';
+    host.innerHTML = skeleton('正在加载电芯视角看板（跨客户聚合，请稍候）…');
     const q = `?view=cell&cell_cap=${encodeURIComponent(cellCap)}`;
     let d;
     try {
@@ -4975,60 +5003,41 @@ const Page1 = {
     renderLayout(selected_oem = '') {
         return `
         <div class="card" style="margin-bottom:20px;">
-            <!-- 三视角顶栏：左=视角切换+时间范围，右=视图/下载（推到行尾，与左侧留出间隔） -->
-            <div style="display:flex;align-items:center;gap:12px;flex-wrap:nowrap;margin:0 0 12px 0;overflow-x:auto;">
+            <!-- 一行筛选条：视角 | 客户 / 容量（随视角切换）| 时间范围 …… 下载页面；选完即加载，不需要「查看」按钮 -->
+            <div class="p1-toolbar">
                 <div class="t3-vswitch" style="flex:0 0 auto;">
                     <button class="p1-view-c on" data-view="customer" onclick="Page1.switchView('customer')">👤 客户视角</button>
                     <button class="p1-view-p" data-view="project" onclick="Page1.switchView('project')">📦 项目视角</button>
                     <button class="p1-view-cell" data-view="cell" onclick="Page1.switchView('cell')">🔋 电芯视角</button>
                 </div>
+                <span class="p1-sep"></span>
+                <!-- 客户视角 -->
+                <span class="p1-fgrp" id="p1FilterC">
+                    <span class="p1-flab">客户</span>
+                    <select id="p1Customer">${Utils.customerOptions(selected_oem)}</select>
+                </span>
+                <!-- 项目视角：项目 = 某客户 × 某款电芯 -->
+                <span class="p1-fgrp" id="p1FilterP" style="display:none;">
+                    <span class="p1-flab">客户</span>
+                    <select id="p1ProjCust">${Utils.customerOptions(selected_oem)}</select>
+                    <span class="p1-flab" title="该客户电量项目（一款电芯可含多个车型）">项目容量</span>
+                    <select id="p1ProjCap"><option value="">选择项目(容量)...</option></select>
+                </span>
+                <!-- 电芯视角：跨客户看同一容量电芯 -->
+                <span class="p1-fgrp" id="p1FilterCell" style="display:none;">
+                    <span class="p1-flab">电芯容量</span>
+                    <select id="p1CellProduct"><option value="">选择电芯产品...</option></select>
+                </span>
+                <span class="p1-sep"></span>
                 <div class="t3-timefilter" id="p1TimeFilter" style="flex:0 0 auto;" title="时间范围作用于：接入走势趋势图 + 质量分析面板。顶部 KPI 为历史累计，不随时间筛选变化">
-                    <span style="font-size:12px;color:var(--text-muted);font-weight:700;">📅 时间范围</span>
+                    <span class="p1-flab">时间</span>
                     <div class="seg" id="p1SegTime">
                         <button data-t="3m">近3月</button><button data-t="6m">近6月</button>
                         <button data-t="12m">近12月</button><button data-t="all" class="on">全部</button>
                     </div>
                 </div>
-                <!-- 右侧操作组：下载页面（视图管理已移到页面右侧悬停面板） -->
-                <div style="margin-left:auto;display:flex;align-items:center;gap:12px;flex:0 0 auto;">
-                    <!-- 下载页面：当前看板导出为独立 HTML（todo#1，给客户看） -->
-                    <div class="t3-timefilter" title="把当前看板导出为独立 HTML 文件（自带样式与图表，无需登录即可查看），可直接发给客户">
-                        <button class="btn btn-sm btn-primary" onclick="Page1.downloadPage()">⬇ 下载页面</button>
-                    </div>
-                </div>
-            </div>
-            <!-- 面包屑：当前视角上下文回跳 -->
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 6px 0;font-size:12.5px;color:var(--muted);" id="p1Crumbs"></div>
-            <!-- 客户视角 -->
-            <div class="filter-bar" id="p1FilterC" style="border:none;padding:0;margin:0 0 12px 0;">
-                <div class="form-group">
-                    <label>客户 (OEM)</label>
-                    <select id="p1Customer">${Utils.customerOptions(selected_oem)}</select>
-                </div>
-            </div>
-            <!-- 项目视角（严格按原型：项目 = 某客户 × 某款电芯 的单项目全详情） -->
-            <div class="filter-bar" id="p1FilterP" style="border:none;padding:0;margin:0 0 12px 0;display:none;">
-                <div class="form-group">
-                    <label>客户 (OEM)</label>
-                    <select id="p1ProjCust">${Utils.customerOptions(selected_oem)}</select>
-                </div>
-                <div class="form-group">
-                    <label>项目 · 容量 (Ah) <span style="font-size:11px;color:var(--text-muted);font-weight:400;">该客户电量项目（一款电芯可含多个车型）</span></label>
-                    <select id="p1ProjCap"><option value="">选择项目(容量)...</option></select>
-                </div>
-                <div class="form-group" style="align-items:flex-end;">
-                    <button class="btn btn-primary" onclick="Page1.loadProject()">查看项目</button>
-                </div>
-            </div>
-            <!-- 电芯视角（三视角之一）：选某一款电芯产品 → 看它单款表现 -->
-            <div class="filter-bar" id="p1FilterCell" style="border:none;padding:0;margin:0 0 12px 0;display:none;">
-                <div class="form-group" style="flex-wrap:wrap;">
-                    <label>电芯产品 <span style="font-size:11px;color:var(--text-muted);font-weight:400;">选某一款电芯看它单款表现</span></label>
-                    <div style="display:flex;gap:8px;align-items:center;">
-                        <select id="p1CellProduct" style="min-width:280px;"><option value="">选择电芯产品...</option></select>
-                        <button class="btn btn-primary" onclick="Page1.loadCellView()">查看电芯</button>
-                    </div>
-                </div>
+                <!-- 下载页面：当前看板导出为独立 HTML（给客户看）；视图管理在页面右侧悬停面板 -->
+                <button class="btn btn-sm btn-primary" style="margin-left:auto;" title="把当前看板导出为独立 HTML 文件（自带样式与图表，无需登录即可查看），可直接发给客户" onclick="Page1.downloadPage()">⬇ 下载页面</button>
             </div>
             <div id="p1Dashboard">
                 <div class="empty-state">
@@ -5876,8 +5885,17 @@ ${engineJs}
                     const oem = (document.getElementById('p1Customer') || {}).value || '';
                     if (oem) await this.loadDashboard(false);
                 } else if (mode === 'project') {
+                    const pcust = document.getElementById('p1ProjCust');
+                    const ccust = (document.getElementById('p1Customer') || {}).value || '';
+                    if (pcust && ccust && pcust.value !== ccust) {
+                        pcust.value = ccust;
+                        const capSel0 = document.getElementById('p1ProjCap');
+                        if (capSel0) capSel0.value = '';
+                    }
                     await this._fillProjectCaps();
-                    const cap = (document.getElementById('p1ProjCap') || {}).value || '';
+                    const capSel = document.getElementById('p1ProjCap');
+                    if (capSel && !capSel.value && capSel.options.length > 1) capSel.selectedIndex = 1;
+                    const cap = capSel ? capSel.value : '';
                     if (cap) await this.loadProject();
                 } else if (mode === 'cell') {
                     await this._fillCellCaps();
@@ -5889,6 +5907,7 @@ ${engineJs}
                         this._selectCellProduct(oem, projCap);
                     }
                     const sel = document.getElementById('p1CellProduct');
+                    if (sel && !sel.value && sel.options.length > 1) sel.selectedIndex = 1;   // 默认第一个容量
                     if (sel && sel.value) await this.loadCellView();
                 }
             } catch (e) { /* 自动加载失败不阻塞切换 */ }
@@ -6233,7 +6252,11 @@ ${engineJs}
         if (!custSel || !capsSel) return;
         // 客户下拉：切换客户 → 刷新该项目(容量)下拉并自动加载（选完即确认）
         custSel.onchange = async () => {
+            // 两个视角共用同一个「当前客户」，切回客户视角时不会跳回旧客户
+            const cc = document.getElementById('p1Customer');
+            if (cc && custSel.value) { cc.value = custSel.value; this.currentOem = custSel.value; }
             await this._fillProjCapsForCust(custSel.value);
+            if (!capsSel.value && capsSel.options.length > 1) capsSel.selectedIndex = 1;   // 默认第一个项目
             if (this._view === 'project' && capsSel.value) this.loadProject();
         };
         // 容量下拉：选中即自动加载该项目
