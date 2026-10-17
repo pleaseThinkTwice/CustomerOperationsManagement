@@ -2011,6 +2011,7 @@ tbody tr:hover { background: var(--bg-card-hover); }
 /* 对齐规则：文本/编号列与数值列(.num，等宽数字)均左对齐；状态/操作列(.ctr)居中；表头与该列内容同向 */
 .t3-tbl .ctr{text-align:center;}
 .t3-box:hover rect[fill-opacity]{fill-opacity:.4;}
+.t3-tbl input.t3-ed{width:100%;max-width:92px;padding:4px 6px;font-size:12.5px;background:var(--bg-input);border:1px solid var(--accent);border-radius:6px;color:inherit;}
 .t3-tbl.dense th,.t3-tbl.dense td{padding-left:9px;padding-right:9px;}   /* 列多的表收紧左右留白，尽量一屏放下 */
 .t3-tbl tbody tr:hover{background:var(--bg-secondary);}
 .t3-tbl .num{text-align:left;font-variant-numeric:tabular-nums;}
@@ -2340,7 +2341,7 @@ tbody tr:hover { background: var(--bg-card-hover); }
         info: { packShip: 20240, moduleShip: 8096, cellShip: 827000, conn: 15300, packIdMiss: 214, access15: 312, connRate: 75.6, insured: 11000, overdue: 12, alarm: 320, closed: 240, alarm7: 28, closed7: 22, struct: '1P204S', cap: q.cell_cap || 153, s: 204, sop: '2025-06', qy: '8年', qkm: '30万', qsoh: '80' },
         trend: makeTrend(), sohBox: makeSohBox(),
         cars: [{ name: '小米SU7', vehicle_model: 'SU7', struct: '1P204S', conn: 9600, packIdMiss: 130, overdue: 7, alarm: 180 }, { name: '小米YU7', vehicle_model: 'YU7', struct: '1P204S', conn: 5700, packIdMiss: 84, overdue: 5, alarm: 140 }],
-        warranty: [{ vehicle_model: '小米SU7', pn: 'XR153-01', years: 8, mileage: 300000, soh: 80 }],
+        warranty: [{ id: 1, vehicle_model: '小米SU7', pn: 'XR153-01', years: 8, mileage: 300000, soh: 80 }, { id: 2, vehicle_model: '小米YU7', pn: 'XR153-02', years: 8, mileage: 200000, soh: 70 }],
         modesDetail: MODES.map(function (m) { return { name: m, count: Math.round(Math.random() * 40 + 5) }; }),
         modes: MODES.map(function (m) { return { name: m, count: Math.round(Math.random() * 60 + 10) }; }),
         outgoingModes: MODES.map(function (m) { return { name: m, count: Math.round(Math.random() * 80 + 10) }; }),
@@ -4384,9 +4385,9 @@ const ThreeView = (() => {
 
   // ---- SVG 箱线图（每个区间一个箱体，平铺）----
   // bins: [{range, n, min, q1, median, q3, max}]；thr：质保 SOH 门槛（虚线参考）
-  function boxPlot(bins, thr) {
+  function boxPlot(bins, thr, w = 480) {
     if (!bins || !bins.length) return '<div class="t3-empty">暂无 SOH 分布数据</div>';
-    const w = 480, h = 236, padL = 44, padR = 10, padT = 18, padB = 42;   // 卡片为半宽，画布收窄以保证文字可读
+    const h = 236, padL = 44, padR = 10, padT = 18, padB = 42;   // w 按卡片宽度给（半宽 480 / 通栏 900），保证文字可读
     const iw = w - padL - padR, ih = h - padT - padB;
     const t = Number(thr);
     const lo = Math.min(...bins.map(b => b.min), isFinite(t) && t > 0 ? t : 100);
@@ -5009,25 +5010,36 @@ const ThreeView = (() => {
     const trendHtml = lineChart(trendData, trendLabels, SEQ.b2);
     const granTabs = `<div class="seg" id="t3Gran"><button data-g="month" class="${(!useD15 && !useYear) ? 'on' : ''}">by 月</button><button data-g="year" class="${useYear ? 'on' : ''}">by 年</button><button data-g="d15" class="${useD15 ? 'on' : ''}">近15天</button></div>`;
 
-    // 适用车型明细
-    const carRows = (d.cars || []).map(c => {
-      const pct = info.packShip ? (100 * (c.conn || 0) / info.packShip).toFixed(1) + '%' : '-';
+    // 适用车型 & 质保：车型明细与质保台账按车型合并；质保条款拆成 年限/里程/SOH 三列，可逐行编辑
+    const sameCar = (c, w) => [c.name, c.vehicle_model].filter(Boolean).includes(w.vehicle_model);
+    const carList = () => {
+      const ws = d.warranty || (d.warranty = []);
+      const rows = (d.cars || []).map(c => ({ c, w: ws.find(w => sameCar(c, w)) }));
+      ws.filter(w => !rows.some(r => r.w === w)).forEach(w => rows.push({ c: { name: w.vehicle_model }, w }));
+      return rows;
+    };
+    let carEdit = -1;   // 正在编辑的行下标
+    const carRowsHtml = () => carList().map(({ c, w }, i) => {
+      const pct = info.packShip && c.conn != null ? (100 * (c.conn || 0) / info.packShip).toFixed(1) + '%' : '-';
       const apct = info.alarm && c.alarm ? (100 * (c.alarm || 0) / info.alarm).toFixed(1) + '%' : '-';
-      return `<tr><td><b>${esc(c.name || c.vehicle_model || '-')}</b></td><td>${esc(c.struct || '-')}</td>
-        <td class="num">${fmt(c.conn)}</td><td class="num">${esc(pct)}</td>${missTd(c.packIdMiss, c.conn)}
-        <td class="num">${fmt(c.overdue)}</td><td class="num">${fmt(c.alarm)}</td><td class="num">${esc(apct)}</td></tr>`;
-    }).join('') || '<tr><td colspan="8" class="t3-empty">暂无适用车型明细</td></tr>';
-
-    // 质保台账
-    const wRows = (d.warranty || []).map(w => {
-      const stint = (y, mi, s) => `${(y != null ? y + '年' : '-')} / ${(mi != null ? Number(mi).toLocaleString() : '-')}km / SOH${(s != null ? '≥' + s + '%' : '-')}`;
-      return `<tr><td>${esc(w.vehicle_model || '-')}</td><td>${esc(w.pn || '-')}</td>
-        <td>${stint(w.years, w.mileage, w.soh)}</td></tr>`;
-    }).join('') || '<tr><td colspan="3" class="t3-empty">暂无质保台账，可在质保配置维护</td></tr>';
+      w = w || {};
+      const v = x => x != null && x !== '' ? fmt(x) : '-';
+      const inp = (k, ph, min, max) => `<input class="t3-ed" type="number" data-k="${k}" min="${min}" max="${max}" placeholder="${ph}" value="${w[k] != null ? esc(w[k]) : ''}">`;
+      const ed = i === carEdit;
+      return `<tr data-i="${i}"><td><b>${esc(c.name || c.vehicle_model || '-')}</b></td><td>${esc(w.pn || '-')}</td><td>${esc(c.struct || '-')}</td>
+        <td class="num">${v(c.conn)}</td><td class="num">${esc(pct)}</td>${c.conn != null ? missTd(c.packIdMiss, c.conn) : '<td class="num">-</td>'}
+        <td class="num">${v(c.overdue)}</td><td class="num">${v(c.alarm)}</td><td class="num">${esc(apct)}</td>
+        <td class="num">${ed ? inp('years', '年', 1, 30) : v(w.years)}</td>
+        <td class="num">${ed ? inp('mileage', 'km', 0, 2000000) : v(w.mileage)}</td>
+        <td class="num">${ed ? inp('soh', '%', 1, 100) : (w.soh != null ? '≥' + esc(w.soh) : '-')}</td>
+        <td class="ctr">${ed
+          ? `<button class="btn btn-sm btn-primary" data-act="save">保存</button> <button class="btn btn-sm btn-secondary" data-act="cancel">取消</button>`
+          : `<button class="btn btn-sm btn-secondary" data-act="edit">✏️ 编辑</button>`}</td></tr>`;
+    }).join('') || '<tr><td colspan="13" class="t3-empty">暂无适用车型 / 质保台账</td></tr>';
 
     // SOH 衰减走势：按累计里程 / 累计循环数分区间，每区间一个箱线图
     const SOH_AXIS = { mileage: '累计里程', cycle: '累计循环数' };
-    const sohBoxHtml = () => boxPlot((d.sohBox || {})[state.sohAxis], parseFloat(info.qsoh));
+    const sohBoxHtml = () => boxPlot((d.sohBox || {})[state.sohAxis], parseFloat(info.qsoh), 900);
     const sohSeg = `<div class="seg" id="t3SohAxis">${Object.keys(SOH_AXIS).map(k =>
       `<button data-x="${k}" class="${k === state.sohAxis ? 'on' : ''}">${SOH_AXIS[k]}</button>`).join('')}</div>`;
 
@@ -5057,21 +5069,15 @@ const ThreeView = (() => {
         <div class="chead"><div class="ctitle" title="by 失效模式 · 累积/增量 + 时间筛选">📊 质量分析</div><div class="qtabs" id="t3QHeadProj"></div></div>
         <div id="t3ProjQuality"></div>
       </div>
-      <!-- SOH + 质保台账 -->
-      <div class="t3-grid2">
-        <div class="t3-card">
-          <div class="chead"><div><div class="ctitle" title="按累计里程 / 累计循环数分区间的 SOH 分布（箱线图）">📉 SOH 衰减走势</div></div>${sohSeg}</div>
-          <div id="t3SohBox">${sohBoxHtml()}</div>
-        </div>
-        <div class="t3-card">
-          <div class="chead"><div><div class="ctitle" title="按电芯项目维护">🛡️ 质保台账</div></div></div>
-          <div class="tblwrap"><table class="t3-tbl">${colg(20, 20, '')}<thead><tr><th>车型</th><th>PN</th><th>质保条款</th></tr></thead><tbody>${wRows}</tbody></table></div>
-        </div>
-      </div>
-      <!-- 适用车型 -->
+      <!-- SOH 衰减走势 -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle" title="该电芯项目下所有车型">🚗 适用车型明细</div></div></div>
-        <div class="tblwrap"><table class="t3-tbl">${colg(16, 15, 12, 11, 12, 11, 12, 11)}<thead><tr><th>车型</th><th>电池结构</th><th class="num">接入</th><th class="num">占比</th><th class="num">pack_id缺失率</th><th class="num">过保数</th><th class="num">预警外发</th><th class="num">预警占比</th></tr></thead><tbody>${carRows}</tbody></table></div>
+        <div class="chead"><div><div class="ctitle" title="按累计里程 / 累计循环数分区间的 SOH 分布（箱线图）">📉 SOH 衰减走势</div></div>${sohSeg}</div>
+        <div id="t3SohBox">${sohBoxHtml()}</div>
+      </div>
+      <!-- 适用车型 & 质保（原「适用车型明细」+「质保台账」合并） -->
+      <div class="t3-card">
+        <div class="chead"><div><div class="ctitle" title="该电芯项目下所有车型及其质保条款；质保三列可编辑">🚗 适用车型 &amp; 质保</div></div></div>
+        <div class="tblwrap"><table class="t3-tbl dense" id="t3CarTbl">${colg(9, 9, 7, 7, 6, 8, 6, 7, 7, 8, 9, 7, 10)}<thead><tr><th>车型</th><th>PN</th><th>电池结构</th><th class="num">接入</th><th class="num">占比</th><th class="num">pack_id缺失率</th><th class="num">过保数</th><th class="num">预警外发</th><th class="num">预警占比</th><th class="num">质保年限(年)</th><th class="num">质保里程(km)</th><th class="num">质保SOH(%)</th><th class="ctr">操作</th></tr></thead><tbody>${carRowsHtml()}</tbody></table></div>
       </div>
       <!-- 项目关键处置事件 -->
       <div class="t3-card">
@@ -5093,6 +5099,42 @@ const ThreeView = (() => {
       const b = e.target.closest('button[data-g]'); if (!b) return;
       state.gran = b.dataset.g;
       renderProject(host, d, oem);
+    });
+    // 适用车型 & 质保：行内编辑质保三列（只重绘表体）
+    const carTbl = document.getElementById('t3CarTbl');
+    const redrawCars = () => { carTbl.tBodies[0].innerHTML = carRowsHtml(); alignCells(carTbl); };
+    if (carTbl) carTbl.addEventListener('click', async e => {
+      const btn = e.target.closest('button[data-act]'); if (!btn) return;
+      e.stopPropagation();
+      const i = +btn.closest('tr').dataset.i, act = btn.dataset.act;
+      if (act === 'edit') { carEdit = i; redrawCars(); carTbl.querySelector('input.t3-ed').focus(); return; }
+      if (act === 'cancel') { carEdit = -1; redrawCars(); return; }
+      // 保存：空值 = 未设置；校验范围后写回（有 id 走接口，演示数据直接改内存）
+      const { c, w } = carList()[i];
+      const vals = {};
+      for (const el of btn.closest('tr').querySelectorAll('input.t3-ed')) {
+        const raw = el.value.trim();
+        if (raw === '') { vals[el.dataset.k] = null; continue; }
+        const n = Number(raw);
+        if (!isFinite(n) || n < +el.min || n > +el.max) { Toast.error(`${el.closest('table').tHead.rows[0].cells[el.closest('td').cellIndex].textContent} 需在 ${el.min}~${el.max} 之间`); el.focus(); return; }
+        vals[el.dataset.k] = n;
+      }
+      let rec = w;
+      if (!rec) { rec = { vehicle_model: c.name || c.vehicle_model }; d.warranty.push(rec); }
+      if (rec.id != null && typeof API !== 'undefined') {
+        btn.disabled = true;
+        const res = await API.put(`/api/warranty_settings/${rec.id}`, vals);
+        btn.disabled = false;
+        if (!res || !res.success) { Toast.error('保存失败'); return; }
+      }
+      Object.assign(rec, vals);
+      carEdit = -1; redrawCars();
+      Toast.show('质保条款已保存', 'success');
+    });
+    if (carTbl) carTbl.addEventListener('keydown', e => {
+      if (!e.target.matches('input.t3-ed')) return;
+      if (e.key === 'Enter') carTbl.querySelector('button[data-act="save"]').click();
+      if (e.key === 'Escape') carTbl.querySelector('button[data-act="cancel"]').click();
     });
     // SOH 箱线图分桶维度切换（只重绘该图）
     const sseg = document.getElementById('t3SohAxis');
