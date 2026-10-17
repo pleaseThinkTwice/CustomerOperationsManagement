@@ -2005,10 +2005,10 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .t3-tbl{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap;}
 .t3-tbl th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--line);text-transform:none;letter-spacing:0;vertical-align:middle;}
 .t3-tbl td{padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:middle;}
-/* 对齐规则：文本/编号列左对齐；数值列(.num)右对齐+等宽数字；状态/操作列(.ctr)居中；表头与该列内容同向 */
+/* 对齐规则：文本/编号列与数值列(.num，等宽数字)均左对齐；状态/操作列(.ctr)居中；表头与该列内容同向 */
 .t3-tbl .ctr{text-align:center;}
 .t3-tbl tbody tr:hover{background:var(--bg-secondary);}
-.t3-tbl .num{text-align:right;font-variant-numeric:tabular-nums;}
+.t3-tbl .num{text-align:left;font-variant-numeric:tabular-nums;}
 .t3-tbl .lk{color:var(--accent);cursor:pointer;font-weight:600;}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;}
 .seg button{border:0;background:transparent;padding:6px 13px;font-size:12px;color:var(--muted);font-weight:600;}
