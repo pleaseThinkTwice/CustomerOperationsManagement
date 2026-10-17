@@ -2007,6 +2007,40 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .t3-crumb{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 12px;font-size:12.5px;color:var(--muted);transition:.15s;}
 .t3-crumb:hover{border-color:var(--accent);color:var(--accent);}
 .t3-crumb.cur{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+/* 首页看板 · 右侧悬停视图面板（参考 Teambition 视图管理：贴边标签，悬停展开，可钉住） */
+.vdock{position:fixed;top:50%;transform:translateY(-50%);right:0;z-index:900;display:flex;align-items:flex-start;}
+.vdock-tab{width:32px;display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 0;margin-top:16px;background:var(--panel-2);border:1px solid var(--line-strong);border-right:0;border-radius:10px 0 0 10px;color:var(--text-secondary);font-size:12.5px;font-weight:700;cursor:pointer;box-shadow:var(--shadow);user-select:none;}
+/* 竖排用「1 字宽 + 逐字换行」实现，writing-mode 在这里的 flex 布局下会被压成 0 高 */
+.vdock-tab .lb,.vdock-tab .cur{width:1.1em;word-break:break-all;text-align:center;line-height:1.3;flex:none;}
+.vdock-tab .cur{color:var(--accent);font-weight:600;font-size:11.5px;max-height:7.8em;overflow:hidden;padding-top:6px;border-top:1px solid var(--line-strong);}
+.vdock-panel{width:0;overflow:hidden;transition:width .18s ease;background:var(--bg-secondary);border:1px solid var(--line-strong);border-right:0;border-radius:12px 0 0 12px;box-shadow:var(--shadow);max-height:calc(100vh - 160px);display:flex;flex-direction:column;}
+.vdock:hover .vdock-panel,.vdock.pinned .vdock-panel{width:300px;}
+/* 展开时标签保留在面板左侧：若隐藏标签，面板宽度从 0 展开的瞬间鼠标会落空，导致闪烁 */
+.vdock:hover .vdock-tab,.vdock.pinned .vdock-tab{color:var(--accent);border-color:var(--accent);}
+.vdock-inner{width:300px;display:flex;flex-direction:column;min-height:0;}
+.vdock-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);}
+.vdock-head b{flex:1;font-size:14px;color:var(--text-primary);}
+.vdock-pin{border:0;background:transparent;cursor:pointer;font-size:14px;opacity:.5;padding:2px 4px;border-radius:6px;}
+.vdock.pinned .vdock-pin{opacity:1;background:var(--brand-soft);}
+.vdock-body{overflow-y:auto;padding:6px 8px 8px;flex:1;}
+.vdock-sec{font-size:11px;font-weight:700;color:var(--text-muted);padding:10px 8px 4px;}
+.vdock-item{display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;cursor:pointer;border:1px solid transparent;}
+.vdock-item:hover{background:var(--bg-card-hover);}
+.vdock-item.on{background:var(--brand-soft);border-color:var(--line-strong);}
+.vdock-item .ic{flex:none;width:22px;text-align:center;}
+.vdock-item .tx{flex:1;min-width:0;}
+.vdock-item .nm{font-size:13px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vdock-item .ds{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vdock-item .ops{display:none;gap:2px;flex:none;}
+.vdock-item:hover .ops{display:flex;}
+.vdock-item .ops button{border:0;background:transparent;cursor:pointer;font-size:12px;padding:3px 4px;border-radius:5px;color:var(--text-secondary);}
+.vdock-item .ops button:hover{background:var(--panel);color:var(--accent);}
+.vdock-item .dft{font-size:10px;color:var(--warn);flex:none;}
+.vdock-item input{width:100%;font-size:12.5px;padding:4px 6px;}
+.vdock-dirty{margin:6px 8px 0;padding:8px 10px;border-radius:8px;background:var(--warn-soft);font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.vdock-foot{border-top:1px solid var(--line);padding:10px 12px;display:flex;gap:6px;}
+.vdock-foot input{flex:1;font-size:12.5px;padding:6px 8px;}
+.vdock-empty{font-size:12px;color:var(--text-muted);padding:6px 8px 10px;line-height:1.6;}
 
     </style>
 <script>
@@ -2830,6 +2864,9 @@ const App = {
             page18: () => PageHandbook.init(),
             page19: () => PageTools.init(),
         };
+        // 首页看板右侧视图面板只在首页显示（面板挂在 body 上，避免被卡片 transform 影响 fixed 定位）
+        const vdock = document.getElementById('p1ViewDock');
+        if (vdock) vdock.style.display = pageId === 'page1' ? '' : 'none';
         if (pageInits[pageId] && !this._inited[pageId]) {
             this._inited[pageId] = true;
             pageInits[pageId]();
@@ -4876,7 +4913,7 @@ const ThreeView = (() => {
     gotoProject, gotoCell, gotoCustomer,
     setSwitch(fn) { onSwitch = fn; },
     setTimeRange(tr) { if (tr) state.timeRange = { mode: tr.mode || 'all', start: tr.start || '', end: tr.end || '' }; },
-    getState() { return { view: state.view, oem: state.oem, cellCap: state.cellCap }; },
+    getState() { return { view: state.view, oem: state.oem, cellCap: state.cellCap, timeRange: state.timeRange.mode || 'all' }; },
     reframe,
   };
 })();
@@ -4910,7 +4947,7 @@ const Page1 = {
             this.initialized = true;
             this._view = 'customer';
             this._initCapOutsideClick();
-            this.refreshViewDropdown();   // 自定义视图下拉（todo 任务#4）
+            this._mountViewDock();        // 右侧悬停视图面板（参考 TB 视图管理）
         }
         this.bindEvents();
         // 三视角内部跳转（项目行下钻 / 电芯下钻 / 返回）交由 page1 承接
@@ -4921,10 +4958,16 @@ const Page1 = {
             await DashboardModules.init('p1Modules');
             if (App.customers.length) {
                 await this.loadCapacityOptions();
-                // 首次打开：不强制刷新，Doris 模块直接吃 test 表 7 天缓存（秒出、流畅）
-                // 手动点「查询」按钮才会 refresh=1 强制重查 Doris。
-                await this.loadDashboard(false);
-                this._renderCrumbs();
+                // 有设为默认的视图则直接打开它，否则走默认客户视角
+                const dft = this._getSavedViews().find(v => v.isDefault);
+                if (dft) {
+                    await this.applySavedView(dft.id, true);
+                } else {
+                    // 首次打开：不强制刷新，Doris 模块直接吃 test 表 7 天缓存（秒出、流畅）
+                    // 手动点「查询」按钮才会 refresh=1 强制重查 Doris。
+                    await this.loadDashboard(false);
+                    this._renderCrumbs();
+                }
             }
         }
     },
@@ -4946,17 +4989,8 @@ const Page1 = {
                         <button data-t="12m">近12月</button><button data-t="all" class="on">全部</button>
                     </div>
                 </div>
-                <!-- 右侧操作组：自定义视图 + 下载页面（margin-left:auto 推到行尾） -->
+                <!-- 右侧操作组：下载页面（视图管理已移到页面右侧悬停面板） -->
                 <div style="margin-left:auto;display:flex;align-items:center;gap:12px;flex:0 0 auto;">
-                    <!-- 自定义视图：保存常用筛选组合（todo 任务#4） -->
-                    <div class="t3-timefilter" id="p1SavedViewBox" title="保存常用的筛选组合（视角+客户+容量+时间范围），下次一键调用">
-                        <span style="font-size:12px;color:var(--text-muted);font-weight:700;">🔖 视图</span>
-                        <select id="p1SavedViews" onchange="Page1.applySavedView(this.value)" style="max-width:130px;">
-                            <option value="">已存视图…</option>
-                        </select>
-                        <button class="btn btn-sm btn-secondary" onclick="Page1.saveCurrentView()">💾 保存当前</button>
-                        <button class="btn btn-sm btn-secondary" onclick="Page1.deleteSavedView()" title="删除下拉中选中的视图">🗑 删除</button>
-                    </div>
                     <!-- 下载页面：当前看板导出为独立 HTML（todo#1，给客户看） -->
                     <div class="t3-timefilter" title="把当前看板导出为独立 HTML 文件（自带样式与图表，无需登录即可查看），可直接发给客户">
                         <button class="btn btn-sm btn-primary" onclick="Page1.downloadPage()">⬇ 下载页面</button>
@@ -5454,106 +5488,248 @@ const Page1 = {
     },
 
     // ============ 客户/项目/电芯 三视角（任务5：电芯=某容量AH跨客户对比）============
-    // ============ 自定义视图：保存/应用/删除常用筛选组合（todo 任务#4，localStorage） ============
+    // ============ 视图管理：右侧悬停面板（参考 Teambition 视图管理，localStorage） ============
+    // 视图 = 视角 + 客户 + 项目容量/电芯容量 + 时间范围。系统视图「默认视图」不可改；
+    // 我的视图可新建 / 应用 / 重命名 / 用当前筛选覆盖 / 设为默认（打开首页自动应用）/ 删除。
     _getSavedViews() {
-        try { return JSON.parse(localStorage.getItem('p1SavedViews') || '[]'); } catch (e) { return []; }
+        let list;
+        try { list = JSON.parse(localStorage.getItem('p1SavedViews') || '[]'); } catch (e) { list = []; }
+        if (!Array.isArray(list)) list = [];
+        // 兼容旧数据（按下标存、没有 id）
+        let patched = false;
+        list.forEach((v, i) => { if (!v.id) { v.id = 'v' + Date.now().toString(36) + i; patched = true; } });
+        if (patched) { try { localStorage.setItem('p1SavedViews', JSON.stringify(list)); } catch (e) {} }
+        return list;
     },
     _putSavedViews(list) {
-        localStorage.setItem('p1SavedViews', JSON.stringify(list));
-        this.refreshViewDropdown();
+        try { localStorage.setItem('p1SavedViews', JSON.stringify(list)); } catch (e) { Toast.error('视图保存失败（浏览器存储不可用）'); }
+        this._renderViewDock();
     },
-    refreshViewDropdown() {
-        const sel = document.getElementById('p1SavedViews');
-        if (!sel) return;
-        const views = this._getSavedViews();
-        sel.innerHTML = '<option value="">已存视图…</option>' +
-            views.map((v, i) => `<option value="${i}">${Utils.esc(v.name)}</option>`).join('');
-    },
-    // 收集当前筛选组合（视角 + 客户 + 容量/产品 + 时间范围）
+    // 收集当前筛选组合（视角 + 客户 + 项目容量/电芯容量 + 时间范围）
     _collectView() {
         const view = this._view || 'customer';
-        const oem = (document.getElementById('p1Customer') || {}).value || '';
-        const v = { view, oem };
-        if (view === 'customer') {
-            v.cellCap = Array.from(document.querySelectorAll('#p1Capacity input:checked'))
-                .map(c => c.value).join(',');
-        } else if (view === 'project') {
+        const v = { view };
+        if (view === 'project') {
+            v.oem = (document.getElementById('p1ProjCust') || {}).value || '';
             v.projCap = (document.getElementById('p1ProjCap') || {}).value || '';
-        } else if (view === 'cell') {
-            v.cellProduct = (document.getElementById('p1CellProduct') || {}).value || '';
+        } else {
+            v.oem = (document.getElementById('p1Customer') || {}).value || '';
         }
-        if (window.ThreeView && ThreeView.state) v.timeRange = (ThreeView.state.timeRange || {}).mode || 'all';
+        if (view === 'cell') v.cellProduct = (document.getElementById('p1CellProduct') || {}).value || '';
+        v.timeRange = window.ThreeView ? (ThreeView.getState().timeRange || 'all') : 'all';
         return v;
     },
+    _sameView(a, b) {
+        if (!a || !b) return false;
+        return ['view', 'oem', 'projCap', 'cellProduct', 'timeRange'].every(k => String(a[k] || '') === String(b[k] || ''));
+    },
+    _viewDesc(v) {
+        const vn = { customer: '客户视角', project: '项目视角', cell: '电芯视角' }[v.view] || '客户视角';
+        const tn = { '3m': '近3月', '6m': '近6月', '12m': '近12月', all: '全部时间' }[v.timeRange || 'all'] || '全部时间';
+        const c = (App.customers || []).find(x => x.oem === v.oem);
+        const cust = v.view === 'cell' ? '' : (c ? (c.oem_ch || c.name_cn || c.oem) : (v.oem || ''));
+        const cap = v.view === 'project' ? v.projCap : (v.view === 'cell' ? v.cellProduct : '');
+        return [vn, cust, cap ? cap + 'Ah' : '', tn].filter(Boolean).join(' · ');
+    },
+
+    _mountViewDock() {
+        if (document.getElementById('p1ViewDock')) return;
+        const d = document.createElement('div');
+        d.id = 'p1ViewDock';
+        d.className = 'vdock';
+        let pinned = false;
+        try { pinned = localStorage.getItem('p1ViewDockPinned') === '1'; } catch (e) {}
+        if (pinned) d.classList.add('pinned');
+        d.style.display = (App.currentPage === 'page1') ? '' : 'none';
+        document.body.appendChild(d);
+        // 悬停展开时刷新「当前筛选已修改」提示
+        d.addEventListener('mouseenter', () => this._renderViewDock());
+        this._renderViewDock();
+    },
+
+    _toggleViewDockPin() {
+        const d = document.getElementById('p1ViewDock');
+        if (!d) return;
+        const on = !d.classList.contains('pinned');
+        d.classList.toggle('pinned', on);
+        try { localStorage.setItem('p1ViewDockPinned', on ? '1' : '0'); } catch (e) {}
+        this._renderViewDock();
+    },
+
+    _renderViewDock() {
+        const d = document.getElementById('p1ViewDock');
+        if (!d) return;
+        const views = this._getSavedViews();
+        const active = views.find(v => v.id === this._activeViewId);
+        const curName = active ? active.name : '默认视图';
+        const cur = this._collectView();
+        const dirty = active && !this._sameView(active, cur);
+        // 悬停时内容没变就不重绘，避免光标下的元素被替换
+        const sig = JSON.stringify([views, this._activeViewId, this._renamingId, dirty, d.classList.contains('pinned')]);
+        if (sig === this._viewDockSig) return;
+        this._viewDockSig = sig;
+        const item = v => {
+            if (this._renamingId === v.id) {
+                return `<div class="vdock-item on"><span class="ic">✏️</span><div class="tx">
+                    <input id="vdRename" value="${Utils.esc(v.name)}" maxlength="30"
+                        onkeydown="if(event.key==='Enter')Page1.renameSavedView('${v.id}',this.value);if(event.key==='Escape')Page1._cancelRename();"
+                        onblur="Page1.renameSavedView('${v.id}',this.value)"></div></div>`;
+            }
+            return `<div class="vdock-item ${v.id === this._activeViewId ? 'on' : ''}" onclick="Page1.applySavedView('${v.id}')" title="${Utils.esc(this._viewDesc(v))}">
+                <span class="ic">🔖</span>
+                <div class="tx"><div class="nm">${Utils.esc(v.name)}</div><div class="ds">${Utils.esc(this._viewDesc(v))}</div></div>
+                ${v.isDefault ? '<span class="dft" title="打开首页时自动应用">默认</span>' : ''}
+                <span class="ops" onclick="event.stopPropagation()">
+                    <button title="${v.isDefault ? '取消默认' : '设为默认'}" onclick="Page1.setDefaultView('${v.id}')">${v.isDefault ? '★' : '☆'}</button>
+                    <button title="用当前筛选覆盖" onclick="Page1.updateSavedView('${v.id}')">⟳</button>
+                    <button title="重命名" onclick="Page1.startRename('${v.id}')">✏️</button>
+                    <button title="删除" onclick="Page1.deleteSavedView('${v.id}')">🗑</button>
+                </span>
+            </div>`;
+        };
+        d.innerHTML = `
+            <div class="vdock-tab" title="视图管理 · 当前：${Utils.esc(curName)}"><span>🔖</span><span class="lb">视图</span><span class="cur">${Utils.esc(curName)}</span></div>
+            <div class="vdock-panel"><div class="vdock-inner">
+                <div class="vdock-head"><b>视图</b>
+                    <button class="vdock-pin" title="${d.classList.contains('pinned') ? '取消固定' : '固定面板'}" onclick="Page1._toggleViewDockPin()">📌</button>
+                </div>
+                ${dirty ? `<div class="vdock-dirty">当前筛选与「${Utils.esc(active.name)}」不同
+                    <button class="btn btn-sm btn-primary" onclick="Page1.updateSavedView('${active.id}')">保存到该视图</button></div>` : ''}
+                <div class="vdock-body">
+                    <div class="vdock-sec">系统视图</div>
+                    <div class="vdock-item ${!this._activeViewId ? 'on' : ''}" onclick="Page1.applySavedView('')">
+                        <span class="ic">🏠</span>
+                        <div class="tx"><div class="nm">默认视图</div><div class="ds">客户视角 · 全部时间</div></div>
+                        ${views.some(v => v.isDefault) ? '' : '<span class="dft">默认</span>'}
+                    </div>
+                    <div class="vdock-sec">我的视图（${views.length}）</div>
+                    ${views.length ? views.map(item).join('') : '<div class="vdock-empty">还没有保存的视图。调好视角、客户、容量和时间范围后，在下方起个名字保存。</div>'}
+                </div>
+                <div class="vdock-foot">
+                    <input id="vdNewName" placeholder="新视图名称，如：蔚来102Ah近3月" maxlength="30"
+                        onkeydown="if(event.key==='Enter')Page1.saveCurrentView()">
+                    <button class="btn btn-sm btn-primary" onclick="Page1.saveCurrentView()">保存</button>
+                </div>
+            </div></div>`;
+        if (this._renamingId) {
+            const el = document.getElementById('vdRename');
+            if (el) { el.focus(); el.select(); }
+        }
+    },
+
     saveCurrentView() {
-        const name = prompt('给当前筛选组合起个名字：\n（如：蔚来102Ah近3月）');
-        if (!name || !name.trim()) return;
+        const input = document.getElementById('vdNewName');
+        const name = (input && input.value || '').trim();
+        if (!name) { Toast.info('先给视图起个名字'); if (input) input.focus(); return; }
         const views = this._getSavedViews();
         const v = this._collectView();
-        v.name = name.trim();
+        v.id = 'v' + Date.now().toString(36);
+        v.name = name;
         views.push(v);
+        this._activeViewId = v.id;
         this._putSavedViews(views);
-        Toast.success(`视图「${v.name}」已保存`);
+        Toast.success(`视图「${name}」已保存`);
     },
-    async applySavedView(idx) {
-        if (idx === '' || idx == null) return;
-        const v = this._getSavedViews()[Number(idx)];
-        const sel = document.getElementById('p1SavedViews');
-        if (sel) sel.value = '';
+
+    updateSavedView(id) {
+        const views = this._getSavedViews();
+        const v = views.find(x => x.id === id);
         if (!v) return;
+        Object.assign(v, this._collectView());
+        this._activeViewId = id;
+        this._putSavedViews(views);
+        Toast.success(`已用当前筛选更新「${v.name}」`);
+    },
+
+    startRename(id) {
+        this._renamingId = id;
+        this._renderViewDock();
+    },
+    _cancelRename() {
+        this._renamingId = null;
+        this._renderViewDock();
+    },
+    renameSavedView(id, name) {
+        if (this._renamingId !== id) return;   // 回车后 blur 再触发一次，忽略
+        this._renamingId = null;
+        name = (name || '').trim();
+        const views = this._getSavedViews();
+        const v = views.find(x => x.id === id);
+        if (v && name && name !== v.name) {
+            v.name = name;
+            this._putSavedViews(views);
+            Toast.success('已重命名');
+        } else {
+            this._renderViewDock();
+        }
+    },
+
+    setDefaultView(id) {
+        const views = this._getSavedViews();
+        const v = views.find(x => x.id === id);
+        if (!v) return;
+        const on = !v.isDefault;
+        views.forEach(x => { x.isDefault = false; });
+        v.isDefault = on;
+        this._putSavedViews(views);
+        Toast.success(on ? `打开首页时将自动应用「${v.name}」` : '已取消默认视图');
+    },
+
+    deleteSavedView(id) {
+        const views = this._getSavedViews();
+        const idx = views.findIndex(x => x.id === id);
+        if (idx < 0) return;
+        if (!confirm(`删除视图「${views[idx].name}」？`)) return;
+        views.splice(idx, 1);
+        if (this._activeViewId === id) this._activeViewId = null;
+        this._putSavedViews(views);
+        Toast.success('已删除');
+    },
+
+    // id 为空 = 系统「默认视图」：客户视角 + 当前客户 + 全部时间
+    async applySavedView(id, silent) {
+        const v = id ? this._getSavedViews().find(x => x.id === id)
+            : { view: 'customer', oem: (document.getElementById('p1Customer') || {}).value || '', timeRange: 'all', name: '默认视图' };
+        if (!v) return;
+        this._activeViewId = id || null;
+        this._renderViewDock();
         try {
             // 时间范围
-            if (v.timeRange && window.ThreeView) {
-                ThreeView.setTimeRange({ mode: v.timeRange });
-                document.querySelectorAll('#p1SegTime button').forEach(b =>
-                    b.classList.toggle('on', b.dataset.t === v.timeRange));
-            }
+            const tr = v.timeRange || 'all';
+            if (window.ThreeView) ThreeView.setTimeRange({ mode: tr });
+            document.querySelectorAll('#p1SegTime button').forEach(b =>
+                b.classList.toggle('on', b.dataset.t === tr));
             // 客户
             const cust = document.getElementById('p1Customer');
-            if (cust && v.oem) {
+            if (cust && v.oem && v.view !== 'project') {
                 cust.value = v.oem;
                 this.currentOem = v.oem;
             }
-            if (v.view === 'customer') {
-                this.switchView('customer', false);
-                await this.loadCapacityOptions();
-                if (v.cellCap) {
-                    const caps = new Set(String(v.cellCap).split(',').filter(Boolean));
-                    document.querySelectorAll('#p1Capacity input[type=checkbox]').forEach(cb => {
-                        cb.checked = caps.has(cb.value);
-                    });
-                }
-                await this.loadDashboard(false);
-            } else if (v.view === 'project') {
+            if (v.view === 'project') {
                 this.switchView('project', false);
+                const pcust = document.getElementById('p1ProjCust');
+                if (pcust && v.oem) pcust.value = v.oem;
                 await this._fillProjectCaps();
                 const pc = document.getElementById('p1ProjCap');
                 if (pc && v.projCap) pc.value = v.projCap;
-                await this.loadProject();
+                if (pc && pc.value) await this.loadProject();
             } else if (v.view === 'cell') {
                 this.switchView('cell', false);
                 await this._fillCellCaps();
                 const cp = document.getElementById('p1CellProduct');
                 if (cp && v.cellProduct) cp.value = v.cellProduct;
-                await this.loadCellView();
+                if (cp && cp.value) await this.loadCellView();
+            } else {
+                this.switchView('customer', false);
+                await this.loadCapacityOptions();
+                await this.loadDashboard(false);
             }
-            if (v.timeRange && window.ThreeView) ThreeView.reframe();
-            Toast.info(`已应用视图「${Utils.esc(v.name)}」`);
+            this._renderCrumbs();
+            this._renderViewDock();
+            if (!silent) Toast.info(`已切换到「${v.name}」`);
         } catch (e) {
             Toast.error('应用视图失败：' + (e && e.message));
         }
-    },
-    deleteSavedView() {
-        const sel = document.getElementById('p1SavedViews');
-        if (!sel || sel.value === '') { Toast.info('请先在下拉中选择要删除的视图'); return; }
-        const views = this._getSavedViews();
-        const idx = Number(sel.value);
-        const v = views[idx];
-        if (!v) return;
-        if (!confirm(`删除视图「${v.name}」？`)) return;
-        views.splice(idx, 1);
-        this._putSavedViews(views);
-        Toast.success('已删除');
     },
 
     // ============ 下载页面：当前看板导出为独立 HTML（todo#1，给客户看） ============
