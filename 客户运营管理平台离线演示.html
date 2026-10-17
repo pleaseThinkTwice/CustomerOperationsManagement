@@ -65,6 +65,10 @@
     --font-mono: "Consolas", "JetBrains Mono", ui-monospace, monospace;
     --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
     --grid: rgba(139, 164, 196, 0.14);   /* 图表网格线 */
+    /* 图表顺序色（Sequential）：蓝、绿两组，各三档由深到浅。深色底取值 */
+    --seq-b1: #1a50c0; --seq-b2: #4f94f2; --seq-b3: #98c6ff;
+    --seq-g1: #0f7f45; --seq-g2: #2bb868; --seq-g3: #8ee0a2;
+    --seq-na: #64748b;   /* 未归类的失效模式 */
 }
 
 /* ---- 浅色主题 ---- */
@@ -118,6 +122,10 @@
     --info-soft: rgba(49, 130, 206, 0.12);
     --font-mono: "Consolas", "JetBrains Mono", ui-monospace, monospace;
     --grid: rgba(26, 35, 50, 0.08);
+    /* 图表顺序色：浅色底取值 */
+    --seq-b1: #1a47aa; --seq-b2: #3f83e2; --seq-b3: #86b8f5;
+    --seq-g1: #0a6634; --seq-g2: #169a50; --seq-g3: #62cb88;
+    --seq-na: #94a3b8;
 }
 
 * {
@@ -4232,13 +4240,17 @@ const ThreeView = (() => {
   let onSwitch = null;
 
   // ---- 颜色/图元 ----
-  const COLORS = { ins: '#ef4444', soc: '#f59e0b', cap: '#8b5cf6', self: '#06b6d4', volt: '#10b981', other: '#94a3b8' };
+  // 顺序色系：蓝、绿两组各三档（深 → 浅），取值随深浅主题切换（见 :root 的 --seq-*）。
+  // 颜色跟着失效模式走，不跟排名走：同一模式在任何图里都是同一个颜色。
+  const SEQ = { b1: 'var(--seq-b1)', b2: 'var(--seq-b2)', b3: 'var(--seq-b3)', g1: 'var(--seq-g1)', g2: 'var(--seq-g2)', g3: 'var(--seq-g3)', na: 'var(--seq-na)' };
+  const COLORS = { ins: SEQ.b1, soc: SEQ.b2, cap: SEQ.b3, self: SEQ.g1, volt: SEQ.g2, heat: SEQ.g3, other: SEQ.na };
   function modeColor(name) {
     if (name.includes('绝缘')) return COLORS.ins;
     if (name.includes('SOC') || name.includes('一致')) return COLORS.soc;
     if (name.includes('容量')) return COLORS.cap;
     if (name.includes('自放电')) return COLORS.self;
     if (name.includes('压差') || name.includes('电压')) return COLORS.volt;
+    if (name.includes('热失控') || name.includes('温')) return COLORS.heat;
     return COLORS.other;
   }
 
@@ -4395,10 +4407,10 @@ const ThreeView = (() => {
         const v = s.data[i] || 0;
         const bh = ih * v / max, y = padT + ih - bh;
         const x = cx + side * (bw / 2 + 1);
-        bars += `<rect x="${x - bw / 2}" y="${y}" width="${bw}" height="${Math.max(bh, 1.5)}" rx="3" fill="${s.color}" opacity=".88"><title>${esc(lab)} · ${esc(s.name)}：${fmt(v)}</title></rect>`;
+        bars += `<rect x="${x - bw / 2}" y="${y}" width="${bw}" height="${Math.max(bh, 1.5)}" rx="3" fill="${s.color}"><title>${esc(lab)} · ${esc(s.name)}：${fmt(v)}</title></rect>`;
         // 每根柱各自标注数量（0 不标；字号小、颜色随柱，与柱错开避免重叠）
         if (v > 0) {
-          bars += `<text x="${x}" y="${y - 4}" text-anchor="middle" class="tick" style="font-size:8.5px;fill:${s.color};">${v >= 10000 ? wan(v) : v}</text>`;
+          bars += `<text x="${x}" y="${y - 4}" text-anchor="middle" class="tick" style="font-size:8.5px;">${v >= 10000 ? wan(v) : v}</text>`;
         }
       });
       bars += `<text x="${cx}" y="${h - 8}" text-anchor="middle" class="tick">${esc(lab)}</text>`;
@@ -4454,7 +4466,7 @@ const ThreeView = (() => {
       modes.forEach(m => {
         const v = (mx[m] || {})[i]; if (!v) return;
         const bh = ih * v / max, y = yB - bh;
-        bars += `<rect x="${cx - bw / 2}" y="${y}" width="${bw}" height="${Math.max(bh, 0.5)}" fill="${modeColor(m)}" opacity=".9"><title>${esc(lb)} · ${esc(m)}：${fmt(v)}</title></rect>`;
+        bars += `<rect x="${cx - bw / 2}" y="${y}" width="${bw}" height="${Math.max(bh, 0.5)}" fill="${modeColor(m)}" stroke="var(--bg-input)" stroke-width="1.5"><title>${esc(lb)} · ${esc(m)}：${fmt(v)}</title></rect>`;
         yB = y;
       });
       // 月份标签全量显示（不旋转不隔行，用户要求复原），缩小字号缓解密集重叠
@@ -4494,9 +4506,9 @@ const ThreeView = (() => {
 
   // ---- 质量面板（预警/闭环/客诉 + 累积/增量 + 堆叠柱 + 甜甜圈 + 明细表）----
   const QMETA = {
-    alarm: { label: '预警外发', icon: '⚠️', color: '#dc2626', unit: ' 单' },
-    closed: { label: '市场闭环', icon: '✅', color: '#16a34a', unit: ' 单' },
-    complaint: { label: '客诉', icon: '📣', color: '#d97706', unit: ' 单' },
+    alarm: { label: '预警外发', icon: '⚠️', color: SEQ.b2, unit: ' 单' },
+    closed: { label: '市场闭环', icon: '✅', color: SEQ.g2, unit: ' 单' },
+    complaint: { label: '客诉', icon: '📣', color: SEQ.b1, unit: ' 单' },
   };
   function metricByMode(fq, metric) {
     const mx = (fq && fq[metric]) || {};
@@ -4526,7 +4538,8 @@ const ThreeView = (() => {
       clone.setAttribute('width', w); clone.setAttribute('height', h);
       const cs = getComputedStyle(document.documentElement);
       const vars = ['--grid', '--muted', '--text-primary', '--text-muted', '--text-secondary',
-                    '--accent', '--ok', '--danger', '--warn', '--bg-secondary', '--panel']
+                    '--accent', '--ok', '--danger', '--warn', '--bg-secondary', '--panel', '--bg-input',
+                    '--seq-b1', '--seq-b2', '--seq-b3', '--seq-g1', '--seq-g2', '--seq-g3', '--seq-na']
         .map(v => `${v}:${cs.getPropertyValue(v).trim()}`).filter(s => !s.endsWith(':')).join(';');
       const st = document.createElementNS('http://www.w3.org/2000/svg', 'style');
       st.textContent = `svg{${vars}} text{font-family:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;} .tick{font-size:10.5px;fill:var(--muted);}`;
@@ -4669,7 +4682,7 @@ const ThreeView = (() => {
     const useYear = state.gran === 'year';
     const trendData = useD15 ? (tr.days_data || []) : useYear ? (tr.year_data || []) : (tr.data || []);
     const trendLabels = useD15 ? (tr.days_labels || []) : useYear ? (tr.year_labels || []) : (tr.labels || []);
-    const trendHtml = lineChart(trendData, trendLabels, '#2f6bff');
+    const trendHtml = lineChart(trendData, trendLabels, SEQ.b2);
     const granTabs = `<button data-g="month" class="${(!useD15 && !useYear) ? 'on' : ''}">by 月</button><button data-g="year" class="${useYear ? 'on' : ''}">by 年</button><button data-g="d15" class="${useD15 ? 'on' : ''}">近15天</button>`;
 
     // 项目列表（点击行 → 进入项目视角）
@@ -4708,7 +4721,7 @@ const ThreeView = (() => {
     }).join('') + (modes.length ? `<tr style="background:var(--bg-secondary)"><td><b>合计</b></td><td class="num"><b>${fmt(grandAlarm)}</b></td><td class="num"><b>${fmt(grandClosed)}</b></td><td class="num">${grandAlarm ? (100 * grandClosed / grandAlarm).toFixed(1) + '%' : '-'}</td><td class="num"><b>${fmt(grandComp)}</b></td><td>-</td></tr>` : '');
 
     // 排名
-    const rankMeta = { alarm: { label: '预警外发', color: '#dc2626', unit: '' }, closed: { label: '市场闭环', color: '#16a34a', unit: '' }, conn: { label: '接入数', color: '#2f6bff', unit: '' }, overdue: { label: '过保数', color: '#d97706', unit: '' } };
+    const rankMeta = { alarm: { label: '预警外发', color: SEQ.b2, unit: '' }, closed: { label: '市场闭环', color: SEQ.g2, unit: '' }, conn: { label: '接入数', color: SEQ.b1, unit: '' }, overdue: { label: '过保数', color: SEQ.g1, unit: '' } };
     const rm = rankMeta[state.rank] || rankMeta.alarm;
     const rankItems = (d.projects || []).map(p => {
       const val = state.rank === 'conn' ? (p.conn || 0) : state.rank === 'overdue' ? (p.overdue || 0) : state.rank === 'closed' ? (p.closed || 0) : (p.alarm || 0);
@@ -4741,8 +4754,8 @@ const ThreeView = (() => {
           <div class="chead"><div><div class="ctitle" title="按电芯容量分组 · 双柱各标数量">📊 各容量出货 / 接入对比</div></div></div>
           <div>${groupedBarChart(
             (d.projects || []).map(p => String(p.cap || p.name || '')),
-            { name: '出货(Pack)', color: '#2f6bff', data: (d.projects || []).map(p => p.pack || 0) },
-            { name: '接入车辆', color: '#10b981', data: (d.projects || []).map(p => p.conn || 0) }
+            { name: '出货(Pack)', color: SEQ.b2, data: (d.projects || []).map(p => p.pack || 0) },
+            { name: '接入车辆', color: SEQ.g2, data: (d.projects || []).map(p => p.conn || 0) }
           )}</div>
         </div>
       </div>
@@ -4857,7 +4870,7 @@ const ThreeView = (() => {
     const useYear = state.gran === 'year';
     const trendData = useD15 ? (tr.days_data || []) : useYear ? (tr.year_data || []) : (tr.data || []);
     const trendLabels = useD15 ? (tr.days_labels || []) : useYear ? (tr.year_labels || []) : (tr.labels || []);
-    const trendHtml = lineChart(trendData, trendLabels, '#7c3aed');
+    const trendHtml = lineChart(trendData, trendLabels, SEQ.b2);
     const granTabs = `<div class="seg" id="t3Gran"><button data-g="month" class="${(!useD15 && !useYear) ? 'on' : ''}">by 月</button><button data-g="year" class="${useYear ? 'on' : ''}">by 年</button><button data-g="d15" class="${useD15 ? 'on' : ''}">近15天</button></div>`;
 
     // 适用车型明细
@@ -4883,7 +4896,7 @@ const ThreeView = (() => {
       sohLabels.push(m + '月');
       sohData.push(+(100 - 0.15 * m - 0.005 * m * m).toFixed(2));
     }
-    const sohHtml = lineChart(sohData, sohLabels, '#10b981') +
+    const sohHtml = lineChart(sohData, sohLabels, SEQ.g2) +
       `<div class="legend"><span>当前车龄 <b>${ageMonths} 个月</b></span><span>当前 SOH <b>${sohData[sohData.length - 1]}%</b></span><span>质保门槛 <b>${esc(info.qsoh || '-')}</b></span></div>`;
 
     const eventsHtml = renderTimeline(d.events);
@@ -4997,17 +5010,17 @@ const ThreeView = (() => {
     // SOH 分布（近似口径）
     const sohLabels = ['<90', '90~92', '92~94', '94~96', '96~98', '98~100'];
     const sohData = [0.1, 0.6, 3.1, 9.8, 34.5, 51.9];
-    const sohHtml = barChart(sohData, sohLabels, '#10b981', ' %');
+    const sohHtml = barChart(sohData, sohLabels, SEQ.g2, ' %');
 
     // ppm 走势（近似）
     const ppmData = [12.1, 13.8, 15.2, 17.6, 19.4, 21.8, 23.1, 22.4, 20.9, Number(info.ppm || 0)];
     const ppmLabels = ['25-12', '26-01', '26-02', '26-03', '26-04', '26-05', '26-06', '26-07', '26-08', '26-09'];
-    const ppmHtml = lineChart(ppmData, ppmLabels, '#ef4444');
+    const ppmHtml = lineChart(ppmData, ppmLabels, SEQ.b2);
 
     // 批次出货柱状 + 批次表
     const batches = d.batches || [];
     const batchBarHtml = batches.length
-      ? barChart(batches.map(b => b.qty), batches.map(b => b.batch.slice(-5) + '·' + b.cust[0]), '#2f6bff', ' 颗')
+      ? barChart(batches.map(b => b.qty), batches.map(b => b.batch.slice(-5) + '·' + b.cust[0]), SEQ.b2, ' 颗')
       : '<div class="t3-empty">暂无批次数据</div>';
     const batchRows = batches.map(b => `
       <tr><td><b>${esc(b.cust)}</b></td><td><b>${esc(b.batch)}</b></td><td>${esc(b.plant)}</td>
