@@ -5054,7 +5054,7 @@ const ThreeView = (() => {
       const thrs = [...new Set(ws.map(w => +w.soh))];
       return boxPlot((src || {})[state.sohAxis], thrs.length === 1 ? thrs[0] : NaN, 900);
     };
-    const sohPnSel = `<span class="p1-fgrp"><span class="p1-flab">PN</span><select id="t3SohPn"><option value="">整体</option>${
+    const sohPnSel = `<span class="p1-fgrp"><span class="p1-flab">PN</span><select id="t3SohPn"><option value="__all"${state.sohPn ? '' : ' selected'}>整体</option>${
       sohPns.map(pn => `<option value="${esc(pn)}"${pn === state.sohPn ? ' selected' : ''}>${esc(pn)}</option>`).join('')}</select></span>`;
     const sohSeg = `<div class="seg" id="t3SohAxis">${Object.keys(SOH_AXIS).map(k =>
       `<button data-x="${k}" class="${k === state.sohAxis ? 'on' : ''}">${SOH_AXIS[k]}</button>`).join('')}</div>`;
@@ -5156,7 +5156,8 @@ const ThreeView = (() => {
     // SOH 箱线图：整体 / PN 下拉（可搜索，同客户下拉）
     const pnSel = document.getElementById('t3SohPn');
     if (pnSel) {
-      pnSel.addEventListener('change', () => { state.sohPn = pnSel.value; document.getElementById('t3SohBox').innerHTML = sohBoxHtml(); });
+      // 「整体」用非空值 __all：可搜索下拉不列出空值选项，空值会导致选了 PN 后切不回整体
+      pnSel.addEventListener('change', () => { state.sohPn = pnSel.value === '__all' ? '' : pnSel.value; document.getElementById('t3SohBox').innerHTML = sohBoxHtml(); });
       if (typeof SearchSelect !== 'undefined') SearchSelect.enhance(pnSel, { minWidth: '150px' });
     }
     // SOH 箱线图分桶维度切换（只重绘该图）
