@@ -2010,6 +2010,7 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
 .qpanel{display:flex;flex-direction:column;gap:10px;}
 .qtabs{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.chead .qtabs{flex:1;margin-left:14px;}
 .qinfo{font-size:12px;color:var(--muted);margin-left:auto;}
 .qinfo b{color:var(--text-primary);}
 .qsub{font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px;}
@@ -4497,7 +4498,9 @@ const ThreeView = (() => {
       // 过滤后的矩阵(fq)按下标存数组，原始矩阵(q)按月份标签存对象，两种都要支持
       const row = mx[m] || {};
       const arr = Array.isArray(row) ? row : (fq.labels || []).map(l => row[l] || 0);
-      return { label: m, value: arr.reduce((s, v) => s + v, 0), color: modeColor(m) };
+      // 累积量模式下数组已是逐月累加值，取最后一个才是区间总量，不能再求和
+      const value = (Array.isArray(row) && state.qacc) ? (arr[arr.length - 1] || 0) : arr.reduce((s, v) => s + v, 0);
+      return { label: m, value, color: modeColor(m) };
     }).filter(x => x.value > 0).sort((a, b) => b.value - a.value);
   }
   // 给 host 内所有看板表格启用点击表头排序（todo 任务#3）
@@ -4604,11 +4607,6 @@ const ThreeView = (() => {
         <td class="num">${fmt(r.complaint)}</td><td class="num">${share(r[m])}</td></tr>`).join('')
     }<tr style="background:var(--bg-secondary)"><td><b>合计</b></td><td class="num"><b>${fmt(tot.alarm)}</b></td><td class="num"><b>${fmt(tot.closed)}</b></td><td class="num">${rate(tot.closed, tot.alarm)}</td><td class="num"><b>${fmt(tot.complaint)}</b></td><td class="num">100%</td></tr></tbody></table>`;
     container.innerHTML = `<div class="qpanel">
-      <div class="qtabs">
-        <div class="seg" id="t3QM${key}">${metricTabs}</div>
-        <div class="seg" id="t3QA${key}">${accTabs}</div>
-        <span class="qinfo">${esc(range)} · ${esc(meta.label)}合计 <b>${fmt(total)}</b>${esc(meta.unit)}</span>
-      </div>
       <div class="t3-grid2 r21">
         <div><div class="qsub">${meta.icon} ${esc(meta.label)}走势</div>${stackedBar(fq, m)}</div>
         <div style="display:flex;flex-direction:column;">
@@ -4618,6 +4616,11 @@ const ThreeView = (() => {
       </div>
       <div style="margin-top:12px"><div class="qsub">失效模式明细</div>${modeTable}</div>
     </div>`;
+    // 指标 / 增量切换放在卡片标题「质量分析」同一行
+    const head = document.getElementById('t3QHead' + key);
+    if (head) head.innerHTML = `<div class="seg" id="t3QM${key}">${metricTabs}</div>
+        <div class="seg" id="t3QA${key}">${accTabs}</div>
+        <span class="qinfo">${esc(range)} · ${esc(meta.label)}合计 <b>${fmt(total)}</b>${esc(meta.unit)}</span>`;
     const qm = document.getElementById('t3QM' + key);
     const qa = document.getElementById('t3QA' + key);
     if (qm) qm.addEventListener('click', e => { const b = e.target.closest('button[data-qm]'); if (b) { state.qmetric = b.dataset.qm; reframe(); } });
@@ -4738,7 +4741,7 @@ const ThreeView = (() => {
       </div>
       <!-- 质量分析（整行放大，与项目/电芯视角一致，todo 任务#6） -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle" title="by 失效模式 · 累积/增量 + 时间筛选">📊 质量分析（预警 / 闭环 / 客诉）</div></div></div>
+        <div class="chead"><div class="ctitle" title="by 失效模式 · 累积/增量 + 时间筛选">📊 质量分析</div><div class="qtabs" id="t3QHeadCust"></div></div>
         <div id="t3CustQuality"></div>
       </div>
       <div class="t3-grid2 equal">
@@ -4900,7 +4903,7 @@ const ThreeView = (() => {
       </div>
       <!-- 项目质量分析（失效模式占比、明细都在这里，不再单独成卡） -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle" title="by 失效模式 · 累积/增量 + 时间筛选">📊 项目质量分析（预警 / 闭环 / 客诉）</div></div></div>
+        <div class="chead"><div class="ctitle" title="by 失效模式 · 累积/增量 + 时间筛选">📊 质量分析</div><div class="qtabs" id="t3QHeadProj"></div></div>
         <div id="t3ProjQuality"></div>
       </div>
       <!-- SOH + 质保台账 -->
@@ -5045,7 +5048,7 @@ const ThreeView = (() => {
       </div>
       <!-- 电芯质量分析 -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle" title="跨客户聚合 · 累积/增量 + 时间筛选">📊 电芯质量分析（预警 / 闭环 / 客诉）</div></div></div>
+        <div class="chead"><div class="ctitle" title="跨客户聚合 · 累积/增量 + 时间筛选">📊 质量分析</div><div class="qtabs" id="t3QHeadCell"></div></div>
         <div id="t3CellQuality"></div>
       </div>
       <!-- 批次追溯：出货柱状 + 明细 -->
