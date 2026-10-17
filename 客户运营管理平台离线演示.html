@@ -1990,7 +1990,8 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .chart circle.t3-dot:hover{r:5.5;}
 /* 单图表下载按钮：默认半透明，图表容器 hover 时显现，不抢视觉 */
 .t3-svgdl{position:absolute;top:4px;right:4px;z-index:6;padding:1px 8px;font-size:11px;opacity:0;pointer-events:none;transition:opacity .15s;}
-*:hover > .t3-svgdl{opacity:.85;pointer-events:auto;}   /* 鼠标移到图上才出现，不压坐标轴 */
+*:hover > .t3-svgdl,.qbox:hover .t3-svgdl{opacity:.85;pointer-events:auto;}   /* 鼠标移到图上才出现，不压坐标轴 */
+.t3-svgdl.in-head{position:static;margin-left:auto;}
 .t3-svgdl:hover{opacity:1;}
 .t3-svgdl:hover{opacity:1;}
 .t3-tbl{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap;}
@@ -2012,6 +2013,8 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .qpanel{display:flex;flex-direction:column;gap:10px;}
 .qtabs{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 .chead .qtabs{flex:1;margin-left:14px;}
+.qbox-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
+.qbox-head .qsub{margin-bottom:0;}
 .qbox{border:1px solid var(--line-strong);border-radius:12px;background:var(--bg-input);padding:12px 14px;min-width:0;}   /* 质量分析：直方图 / 饼图各自成区 */
 .qinfo{font-size:12px;color:var(--muted);margin-left:auto;}
 .qinfo b{color:var(--text-primary);}
@@ -4285,7 +4288,8 @@ const ThreeView = (() => {
     return labs;
   }
   // 按时间范围 + 累积/增量 过滤质量矩阵
-  function filterQuality(q) {
+  // acc：是否转成逐月累积（默认跟随「月增量 / 累积量」开关，只影响走势图）
+  function filterQuality(q, acc = state.qacc) {
     const allLabels = (q && q.labels) || [];
     const labs = timeRangeLabels(allLabels);
     const idx = labs.map(l => allLabels.indexOf(l)).filter(i => i >= 0);
@@ -4298,9 +4302,9 @@ const ThreeView = (() => {
       return out;
     };
     let alarm = pick('alarm'), closed = pick('closed'), complaint = pick('complaint');
-    if (state.qacc) {
-      const acc = mx => { const o = {}; Object.keys(mx).forEach(m => { let s = 0; o[m] = mx[m].map(v => s += v); }); return o; };
-      alarm = acc(alarm); closed = acc(closed); complaint = acc(complaint);
+    if (acc) {
+      const accum = mx => { const o = {}; Object.keys(mx).forEach(m => { let s = 0; o[m] = mx[m].map(v => s += v); }); return o; };
+      alarm = accum(alarm); closed = accum(closed); complaint = accum(complaint);
     }
     return { labels: labs, alarm, closed, complaint };
   }
@@ -4500,9 +4504,7 @@ const ThreeView = (() => {
       // 过滤后的矩阵(fq)按下标存数组，原始矩阵(q)按月份标签存对象，两种都要支持
       const row = mx[m] || {};
       const arr = Array.isArray(row) ? row : (fq.labels || []).map(l => row[l] || 0);
-      // 累积量模式下数组已是逐月累加值，取最后一个才是区间总量，不能再求和
-      const value = (Array.isArray(row) && state.qacc) ? (arr[arr.length - 1] || 0) : arr.reduce((s, v) => s + v, 0);
-      return { label: m, value, color: modeColor(m) };
+      return { label: m, value: arr.reduce((s, v) => s + v, 0), color: modeColor(m) };
     }).filter(x => x.value > 0).sort((a, b) => b.value - a.value);
   }
   // 给 host 内所有看板表格启用点击表头排序（todo 任务#3）
@@ -4576,14 +4578,18 @@ const ThreeView = (() => {
       btn.textContent = '⬇ PNG';
       btn.title = '下载该图表为 PNG 图片';
       btn.onclick = () => downloadChartSvg(svg, _svgName(svg));
-      wrap.appendChild(btn);
+      // 走势图右上角已有「月增量 / 累积量」，PNG 按钮放进标题行，排在切换按钮左边，避免重叠
+      const head = wrap.querySelector(':scope > .qbox-head');
+      if (head) { btn.classList.add('in-head'); head.insertBefore(btn, head.lastElementChild); }
+      else wrap.appendChild(btn);
     });
   }
 
   function renderQualityPanel(container, q, key, outgoingModes) {
-    const fq = filterQuality(q);
+    const fq = filterQuality(q);            // 走势图：随「月增量 / 累积量」
+    const fqi = filterQuality(q, false);    // 占比、合计、明细表：固定按区间内月增量求和
     const m = state.qmetric, meta = QMETA[m];
-    const byMode = metricByMode(fq, m);
+    const byMode = metricByMode(fqi, m);
     const total = byMode.reduce((s, x) => s + x.value, 0);
     // 环形图、明细表、区间合计统一按当前时间范围统计，避免同一张卡上两个总数对不上
     const accLabel = state.qacc ? '累积量' : '月增量';
@@ -4592,25 +4598,26 @@ const ThreeView = (() => {
     const labels = fq.labels || [];
     const range = labels.length ? `${labels[0]} ~ ${labels[labels.length - 1]}` : '-';
     // 明细：预警 / 闭环 / 闭环率 / 客诉 一张表（原「客户重点失效模式」并入这里）
-    const sumOf = (metric, mode) => {
-      const arr = (fq[metric] || {})[mode] || [];
-      return state.qacc ? (arr[arr.length - 1] || 0) : arr.reduce((a, v) => a + v, 0);
-    };
-    const allModes = Array.from(new Set([].concat(Object.keys(fq.alarm || {}), Object.keys(fq.closed || {}), Object.keys(fq.complaint || {}))));
+    // 明细表固定展示，不随「预警外发 / 市场闭环 / 客诉」和「月增量 / 累积量」切换
+    const sumOf = (metric, mode) => ((fqi[metric] || {})[mode] || []).reduce((a, v) => a + v, 0);
+    const allModes = Array.from(new Set([].concat(Object.keys(fqi.alarm || {}), Object.keys(fqi.closed || {}), Object.keys(fqi.complaint || {}))));
     const rows = allModes.map(mode => ({ mode, alarm: sumOf('alarm', mode), closed: sumOf('closed', mode), complaint: sumOf('complaint', mode) }))
       .filter(r => r.alarm || r.closed || r.complaint)
-      .sort((a, b) => b[m] - a[m]);
+      .sort((a, b) => b.alarm - a.alarm);
     const tot = rows.reduce((t, r) => ({ alarm: t.alarm + r.alarm, closed: t.closed + r.closed, complaint: t.complaint + r.complaint }), { alarm: 0, closed: 0, complaint: 0 });
     const rate = (c, a) => a ? (100 * c / a).toFixed(1) + '%' : '-';
-    const share = v => tot[m] ? (100 * v / tot[m]).toFixed(1) + '%' : '-';
-    const modeTable = `<table class="t3-tbl"><thead><tr><th>失效模式</th><th class="num">⚠️ 预警外发</th><th class="num">✅ 闭环</th><th class="num">闭环率</th><th class="num">📣 客诉</th><th class="num">${esc(meta.label)}占比</th></tr></thead><tbody>${
+    const share = v => tot.alarm ? (100 * v / tot.alarm).toFixed(1) + '%' : '-';
+    const modeTable = `<table class="t3-tbl"><thead><tr><th>失效模式</th><th class="num">⚠️ 预警外发</th><th class="num">✅ 闭环</th><th class="num">闭环率</th><th class="num">📣 客诉</th><th class="num">预警占比</th></tr></thead><tbody>${
       rows.map(r => `<tr><td><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${modeColor(r.mode)};margin-right:7px"></i><b>${esc(r.mode)}</b></td>
         <td class="num"><b>${fmt(r.alarm)}</b></td><td class="num">${fmt(r.closed)}</td><td class="num">${rate(r.closed, r.alarm)}</td>
-        <td class="num">${fmt(r.complaint)}</td><td class="num">${share(r[m])}</td></tr>`).join('')
+        <td class="num">${fmt(r.complaint)}</td><td class="num">${share(r.alarm)}</td></tr>`).join('')
     }<tr style="background:var(--bg-secondary)"><td><b>合计</b></td><td class="num"><b>${fmt(tot.alarm)}</b></td><td class="num"><b>${fmt(tot.closed)}</b></td><td class="num">${rate(tot.closed, tot.alarm)}</td><td class="num"><b>${fmt(tot.complaint)}</b></td><td class="num">100%</td></tr></tbody></table>`;
     container.innerHTML = `<div class="qpanel">
       <div class="t3-grid2 r21">
-        <div class="qbox"><div class="qsub">${meta.icon} ${esc(meta.label)}走势</div>${stackedBar(fq, m)}</div>
+        <div class="qbox">
+          <div class="qbox-head"><div class="qsub">${meta.icon} ${esc(meta.label)}走势</div>
+            <div class="seg" id="t3QA${key}">${accTabs}</div></div>
+          ${stackedBar(fq, m)}</div>
         <div class="qbox" style="display:flex;flex-direction:column;">
           <div class="qsub">${meta.icon} ${esc(meta.label)}占比</div>
           <div style="flex:1;display:flex;align-items:center;justify-content:center;">${donut(byMode)}</div>
@@ -4618,10 +4625,9 @@ const ThreeView = (() => {
       </div>
       <div style="margin-top:12px"><div class="qsub">失效模式明细</div>${modeTable}</div>
     </div>`;
-    // 指标 / 增量切换放在卡片标题「质量分析」同一行
+    // 指标切换放在卡片标题「质量分析」同一行；月增量 / 累积量只控制走势图，放在走势图右上角
     const head = document.getElementById('t3QHead' + key);
     if (head) head.innerHTML = `<div class="seg" id="t3QM${key}">${metricTabs}</div>
-        <div class="seg" id="t3QA${key}">${accTabs}</div>
         <span class="qinfo">${esc(range)} · ${esc(meta.label)}合计 <b>${fmt(total)}</b>${esc(meta.unit)}</span>`;
     const qm = document.getElementById('t3QM' + key);
     const qa = document.getElementById('t3QA' + key);
