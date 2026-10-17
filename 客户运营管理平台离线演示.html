@@ -1945,8 +1945,9 @@ tbody tr:hover { background: var(--bg-card-hover); }
 @media(max-width:1100px){.t3-skel .sk-kpis{grid-template-columns:repeat(3,1fr);}}
 /* 首页一行筛选条：视角 | 客户 | 容量 | 时间 …… 下载 */
 .p1-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px 0;}
-.p1-toolbar .p1-fgrp{display:inline-flex;align-items:center;gap:8px;}
-.p1-toolbar .p1-flab{font-size:12px;color:var(--text-muted);font-weight:700;white-space:nowrap;}
+.p1-toolbar .p1-fgrp,.t3-card .p1-fgrp{display:inline-flex;align-items:center;gap:8px;}
+.t3-card .chead .acts2{display:inline-flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.p1-toolbar .p1-flab,.t3-card .p1-flab{font-size:12px;color:var(--text-muted);font-weight:700;white-space:nowrap;}
 .p1-toolbar select{width:auto;min-width:150px;max-width:240px;height:34px;padding:4px 10px;font-size:13px;}
 .p1-toolbar .p1-sep{width:1px;height:22px;background:var(--line-strong);}
 .t3-empty{border:1.5px dashed var(--line);border-radius:12px;padding:18px;text-align:center;color:var(--muted);font-size:13px;}
@@ -2322,16 +2323,19 @@ tbody tr:hover { background: var(--bg-card-hover); }
   }
 
   // SOH 分区间箱线统计：按累计里程 / 累计循环数分桶，每桶 min/P25/中位数/P75/max + 样本数
-  function makeSohBox() {
+  function makeSohBox(shift, scale, noPn) {
+    shift = shift || 0; scale = scale || 1;
     function box(ranges, f) {
       return ranges.map(function (r, i) {
-        var med = f(i), sp = 0.6 + i * 0.25;
-        return { range: r, n: Math.round(3200 / (i + 1.2)), min: +(med - sp * 3.2).toFixed(1), q1: +(med - sp).toFixed(1), median: +med.toFixed(1), q3: +Math.min(100, med + sp * 0.9).toFixed(1), max: +Math.min(100, med + sp * 2.2).toFixed(1) };
+        var med = f(i) - shift * i * 0.4, sp = 0.6 + i * 0.25;
+        return { range: r, n: Math.round(3200 * scale / (i + 1.2)), min: +(med - sp * 3.2).toFixed(1), q1: +(med - sp).toFixed(1), median: +med.toFixed(1), q3: +Math.min(100, med + sp * 0.9).toFixed(1), max: +Math.min(100, med + sp * 2.2).toFixed(1) };
       });
     }
     return {
       mileage: box(['0~2万', '2~4万', '4~6万', '6~8万', '8~10万', '10~15万', '15~20万', '20万+'], function (i) { return 99 - i * 1.6 - i * i * 0.12; }),
       cycle: box(['0~100', '100~200', '200~300', '300~500', '500~800', '800~1200', '1200+'], function (i) { return 99 - i * 1.9 - i * i * 0.15; }),
+      // 按 PN 的分布（下拉选 PN 时使用）
+      byPn: noPn ? undefined : { 'XR153-01': makeSohBox(-0.6, 0.63, true), 'XR153-02': makeSohBox(0.9, 0.37, true) },
     };
   }
   function threeView(view, q) {
@@ -4254,6 +4258,7 @@ const ThreeView = (() => {
     timeRange: { mode: 'all', start: '', end: '' },   // 全局时间筛选：3m/6m/12m/all/custom
     level: 'Pack',         // Pack/Module/Cell（项目视角出货层级）
     sohAxis: 'mileage',    // mileage/cycle（项目视角 SOH 箱线图分桶维度）
+    sohPn: '',             // ''=整体，否则为 PN（项目视角 SOH 箱线图范围）
     view: 'customer',      // customer/project/cell
     oem: '',
     cellCap: '',
@@ -5038,7 +5043,16 @@ const ThreeView = (() => {
 
     // SOH 衰减走势：按累计里程 / 累计循环数分区间，每区间一个箱线图
     const SOH_AXIS = { mileage: '累计里程', cycle: '累计循环数' };
-    const sohBoxHtml = () => boxPlot((d.sohBox || {})[state.sohAxis], parseFloat(info.qsoh), 900);
+    // 整体 / PN：PN 来自质保台账与分布数据，切项目后原 PN 不存在则回到整体
+    const sohSrc = d.sohBox || {};
+    const sohPns = [...new Set([...(d.warranty || []).map(w => w.pn), ...Object.keys(sohSrc.byPn || {})].filter(Boolean))];
+    if (state.sohPn && !sohPns.includes(state.sohPn)) state.sohPn = '';
+    const sohBoxHtml = () => {
+      const src = state.sohPn ? (sohSrc.byPn || {})[state.sohPn] : sohSrc;
+      return boxPlot((src || {})[state.sohAxis], parseFloat(info.qsoh), 900);
+    };
+    const sohPnSel = `<span class="p1-fgrp"><span class="p1-flab">PN</span><select id="t3SohPn"><option value="">整体</option>${
+      sohPns.map(pn => `<option value="${esc(pn)}"${pn === state.sohPn ? ' selected' : ''}>${esc(pn)}</option>`).join('')}</select></span>`;
     const sohSeg = `<div class="seg" id="t3SohAxis">${Object.keys(SOH_AXIS).map(k =>
       `<button data-x="${k}" class="${k === state.sohAxis ? 'on' : ''}">${SOH_AXIS[k]}</button>`).join('')}</div>`;
 
@@ -5070,7 +5084,7 @@ const ThreeView = (() => {
       </div>
       <!-- SOH 衰减走势 -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle" title="按累计里程 / 累计循环数分区间的 SOH 分布（箱线图）">📉 SOH 衰减走势</div></div>${sohSeg}</div>
+        <div class="chead"><div><div class="ctitle" title="按累计里程 / 累计循环数分区间的 SOH 分布（箱线图）">📉 SOH 衰减走势</div></div><div class="acts2">${sohPnSel}${sohSeg}</div></div>
         <div id="t3SohBox">${sohBoxHtml()}</div>
       </div>
       <!-- 适用车型 & 质保（原「适用车型明细」+「质保台账」合并） -->
@@ -5135,6 +5149,12 @@ const ThreeView = (() => {
       if (e.key === 'Enter') carTbl.querySelector('button[data-act="save"]').click();
       if (e.key === 'Escape') carTbl.querySelector('button[data-act="cancel"]').click();
     });
+    // SOH 箱线图：整体 / PN 下拉（可搜索，同客户下拉）
+    const pnSel = document.getElementById('t3SohPn');
+    if (pnSel) {
+      pnSel.addEventListener('change', () => { state.sohPn = pnSel.value; document.getElementById('t3SohBox').innerHTML = sohBoxHtml(); });
+      if (typeof SearchSelect !== 'undefined') SearchSelect.enhance(pnSel, { minWidth: '150px' });
+    }
     // SOH 箱线图分桶维度切换（只重绘该图）
     const sseg = document.getElementById('t3SohAxis');
     if (sseg) sseg.addEventListener('click', e => {
