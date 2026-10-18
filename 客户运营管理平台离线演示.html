@@ -4435,6 +4435,10 @@ const ThreeView = (() => {
     cellCap: '',
     current: null,         // 当前视角原始数据
     hidden: {},            // 图例点选隐藏的系列：{ 图表键: Set(名称) }
+    qdim: 'mode',          // 质量分析分组维度：mode=失效模式（客户/项目视角）；cust=客户（电芯视角）
+    custOrder: [],         // 电芯视角客户顺序（决定客户配色）
+    cellMode: '',          // 电芯视角失效模式筛选（''=全部）
+    ppmAcc: true,          // 电芯失效率走势：true=累积量 false=月增量
   };
   // page1 承接视角切换（跳到项目/电芯视角等）
   let onSwitch = null;
@@ -4444,6 +4448,12 @@ const ThreeView = (() => {
   // 颜色跟着失效模式走，不跟排名走：同一模式在任何图里都是同一个颜色。
   const SEQ = { b1: 'var(--seq-b1)', b2: 'var(--seq-b2)', b3: 'var(--seq-b3)', g1: 'var(--seq-g1)', g2: 'var(--seq-g2)', g3: 'var(--seq-g3)', na: 'var(--seq-na)' };
   const COLORS = { ins: SEQ.b1, soc: SEQ.b2, cap: SEQ.b3, self: SEQ.g1, volt: SEQ.g2, heat: SEQ.g3, other: SEQ.na };
+  // 质量分析系列配色：电芯视角按客户，其余按失效模式
+  function qColor(name) {
+    if (state.qdim !== 'cust') return modeColor(name);
+    const i = state.custOrder.indexOf(name);
+    return CUST_COLORS[(i < 0 ? state.custOrder.length : i) % CUST_COLORS.length];
+  }
   function modeColor(name) {
     if (name.includes('绝缘')) return COLORS.ins;
     if (name.includes('SOC') || name.includes('一致')) return COLORS.soc;
@@ -4711,6 +4721,7 @@ const ThreeView = (() => {
       const cx = padL + gw * (i + 0.5), x0 = cx - bw * vis.length / 2;
       vis.forEach((s, k) => {
         const v = s.data[i] || 0, bh = ih * v / max, y = padT + ih - bh;
+        if (!v) return;   // 无数据（如该 PN 不供给该客户）不画柱
         bars += `<rect x="${x0 + k * bw + 0.5}" y="${y}" width="${bw - 1}" height="${Math.max(bh, 1)}" rx="2" fill="${s.color}"><title>${esc(lab)} · ${esc(s.name)}：${v}${esc(unit)}</title></rect>`;
       });
       bars += `<text x="${cx}" y="${h - 9}" text-anchor="middle" class="tick">${esc(lab)}</text>`;
@@ -4835,7 +4846,7 @@ const ThreeView = (() => {
       modes.forEach(m => {
         const v = (mx[m] || {})[i]; if (!v) return;
         const bh = ih * v / max, y = yB - bh;
-        bars += `<rect x="${cx - bw / 2}" y="${y}" width="${bw}" height="${Math.max(bh, 0.5)}" fill="${modeColor(m)}" stroke="var(--bg-input)" stroke-width="1.5"><title>${esc(c.tip)} · ${esc(m)}：${fmt(v)}（合计 ${fmt(totals[i])}）</title></rect>`;
+        bars += `<rect x="${cx - bw / 2}" y="${y}" width="${bw}" height="${Math.max(bh, 0.5)}" fill="${qColor(m)}" stroke="var(--bg-input)" stroke-width="1.5"><title>${esc(c.tip)} · ${esc(m)}：${fmt(v)}（合计 ${fmt(totals[i])}）</title></rect>`;
         yB = y;
       });
       const yAx = padT + ih;
@@ -4855,7 +4866,7 @@ const ThreeView = (() => {
       if (totals[i] > 0 && totFits) bars += `<text x="${cx}" y="${yB - 5}" text-anchor="middle" class="tick">${totLabel(totals[i])}</text>`;
     });
     const note = byQuarter ? `<text x="${w - padR}" y="12" text-anchor="end" class="tick">共 ${rawLabels.length} 个月 · 已按季度汇总</text>` : '';
-    const legend = allModes.map(m => lk ? lgItem(lk, m, modeColor(m)) : `<span><i style="background:${modeColor(m)}"></i>${esc(m)}</span>`).join('');
+    const legend = allModes.map(m => lk ? lgItem(lk, m, qColor(m)) : `<span><i style="background:${qColor(m)}"></i>${esc(m)}</span>`).join('');
     return `<svg viewBox="0 0 ${w} ${h}" class="chart">${note}${grid}${bars}</svg><div class="legend lg-c">${legend}</div>`;
   }
 
@@ -4925,7 +4936,7 @@ const ThreeView = (() => {
       // 过滤后的矩阵(fq)按下标存数组，原始矩阵(q)按月份标签存对象，两种都要支持
       const row = mx[m] || {};
       const arr = Array.isArray(row) ? row : (fq.labels || []).map(l => row[l] || 0);
-      return { label: m, value: arr.reduce((s, v) => s + v, 0), color: modeColor(m) };
+      return { label: m, value: arr.reduce((s, v) => s + v, 0), color: qColor(m) };
     }).filter(x => x.value > 0).sort((a, b) => b.value - a.value);
   }
   // 电池结构可能一对多（数组），统一用「/」连接展示
@@ -5067,13 +5078,19 @@ const ThreeView = (() => {
     });
   }
 
-  function renderQualityPanel(container, q, key, outgoingModes) {
+  function renderQualityPanel(container, q, key, outgoingModes, opts) {
+    opts = opts || {};
+    state.qdim = opts.dim || 'mode';
+    const dimLabel = state.qdim === 'cust' ? '客户' : '失效模式';
     const fq = filterQuality(q);            // 走势图：随「月增量 / 累积量」
     const fqi = filterQuality(q, false);    // 占比、合计、明细表：固定按区间内月增量求和
     const qkeys = Object.keys(QMETA).filter(k => !QMETA[k].only || QMETA[k].only === key);
     // 预警规则：跳到「预警闭环 → 常规预警 → 预警外发规则」，按当前客户 / 容量 / 失效模式预筛
     const ruleOem = state.view === 'cell' ? '' : (state.oem || ''), ruleCap = state.view === 'customer' ? '' : (state.cellCap || '');
-    const ruleTd = (mode, extra = '') => `<td${extra}><span class="lk" onclick="ThreeView.gotoRule('${esc(ruleOem)}','${esc(ruleCap)}','${esc(mode)}')" title="跳到预警闭环 · 预警外发规则（${esc(mode)}）">查看规则 →</span></td>`;
+    // 客户维度：按该客户（+ 当前失效模式筛选）跳规则；失效模式维度：按该失效模式跳
+    const ruleTd = (name, extra = '') => state.qdim === 'cust'
+      ? `<td${extra}><span class="lk" onclick="ThreeView.gotoRule('${esc(name)}','${esc(ruleCap)}','${esc(state.cellMode)}')" title="跳到预警闭环 · 预警外发规则（${esc(name)}）">查看规则 →</span></td>`
+      : `<td${extra}><span class="lk" onclick="ThreeView.gotoRule('${esc(ruleOem)}','${esc(ruleCap)}','${esc(name)}')" title="跳到预警闭环 · 预警外发规则（${esc(name)}）">查看规则 →</span></td>`;
     const m = qkeys.includes(state.qmetric) ? state.qmetric : 'alarm', meta = QMETA[m];
     const byMode = metricByMode(fqi, m);
     const total = byMode.reduce((s, x) => s + x.value, 0);
@@ -5097,12 +5114,12 @@ const ThreeView = (() => {
     const WO_TYPES = ['预警', '批改', '现场'];
     const woSum = (t, mode) => (((fqi.woType || {})[t] || {})[mode] || []).reduce((a, v) => a + v, 0);
     const pct = v => total ? (100 * v / total).toFixed(1) + '%' : '-';
-    const woTable = `<table class="t3-tbl wo-tbl" data-nosort="1" style="table-layout:fixed">${colg(22, 16, 18, 18, 26)}<thead><tr><th>失效模式</th><th>工单类型</th><th class="num">数量</th><th class="num">占比</th><th>预警规则</th></tr></thead><tbody>${
+    const woTable = `<table class="t3-tbl wo-tbl" data-nosort="1" style="table-layout:fixed">${colg(22, 16, 18, 18, 26)}<thead><tr><th>${dimLabel}</th><th>工单类型</th><th class="num">数量</th><th class="num">占比</th><th>预警规则</th></tr></thead><tbody>${
       byMode.map(r => WO_TYPES.map((t, k) => `<tr class="${k === 2 ? 'wo-last' : ''}">${k === 0 ? `<td rowspan="3"><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${r.color};margin-right:7px"></i><b>${esc(r.label)}</b><div class="wo-tot">合计 ${fmt(r.value)}</div></td>` : ''}
         <td>${t}</td><td class="num"><b>${fmt(woSum(t, r.label))}</b></td><td class="num">${pct(woSum(t, r.label))}</td>${k === 0 ? ruleTd(r.label, ' rowspan="3"') : ''}</tr>`).join('')).join('')
     }${WO_TYPES.map((t, k) => { const v = byMode.reduce((a, r) => a + woSum(t, r.label), 0); return `<tr class="t3-sum${k === 2 ? ' wo-last' : ''}">${k === 0 ? `<td rowspan="3"><b>合计</b><div class="wo-tot">${fmt(total)}</div></td>` : ''}<td>${t}</td><td class="num"><b>${fmt(v)}</b></td><td class="num">${pct(v)}</td>${k === 0 ? '<td rowspan="3">-</td>' : ''}</tr>`; }).join('')}</tbody></table>`;
-    const modeTable = `<table class="t3-tbl" style="table-layout:fixed">${colg(...Array(7).fill(100 / 7))}<thead><tr><th>失效模式</th><th class="num">⚠️ 预警外发</th><th class="num">✅ 闭环</th><th class="num">闭环率</th><th class="num">📣 客诉</th><th class="num">预警占比</th><th data-no-sort>预警规则</th></tr></thead><tbody>${
-      rows.map(r => `<tr><td><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${modeColor(r.mode)};margin-right:7px"></i><b>${esc(r.mode)}</b></td>
+    const modeTable = `<table class="t3-tbl" style="table-layout:fixed">${colg(...Array(7).fill(100 / 7))}<thead><tr><th>${dimLabel}</th><th class="num">⚠️ 预警外发</th><th class="num">✅ 闭环</th><th class="num">闭环率</th><th class="num">📣 客诉</th><th class="num">预警占比</th><th data-no-sort>预警规则</th></tr></thead><tbody>${
+      rows.map(r => `<tr><td><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${qColor(r.mode)};margin-right:7px"></i><b>${esc(r.mode)}</b></td>
         <td class="num"><b>${fmt(r.alarm)}</b></td><td class="num">${fmt(r.closed)}</td><td class="num">${rate(r.closed, r.alarm)}</td>
         <td class="num">${fmt(r.complaint)}</td><td class="num">${share(r.alarm)}</td>${ruleTd(r.mode)}</tr>`).join('')
     }<tr class="t3-sum"><td><b>合计</b></td><td class="num"><b>${fmt(tot.alarm)}</b></td><td class="num"><b>${fmt(tot.closed)}</b></td><td class="num">${rate(tot.closed, tot.alarm)}</td><td class="num"><b>${fmt(tot.complaint)}</b></td><td class="num">100%</td><td>-</td></tr></tbody></table>`;
@@ -5500,7 +5517,15 @@ const ThreeView = (() => {
   const ppmOf = r => r.conn && failOf(r) != null ? Math.round(1e6 * failOf(r) / r.conn) : 0;
   function renderCell(host, d) {
     state.view = 'cell'; state.current = d; state.cellCap = d.cellCap || state.cellCap;
-    const rows = d.rows || [];
+    // 失效模式筛选：失效车辆数按该模式占比折算（后端支持 failure_mode 时直接返回该模式数据）
+    const modeList = (d.modes || []).map(m => m.name);
+    if (state.cellMode && !modeList.includes(state.cellMode)) state.cellMode = '';
+    syncModeSelect(modeList);
+    const modeTot = (d.modes || []).reduce((a, m) => a + (m.count || 0), 0);
+    const modeShare = !state.cellMode || !modeTot ? 1 : ((d.modes.find(m => m.name === state.cellMode) || {}).count || 0) / modeTot;
+    const scaleFail = v => v == null ? v : Math.round(v * modeShare);
+    const rows = (d.rows || []).map(r => Object.assign({}, r, { fieldWo: scaleFail(r.fieldWo) }));
+    state.custOrder = rows.map(r => r.oem);
     // 跨客户合计按各客户行求和，KPI 与表格合计同一口径
     const sumOf = k => rows.some(r => r[k] != null) ? rows.reduce((s, r) => s + (Number(r[k]) || 0), 0) : null;
     const info = rows.length
@@ -5511,7 +5536,7 @@ const ThreeView = (() => {
       { icon: '🔋', label: '电芯累计出货', val: wan(info.cell) + ' 颗', sub: `${fmt(info.pack)} 包 · ${info.custCount || 0} 客户`, cls: 'hl' },
       { icon: '📥', label: '接入车辆数', val: wan(info.conn) + ' 辆', tip: '已装车并接入的车辆' },
       missCard(info.packIdMiss, info.conn),
-      { icon: '⚠️', label: '失效车辆数', val: failVal(info), sub: '联动 工单数（现场）', cls: 'bad', tip: '失效车辆数 = 现场工单数' },
+      { icon: '⚠️', label: '失效车辆数', val: failVal(info), sub: state.cellMode ? `失效模式：${state.cellMode}` : '联动 工单数（现场）', cls: 'bad', tip: '失效车辆数 = 现场工单数' },
       { icon: '✅', label: '市场已闭环', val: fmt(info.closed), sub: `闭环率 ${closeRate}`, cls: 'ok' },
       { icon: '📉', label: '失效率（ppm）', val: fmt(ppmOf(info)), cls: 'bad', tip: '失效率 = 失效车辆数 / 接入车辆数 × 10⁶' },
       { icon: '📊', label: '今年接入', val: fmt(info.year), tip: '跨客户合计' },
@@ -5532,16 +5557,16 @@ const ThreeView = (() => {
       const pct = info.cell ? (100 * (r.cell || 0) / info.cell).toFixed(1) + '%' : '-';
       return `<tr style="cursor:pointer" onclick="ThreeView.gotoProject('${esc(r.oem)}','${esc(r.cap || d.cellCap)}')">
         <td><b>${esc(r.oem)}</b></td>
-        <td class="num">${fmt(r.pack)}</td><td class="num">${fmt(r.cell)}</td><td class="num">${fmt(r.conn)}</td>
+        <td class="num">${fmt(r.pack)}</td><td class="num">${fmt(r.cell)}</td><td class="num">${esc(pct)}</td><td class="num">${fmt(r.conn)}</td>
         <td class="num">${fmt(r.year)}</td>${missTd(r.packIdMiss, r.conn)}<td class="num">${fmt(r.alarm)}</td>
-        <td class="num">${fmt(r.closed)}（${esc(rClRate)}）</td><td class="num">${failVal(r)}</td>${ppmCell(r)}<td class="num">${esc(pct)}</td>
+        <td class="num">${fmt(r.closed)}（${esc(rClRate)}）</td><td class="num">${failVal(r)}</td>${ppmCell(r)}
         <td><span class="lk">进入项目视角 →</span></td></tr>`;
     }).join('') || '<tr><td colspan="12" class="t3-empty">暂无用该容量的客户</td></tr>';
     // 合计只加总数量列；缺失率 / 闭环率 / 失效率 / 出货占比等比率不合计
     const sumRow = rows.length ? `<tr class="t3-sum"><td><b>合计</b></td>
-      <td class="num"><b>${fmt(info.pack)}</b></td><td class="num"><b>${fmt(info.cell)}</b></td><td class="num"><b>${fmt(info.conn)}</b></td>
+      <td class="num"><b>${fmt(info.pack)}</b></td><td class="num"><b>${fmt(info.cell)}</b></td><td></td><td class="num"><b>${fmt(info.conn)}</b></td>
       <td class="num"><b>${fmt(info.year)}</b></td><td></td><td class="num"><b>${fmt(info.alarm)}</b></td>
-      <td class="num"><b>${fmt(info.closed)}</b></td><td class="num"><b>${failVal(info)}</b></td><td></td><td></td><td></td></tr>` : '';
+      <td class="num"><b>${fmt(info.closed)}</b></td><td class="num"><b>${failVal(info)}</b></td><td></td><td></td></tr>` : '';
 
 
     // SOH 分布：各客户用车习惯不同，按客户分组画（每个客户各区间占比合计 100%）；后端给 d.sohDist 时用后端数据
@@ -5565,22 +5590,47 @@ const ThreeView = (() => {
     const ppmSeries = [{ name: '整体', color: 'var(--text-primary)', main: true, data: ppmData }].concat((d.ppmTrend && d.ppmTrend.length ? d.ppmTrend : rows.map((r, i) => ({
       oem: r.oem, data: ppmShape.map((f, k) => k === 9 ? ppmOf(r) : Math.round(ppmOf(r) * Math.min(1.1, f * (0.92 + 0.04 * ((i + k) % 5))))),
     }))).map((x, i) => ({ name: x.oem, color: CUST_COLORS[i % CUST_COLORS.length], data: x.data })));
-    const ppmHtml = () => multiLineChart(ppmLabels, ppmSeries, 520, 'ppm', ' ppm');
+    // 月增量 = 当月新增失效车辆 / 当月接入车辆 × 10⁶（接入按月爬坡回推，演示口径）
+    const connShape = ppmLabels.map((_, k) => 0.55 + 0.45 * k / Math.max(1, ppmLabels.length - 1));
+    const toInc = cum => cum.map((v, k) => {
+      const f = v * connShape[k], fPrev = k ? cum[k - 1] * connShape[k - 1] : f * 0.9;
+      return Math.max(0, Math.round((f - fPrev) / connShape[k]));
+    });
+    const ppmShown = () => state.ppmAcc ? ppmSeries : ppmSeries.map(x => Object.assign({}, x, { data: toInc(x.data) }));
+    const ppmHtml = () => multiLineChart(ppmLabels, ppmShown(), 520, 'ppm', ' ppm');
     legendRedraw.ppm = () => { const el = document.getElementById('t3PpmLine'); if (el) { el.innerHTML = ppmHtml(); addChartDownloads(el); } };
 
-    // 批次出货柱状 + 批次表
-    const batches = d.batches || [];
-    const batchBarHtml = batches.length
-      ? barChart(batches.map(b => b.qty), batches.map(b => b.batch), SEQ.b2, ' 颗', 760)
-      : '<div class="t3-empty">暂无批次数据</div>';
-    const batchRows = batches.map(b => `
-      <tr><td><b>${esc(b.cust)}</b></td><td><b>${esc(b.batch)}</b></td><td>${esc(b.plant)}</td>
-      <td class="num">${fmt(b.qty)}</td><td class="num">${fmt(b.failed)}</td><td class="num"><b>${esc(b.ppm)}</b></td>
-      <td><span class="pill ${b.status === '预警中' ? 'r' : b.status === '关注' ? 'o' : 'g'}">${esc(b.status)}</span></td></tr>`).join('')
-      || '<tr><td colspan="7" class="t3-empty">暂无批次数据</td></tr>';
+    // PN 追溯：PN 与客户多对多（一个 PN 供多个客户，一个客户用多个 PN）；后端给 d.pnTrace 时直接用
+    const pnTrace = (d.pnTrace && d.pnTrace.length ? d.pnTrace : (() => {
+      const cap = String(d.cellCap || state.cellCap || '').replace(/\D/g, '') || '153';
+      const pns = ['A', 'B', 'C', 'D'].map(x => `P${cap}-${x}`), plants = ['宁德基地', '溧阳基地', '宜宾基地', '宁德基地'];
+      const out = [];
+      pns.forEach((pn, i) => rows.forEach((r, j) => {
+        if ((i + j) % 3 === 2) return;   // 演示：不是每个 PN 都供给每个客户
+        const qty = Math.round((r.cell || 0) * (0.18 + 0.06 * ((i + 2 * j) % 4)));
+        const failed = Math.round((failOf(r) || 0) * qty / Math.max(1, r.cell || 1) * (0.7 + 0.15 * ((i + j) % 4)));
+        out.push({ pn, cust: r.oem, plant: plants[i], qty, failed });
+      }));
+      return out;
+    })()).map(x => Object.assign({}, x, { failed: d.pnTrace && d.pnTrace.length ? scaleFail(x.failed) : x.failed }));
+    pnTrace.forEach(x => { x.ppm = x.qty ? Math.round(1e6 * x.failed / x.qty) : 0; });
+    const pnAvg = (() => { const q = pnTrace.reduce((a, x) => a + x.qty, 0); return q ? 1e6 * pnTrace.reduce((a, x) => a + x.failed, 0) / q : 0; })();
+    pnTrace.forEach(x => { x.status = x.ppm > pnAvg * 1.25 ? '预警中' : x.ppm > pnAvg * 1.05 ? '关注' : '正常'; });
+    const pnList = [...new Set(pnTrace.map(x => x.pn))];
+    const pnBarHtml = () => pnList.length
+      ? multiBarChart(pnList, state.custOrder.map((c, i) => ({ name: c, color: CUST_COLORS[i % CUST_COLORS.length], data: pnList.map(pn => (pnTrace.find(x => x.pn === pn && x.cust === c) || {}).qty || 0) })), 760, 'pn', ' 颗')
+      : '<div class="t3-empty">暂无 PN 数据</div>';
+    legendRedraw.pn = () => { const el = document.getElementById('t3PnBar'); if (el) { el.innerHTML = pnBarHtml(); addChartDownloads(el); } };
+    const batchRows = pnList.map(pn => {
+      const items = pnTrace.filter(x => x.pn === pn);
+      return items.map((b, k) => `<tr>${k === 0 ? `<td rowspan="${items.length}"><b class="mono">${esc(pn)}</b><div class="wo-tot">${items.length} 个客户</div></td>` : ''}
+        <td><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${CUST_COLORS[state.custOrder.indexOf(b.cust) % CUST_COLORS.length]};margin-right:7px"></i><b>${esc(b.cust)}</b></td><td>${esc(b.plant)}</td>
+        <td class="num">${fmt(b.qty)}</td><td class="num">${fmt(b.failed)}</td><td class="num"><b>${fmt(b.ppm)}</b></td>
+        <td><span class="pill ${b.status === '预警中' ? 'r' : b.status === '关注' ? 'o' : 'g'}">${esc(b.status)}</span></td></tr>`).join('');
+    }).join('') || '<tr><td colspan="7" class="t3-empty">暂无 PN 数据</td></tr>';
 
     // 异常电芯明细
-    const riskRows = (d.risks || []).map(r => `
+    const riskRows = (d.risks || []).filter(r => !state.cellMode || r.mode === state.cellMode).map(r => `
       <tr><td><b>${esc(r.cust)}</b></td><td>${esc(r.vin || '—')}</td><td>${esc(r.pack || '—')}</td><td>${esc(r.pos || '—')}</td>
       <td><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${modeColor(r.mode)};margin-right:7px"></i>${esc(r.mode)}</td>
       <td class="num">${esc(r.soh || '—')}</td><td><span class="pill ${r.st || 'o'}">${esc(r.stTxt || '待核查')}</span></td></tr>`).join('')
@@ -5594,9 +5644,9 @@ const ThreeView = (() => {
       <!-- 跨客户对比 -->
       <div class="t3-card">
         <div class="chead"><div><div class="ctitle" title="同一颗电芯，不同客户的质量差异一目了然">🏢 跨客户对比</div></div></div>
-        <div class="tblwrap"><table class="t3-tbl dense">${colg(7, 7, 8, 8, 7, 7, 7, 9, 7, 14, 6, 13)}<thead><tr>
-          <th>客户</th><th class="num">出货(Pack)</th><th class="num">出货(Cell)</th><th class="num">接入车辆数</th><th class="num">今年接入</th><th class="num">pack_id缺失率</th>
-          <th class="num">预警外发</th><th class="num">已闭环(率)</th><th class="num">失效车辆数</th><th class="num" title="横条按各客户最大值缩放；百分比为相对整体失效率的高低">失效率(ppm) · 较整体</th><th class="num">出货占比</th><th class="ctr">操作</th>
+        <div class="tblwrap"><table class="t3-tbl dense">${colg(7, 7, 8, 6, 8, 7, 7, 7, 9, 7, 14, 13)}<thead><tr>
+          <th>客户</th><th class="num">出货(Pack)</th><th class="num">出货(Cell)</th><th class="num">出货占比</th><th class="num">接入车辆数</th><th class="num">今年接入</th><th class="num">pack_id缺失率</th>
+          <th class="num">预警外发</th><th class="num">已闭环(率)</th><th class="num">失效车辆数</th><th class="num" title="横条按各客户最大值缩放；百分比为相对整体失效率的高低">失效率(ppm) · 较整体</th><th class="ctr">操作</th>
         </tr></thead><tbody>${custRows}${sumRow}</tbody></table></div>
       </div>
       <!-- SOH 分布 + 失效率走势（失效模式占比在质量分析里，不再单独成卡） -->
@@ -5606,7 +5656,8 @@ const ThreeView = (() => {
           <div id="t3SohBar">${sohHtml()}</div>
         </div>
         <div class="t3-card">
-          <div class="chead"><div><div class="ctitle" title="按月 · 失效率(ppm) = 失效车辆数 / 接入车辆数 × 10⁶">📉 电芯失效率走势（ppm）</div></div></div>
+          <div class="chead"><div><div class="ctitle" title="累积量 = 累计失效车辆数 / 累计接入车辆数 × 10⁶；月增量 = 当月新增失效 / 当月接入 × 10⁶">📉 电芯失效率走势（ppm）</div></div>
+            <div class="seg" id="t3PpmAcc"><button data-pa="0" class="${!state.ppmAcc ? 'on' : ''}">月增量</button><button data-pa="1" class="${state.ppmAcc ? 'on' : ''}">累积量</button></div></div>
           <div id="t3PpmLine">${ppmHtml()}</div>
         </div>
       </div>
@@ -5615,12 +5666,12 @@ const ThreeView = (() => {
         <div class="chead"><div class="ctitle" title="跨客户聚合 · 累积/增量 + 时间筛选">📊 质量分析</div><div class="qtabs" id="t3QHeadCell"></div></div>
         <div id="t3CellQuality"></div>
       </div>
-      <!-- 批次追溯：出货柱状 + 明细 -->
+      <!-- PN 追溯：PN × 客户（多对多）出货柱状 + 明细 -->
       <div class="t3-card">
-        <div class="chead"><div><div class="ctitle" title="批次 → 预警 → 车辆 · 近似口径">🗃️ 电芯批次追溯</div></div></div>
-        <div style="max-width:760px;">${batchBarHtml}</div>
-        <div class="tblwrap" style="margin-top:8px;"><table class="t3-tbl">${colg(12, 16, 16, 14, 12, 14, 16)}<thead><tr>
-          <th>客户</th><th>批次号</th><th>电芯基地</th><th class="num">出货颗数</th><th class="num">失效颗数</th><th class="num">失效率(ppm)</th><th class="ctr">状态</th>
+        <div class="chead"><div><div class="ctitle" title="PN 与客户多对多 · 按 PN 分组、客户分色">🗃️ PN 追溯</div></div></div>
+        <div id="t3PnBar" style="max-width:760px;">${pnBarHtml()}</div>
+        <div class="tblwrap" style="margin-top:8px;"><table class="t3-tbl" data-nosort="1">${colg(16, 14, 16, 14, 12, 14, 14)}<thead><tr>
+          <th>PN</th><th>客户</th><th>电芯基地</th><th class="num">出货颗数</th><th class="num">失效颗数</th><th class="num">失效率(ppm)</th><th class="ctr">状态</th>
         </tr></thead><tbody>${batchRows}</tbody></table></div>
       </div>
       <!-- 异常电芯明细 -->
@@ -5641,10 +5692,50 @@ const ThreeView = (() => {
           : `<button class="btn btn-secondary" onclick="ThreeView.gotoCustomer('')">← 返回客户视角</button>`}
       </div>`;
 
-    renderQualityPanel(document.getElementById('t3CellQuality'), d.quality || { labels: [], alarm: {}, closed: {}, complaint: {} }, 'Cell', d.outgoingModes);
+    renderQualityPanel(document.getElementById('t3CellQuality'), cellQualityByCust(d, rows), 'Cell', d.outgoingModes, { dim: 'cust' });
+    const pa = document.getElementById('t3PpmAcc');
+    if (pa) pa.addEventListener('click', e => {
+      const b = e.target.closest('button[data-pa]'); if (!b) return;
+      state.ppmAcc = b.dataset.pa === '1';
+      pa.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+      legendRedraw.ppm();
+    });
     enableSort(host);
     addChartDownloads(host);   // 单图表下载 PNG
     return host;
+  }
+
+  // 电芯视角质量分析按客户分组：后端给 d.qualityByCust 时直接用；否则把（所选失效模式的）月度合计按客户接入量拆分
+  function cellQualityByCust(d, rows) {
+    if (d.qualityByCust) return d.qualityByCust;
+    const q = d.quality || { labels: [] }, labels = q.labels || [], custs = rows.map(r => r.oem);
+    const split = mx => {
+      const out = {};
+      custs.forEach(c => { out[c] = {}; });
+      labels.forEach((l, li) => {
+        const tot = Object.keys(mx || {}).filter(m => !state.cellMode || m === state.cellMode).reduce((a, m) => a + ((mx[m] || {})[l] || 0), 0);
+        const w = rows.map((r, i) => (r.conn || 1) * (0.8 + 0.4 * (((i * 7 + li * 3) % 10) / 10)));
+        const W = w.reduce((a, x) => a + x, 0) || 1;
+        let left = tot;
+        custs.forEach((c, i) => { const v = i === custs.length - 1 ? Math.max(0, left) : Math.min(left, Math.round(tot * w[i] / W)); out[c][l] = v; left -= v; });
+      });
+      return out;
+    };
+    const wt = {};
+    Object.keys(q.workorder_type || {}).forEach(t => { wt[t] = split(q.workorder_type[t]); });
+    return { labels, alarm: split(q.alarm), closed: split(q.closed), complaint: split(q.complaint), workorder: split(q.workorder), workorder_type: wt };
+  }
+  // 顶部「失效模式」下拉：按当前电芯的失效模式填充，切换后整页按该模式重算
+  function syncModeSelect(modes) {
+    const sel = document.getElementById('p1CellMode');
+    if (!sel) return;
+    const want = ['', ...modes].join('|');
+    if (sel.dataset.opts !== want) {
+      sel.innerHTML = '<option value="">全部失效模式</option>' + modes.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+      sel.dataset.opts = want;
+    }
+    sel.value = state.cellMode;
+    sel.onchange = () => { state.cellMode = sel.value; reframe(); };
   }
 
   // ==========================================================================
@@ -5784,8 +5875,8 @@ const Page1 = {
             this._initCapOutsideClick();
             this._mountViewDock();        // 右侧悬停视图面板（参考 TB 视图管理）
             // 筛选下拉支持模糊搜索 / 正则
-            ['p1Customer', 'p1ProjCust', 'p1ProjCap', 'p1CellProduct'].forEach(id =>
-                SearchSelect.enhance(document.getElementById(id), { minWidth: id.includes('Cap') || id === 'p1CellProduct' ? '130px' : '190px' }));
+            ['p1Customer', 'p1ProjCust', 'p1ProjCap', 'p1CellProduct', 'p1CellMode'].forEach(id =>
+                SearchSelect.enhance(document.getElementById(id), { minWidth: id.includes('Cap') || id === 'p1CellProduct' ? '130px' : id === 'p1CellMode' ? '150px' : '190px' }));
         }
         this.bindEvents();
         // 三视角内部跳转（项目行下钻 / 电芯下钻 / 返回）交由 page1 承接
@@ -5837,6 +5928,8 @@ const Page1 = {
                 <span class="p1-fgrp" id="p1FilterCell" style="display:none;">
                     <span class="p1-flab">电芯容量</span>
                     <select id="p1CellProduct"><option value="">选择电芯产品...</option></select>
+                    <span class="p1-flab">失效模式</span>
+                    <select id="p1CellMode"><option value="">全部失效模式</option></select>
                 </span>
                 <span class="p1-sep"></span>
                 <div class="t3-timefilter" id="p1TimeFilter" style="flex:0 0 auto;" title="时间范围作用于：接入走势趋势图 + 质量分析面板。顶部 KPI 为历史累计，不随时间筛选变化">
