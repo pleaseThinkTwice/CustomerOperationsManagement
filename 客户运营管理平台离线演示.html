@@ -11194,7 +11194,7 @@ const Page4 = {
         溧阳基地: { 'L1 线': ['XMS', 'NIO'], 'L2 线': ['SHEV', 'CNEV'] },
         宜宾基地: { 'L1 线': ['BYD', 'CNEV'], 'L2 线': ['XMS', 'BYD'], 'L3 线': ['NIO', 'SHEV'] },
     },
-    // 各客户质保政策（年限 / 里程，取先到者）
+    // 质保信息初始值（按客户给默认里程，实际按 OEM × 电芯容量 × PN 维护）
     _WARRANTY: { SHEV: [8, 160000], CNEV: [8, 120000], BYD: [8, 150000], XMS: [8, 160000], NIO: [8, 120000] },
     _TPL_COLS: ['VIN', 'deviceid', 'OEM', 'LSS风险分', '预警次数', '里程(km)', '车龄(年)'],
 
@@ -11223,12 +11223,11 @@ const Page4 = {
             const oem = this._OEMS[i % 5], cell = capOf[oem][Math.floor(r() * 2)], age = +(0.5 + r() * 9).toFixed(1);
             const mileage = Math.round(age * (8000 + r() * 14000));
             const ln = lines.filter(x => x.oem === oem), pick = ln[Math.floor(r() * ln.length)];
-            const pol = this._WARRANTY[oem];
             return {
                 vin: this._vin(r), deviceid: 'DEV' + (810000 + i * 37), oem, model: models[oem],
                 ecm: 'ECM-' + (2300 + Math.floor(r() * 600)), cell, pn: `P${parseInt(cell)}-${oem.slice(0, 2)}${r() < 0.5 ? 'A' : 'B'}`, soh: +(84 + r() * 15).toFixed(1),
                 mileage, age, deliver: this._day(-Math.round(age * 365)), prodDate: this._day(-Math.round(age * 365) - 30 - Math.floor(r() * 60)),
-                base: pick.base, line: pick.line, wYears: pol[0], wKm: pol[1],
+                base: pick.base, line: pick.line,
                 wo3m: r() < 0.12, human: r() < 0.04, lastSend: r() < 0.15 ? this._day(-Math.ceil(r() * 20)) : '',
             };
         });
@@ -11243,8 +11242,13 @@ const Page4 = {
             { id: 4, item: '电压', logic: '末端压差 & 压差扩大速率', threshold: '> 80 mV', window: '近 30 天', suggest: '远程 OTA 修复', send: '否', on: false },
         ];
         this._d = { vehicles, nosend, rvRules, tasks: [], batches: [], sentLog: {}, seq: 3, riskBatches: [], rbSeq: 0,
-            warrantyUpdatedAt: this._day(-1) + ' 02:00',
-            warrantyLog: [{ at: this._day(-1) + ' 02:00', mode: '平台同步', src: '数据平台 · 里程 / 交付 / 售后工单', n: 600, delta: 0, by: '系统定时任务' }] };
+            warrantyUpdatedAt: this._day(-7) + ' 10:30', policies: [],
+            warrantyLog: [{ at: this._day(-7) + ' 10:30', mode: '文件导入', src: '质保信息_初始化.xlsx', delta: 0, by: '李娜' }] };
+        // 质保信息：每个 OEM × 电芯容量 × PN 一条
+        [...new Set(vehicles.map(v => this._pkey(v)))].sort().forEach(k => {
+            const [oem, cell, pn] = k.split('|'), def = this._WARRANTY[oem];
+            this._d.policies.push({ id: k, oem, cell, pn, years: pn.endsWith('B') ? 10 : def[0], km: def[1], soh: oem === 'BYD' ? 80 : 70, by: '李娜', at: this._day(-7) + ' 10:30' });
+        });
         // 预置 1 个风险批次（宁德 L2 线）
         const seedVins = vehicles.filter(v => v.base === '宁德基地' && v.line === 'L2 线' && v.oem === 'BYD').slice(0, 9).map(v => v.vin);
         this._d.riskBatches.push({ no: 'RB' + this._day(-4).replace(/-/g, '').slice(2) + '-01', src: '生产信息圈定', base: '宁德基地', line: 'L2 线', start: this._day(-900), end: this._day(-700), oem: 'BYD', vins: seedVins, desc: '注液工序设备异常，批次自放电偏大风险', by: '李娜', at: this._day(-4) + ' 15:12', task: '' });
@@ -11276,9 +11280,11 @@ const Page4 = {
     _veh(vin) { return this._data().vehicles.find(v => v.vin === vin); },
     _noSet() { const today = this._day(0); return new Set(this._data().nosend.filter(x => x.until >= today).map(x => x.vin)); },
     // 质保到期：交付日 + 质保年限；过保 = 超过到期日或里程超出质保里程（取先到者）
-    _wEnd(v) { const d = new Date(v.deliver + 'T00:00:00'); d.setFullYear(d.getFullYear() + v.wYears); return this._day(0, d.toISOString().slice(0, 10)); },
-    _isOverWarranty(v) { return this._wEnd(v) < this._day(0) || v.mileage > v.wKm; },
-    _overWhy(v) { return [this._wEnd(v) < this._day(0) && '超过质保年限', v.mileage > v.wKm && '里程超出质保'].filter(Boolean).join('、'); },
+    _pkey(v) { return v.oem + '|' + v.cell + '|' + v.pn; },
+    _policy(v) { const k = this._pkey(v); return this._data().policies.find(p => p.id === k); },
+    _wEnd(v) { const p = this._policy(v); if (!p) return ''; const d = new Date(v.deliver + 'T00:00:00'); d.setFullYear(d.getFullYear() + p.years); return this._day(0, d.toISOString().slice(0, 10)); },
+    _isOverWarranty(v) { const p = this._policy(v); return !!p && (this._wEnd(v) < this._day(0) || v.mileage > p.km); },
+    _overWhy(v) { const p = this._policy(v); return p ? [this._wEnd(v) < this._day(0) && '超过质保年限', v.mileage > p.km && '里程超出质保'].filter(Boolean).join('、') : ''; },
     // 车辆外发判定：质保信息 / 非常规外发共用一套口径
     _blockReasons(v, ns) {
         return [v.human && '人为脱保', (ns || this._noSet()).has(v.vin) && '不外发清单', this._isOverWarranty(v) && '过保', v.wo3m && '售后工单'].filter(Boolean);
@@ -11293,7 +11299,7 @@ const Page4 = {
         Modal.open(`<div class="modal-header"><h3>车辆信息 · <span class="mono">${v.vin}</span></h3><button class="modal-close" onclick="Modal.close()">&times;</button></div>
             <div class="p4-kv">${kv('deviceid', v.deviceid)}${kv('OEM', v.oem)}${kv('车型', Utils.esc(v.model))}${kv('ECM', v.ecm)}${kv('电芯容量', v.cell)}${kv('PN', v.pn)}${kv('SOH', v.soh + '%')}
                 ${kv('生产', `${v.base} ${v.line} · ${v.prodDate}`)}${kv('交付日期', v.deliver)}${kv('里程', v.mileage.toLocaleString() + ' km')}</div>
-            <div class="p4-kv">${kv('质保政策', `${v.wYears} 年 / ${(v.wKm / 10000).toFixed(0)} 万km`)}${kv('质保到期', this._wEnd(v))}${kv('质保状态', this._isOverWarranty(v) ? `过保（${this._overWhy(v)}）` : '在保')}
+            <div class="p4-kv">${(p => kv('质保信息', p ? `${p.years} 年 / ${p.km.toLocaleString()} km / SOH ≥ ${p.soh}%` : '未维护'))(this._policy(v))}${kv('质保到期', this._wEnd(v) || '-')}${kv('质保状态', !this._policy(v) ? '-' : this._isOverWarranty(v) ? `过保（${this._overWhy(v)}）` : '在保')}
                 ${kv('近3月售后工单', v.wo3m ? '有' : '无')}${kv('人为脱保(GSS)', v.human ? '是' : '否')}${kv('最近外发', v.lastSend || '-')}
                 ${kv('风险批次', (this._riskVinMap()[v.vin] || []).join('、') || '-')}</div>
             <div class="p4-kv"><div><span>外发判定：</span>${why.length ? `<span class="badge badge-warning">不外发 · ${why.join('、')}</span>` : '<span class="badge badge-success">可外发</span>'}</div>
@@ -11551,164 +11557,152 @@ const Page4 = {
             </table></div></div>` : '';
     },
 
-    // ---------- 质保信息管理：质保统览（OEM × 电芯容量 × PN）+ 质保信息明细 / 更新 ----------
+    // ---------- 质保信息管理：质保统览 + 按 OEM × 电芯容量 × PN 维护质保信息（年限 / 里程 / SOH） ----------
     renderWarranty() {
-        const box = document.getElementById('p4Pane-warranty'), d = this._data();
-        const caps = [...new Set(d.vehicles.map(v => v.cell))];
+        const box = document.getElementById('p4Pane-warranty');
+        const caps = [...new Set(this._data().policies.map(p => p.cell))];
         box.innerHTML = `<div class="card">
             <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <span id="p4WSumTitle">质保统览</span>
+                <span>质保统览</span>
+                <select class="p4-in" id="p4WCap"><option value="">全部容量</option>${caps.map(c => `<option>${c}</option>`).join('')}</select>
             </div>
             <div class="table-wrapper" style="max-height:40vh;overflow:auto;"><table class="dash-table" id="p4WSum" style="font-size:12px;">
-                <thead><tr><th>OEM</th><th>电芯容量</th><th>PN</th><th class="num">车辆数</th><th class="num">进保</th><th class="num">过保</th><th class="num">过保率</th></tr></thead>
+                <thead><tr><th>OEM</th><th>电芯容量</th><th>PN</th><th class="num">车辆数</th><th class="num">在保</th><th class="num">过保</th><th class="num">过保率</th></tr></thead>
                 <tbody id="p4WSumBody"></tbody>
             </table></div>
         </div>
-        <div class="card" id="p4WDetailCard">
+        <div class="card">
             <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <span id="p4WTitle">质保信息管理</span>
+                <span>质保信息管理</span>
                 <div class="p4-row" style="gap:8px;">
-                    <span class="p4-hint" id="p4WUpd">质保数据更新于 ${d.warrantyUpdatedAt}</span>
-                    <label class="btn btn-sm btn-secondary" style="cursor:pointer;">上传质保更新文件<input type="file" id="p4WFile" accept=".xlsx,.xls,.csv" style="display:none;"></label>
-                    <button class="btn btn-sm btn-secondary" onclick="Page4.downloadTpl('质保信息更新模板','VIN,质保起始日,质保年限(年),质保里程(km)')">下载模板</button>
-                    <button class="btn btn-sm btn-primary" id="p4WSync" onclick="Page4.syncWarranty()">⟳ 同步质保信息</button>
+                    <span class="p4-hint" id="p4WUpd">更新于 ${this._data().warrantyUpdatedAt}</span>
+                    <label class="btn btn-sm btn-secondary" style="cursor:pointer;">上传质保信息<input type="file" id="p4WFile" accept=".xlsx,.xls,.csv" style="display:none;"></label>
+                    <button class="btn btn-sm btn-secondary" onclick="Page4.downloadTpl('质保信息模板','OEM,电芯容量,PN,质保年限(年),质保里程(km),质保SOH(%)')">下载模板</button>
+                    <button class="btn btn-sm btn-primary" id="p4WAdd" onclick="Page4.editPolicy(null)">+ 新增</button>
                 </div>
             </div>
-            <div class="p4-row" style="gap:8px;margin-bottom:10px;">
-                <select class="p4-in" id="p4WOem">${this._oemOpts(this._oem(), '全部客户')}</select>
-                <select class="p4-in" id="p4WCap"><option value="">全部容量</option>${caps.map(c => `<option>${c}</option>`).join('')}</select>
-                <select class="p4-in" id="p4WPn"><option value="">全部 PN</option></select>
-                <select class="p4-in" id="p4WStat"><option value="">全部质保状态</option><option>在保</option><option>过保</option></select>
-                <select class="p4-in" id="p4WFlag"><option value="">全部外发判定</option><option value="send">可外发</option><option value="block">不外发</option></select>
-                <input class="p4-in" id="p4WKey" placeholder="VIN / deviceid" style="width:170px;">
-                <button class="btn btn-sm btn-secondary" onclick="Page4.resetWarrantyFilter()">清空筛选</button>
-            </div>
-            <div class="table-wrapper" style="max-height:56vh;overflow:auto;"><table class="dash-table" id="p4WTable" style="font-size:12px;">
-                <thead><tr><th>VIN</th><th>deviceid</th><th>OEM</th><th>电芯容量</th><th>PN</th><th>车型</th><th>交付日期</th><th>质保政策</th><th>质保到期</th><th class="num">里程(km)</th><th>质保状态</th><th>近3月售后工单</th><th>最近外发</th><th>风险批次</th><th>外发判定</th><th data-no-sort>操作</th></tr></thead>
-                <tbody id="p4WBody"></tbody>
+            <div class="table-wrapper" style="max-height:46vh;overflow:auto;"><table class="dash-table" id="p4WPol" style="font-size:12px;">
+                <thead><tr><th>OEM</th><th>电芯容量</th><th>PN</th><th class="num">质保年限</th><th class="num">质保里程(km)</th><th class="num">质保SOH</th><th>更新人</th><th>更新时间</th><th data-no-sort>操作</th></tr></thead>
+                <tbody id="p4WPolBody"></tbody>
             </table></div>
-            <div class="p4-hint" id="p4WCount" style="padding:6px 2px;"></div>
         </div>
         <div class="card" id="p4WLogCard"></div>`;
-        const pnFill = () => {
-            const oem = document.getElementById('p4WOem').value, cap = document.getElementById('p4WCap').value, sel = document.getElementById('p4WPn'), cur = sel.value;
-            const pns = [...new Set(this._data().vehicles.filter(v => (!oem || v.oem === oem) && (!cap || v.cell === cap)).map(v => v.pn))].sort();
-            sel.innerHTML = '<option value="">全部 PN</option>' + pns.map(p => `<option${p === cur ? ' selected' : ''}>${p}</option>`).join('');
-        };
-        this._pnFill = pnFill;
-        ['p4WOem', 'p4WCap'].forEach(id => { document.getElementById(id).onchange = () => { pnFill(); this._renderWarrantyAll(); }; });
-        ['p4WPn', 'p4WStat', 'p4WFlag'].forEach(id => { document.getElementById(id).onchange = () => this._renderWarrantyTable(); });
-        document.getElementById('p4WKey').oninput = () => this._renderWarrantyTable();
+        document.getElementById('p4WCap').onchange = () => this._renderWarrantyAll();
         this._onFile('p4WFile', f => this.uploadWarranty(f.name));
-        pnFill();
         this._renderWarrantyAll();
     },
     _renderWarrantyAll() {
-        if (!document.getElementById('p4WBody')) return;
-        // 顶部客户切换时同步明细的 OEM 筛选
-        const wo = document.getElementById('p4WOem'), top = this._oem();
-        if (top && wo.value !== top) { wo.value = top; this._pnFill(); }
+        if (!document.getElementById('p4WSumBody')) return;
         this._renderWarrantySummary();
-        this._renderWarrantyTable();
+        this._renderPolicyTable();
         this._renderWarrantyLog();
     },
+    _wFilter(x) { const oem = this._oem(), el = document.getElementById('p4WCap'), cap = el ? el.value : ''; return (!oem || x.oem === oem) && (!cap || x.cell === cap); },
     _renderWarrantySummary() {
         const body = document.getElementById('p4WSumBody');
         if (!body) return;
-        const oem = this._oem(), cap = document.getElementById('p4WCap').value, groups = {};
-        this._data().vehicles.filter(v => (!oem || v.oem === oem) && (!cap || v.cell === cap)).forEach(v => {
-            const k = v.oem + '|' + v.cell + '|' + v.pn;
+        const groups = {};
+        this._data().vehicles.filter(v => this._wFilter(v)).forEach(v => {
+            const k = this._pkey(v);
             const g = groups[k] || (groups[k] = { oem: v.oem, cell: v.cell, pn: v.pn, n: 0, over: 0 });
             g.n++; if (this._isOverWarranty(v)) g.over++;
         });
         const list = Object.values(groups).sort((a, b) => a.oem.localeCompare(b.oem) || parseInt(b.cell) - parseInt(a.cell) || a.pn.localeCompare(b.pn));
         const tot = list.reduce((s, g) => ({ n: s.n + g.n, over: s.over + g.over }), { n: 0, over: 0 });
         const rate = (o, n) => n ? (o / n * 100).toFixed(1) : '0.0';
-        const bar = (o, n) => `<span style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;"><span style="display:inline-block;width:60px;height:6px;border-radius:3px;background:var(--bg-input);overflow:hidden;"><span style="display:block;height:100%;width:${rate(o, n)}%;background:${o / n > 0.3 ? 'var(--danger)' : 'var(--warning)'};"></span></span>${rate(o, n)}%</span>`;
-        const sel = this._wPick || {};
-        body.innerHTML = list.map(g => `<tr style="cursor:pointer;${sel.pn === g.pn ? 'background:var(--brand-soft);' : ''}" onclick="Page4.pickWarrantyGroup('${g.oem}','${g.cell}','${g.pn}')">
+        const bar = (o, n) => `<span style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;"><span style="display:inline-block;width:60px;height:6px;border-radius:3px;background:var(--bg-input);overflow:hidden;"><span style="display:block;height:100%;width:${rate(o, n)}%;background:${n && o / n > 0.3 ? 'var(--danger)' : 'var(--warning)'};"></span></span>${rate(o, n)}%</span>`;
+        body.innerHTML = list.map(g => `<tr>
             <td><b>${g.oem}</b></td><td>${g.cell}</td><td class="mono">${g.pn}</td><td class="num">${g.n}</td><td class="num">${g.n - g.over}</td>
             <td class="num" style="color:var(--warning);">${g.over}</td><td class="num">${bar(g.over, g.n)}</td></tr>`).join('')
             + `<tr style="font-weight:700;"><td colspan="3">合计</td><td class="num">${tot.n}</td><td class="num">${tot.n - tot.over}</td><td class="num">${tot.over}</td><td class="num">${rate(tot.over, tot.n)}%</td></tr>`;
-        document.getElementById('p4WSumTitle').textContent = '质保统览';
     },
-    pickWarrantyGroup(oem, cap, pn) {
-        this._wPick = { oem, cap, pn };
-        document.getElementById('p4WOem').value = oem;
-        document.getElementById('p4WCap').value = cap;
-        this._pnFill();
-        document.getElementById('p4WPn').value = pn;
-        this._renderWarrantySummary();
-        this._renderWarrantyTable();
-        document.getElementById('p4WDetailCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    },
-    resetWarrantyFilter() {
-        this._wPick = null;
-        ['p4WCap', 'p4WPn', 'p4WStat', 'p4WFlag'].forEach(id => { document.getElementById(id).value = ''; });
-        document.getElementById('p4WOem').value = this._oem();
-        document.getElementById('p4WKey').value = '';
-        this._pnFill();
-        this._renderWarrantySummary();
-        this._renderWarrantyTable();
-    },
-    _renderWarrantyTable() {
-        const body = document.getElementById('p4WBody');
+    _renderPolicyTable() {
+        const body = document.getElementById('p4WPolBody');
         if (!body) return;
-        const g = id => document.getElementById(id).value;
-        const oem = g('p4WOem'), cap = g('p4WCap'), pn = g('p4WPn'), stat = g('p4WStat'), flag = g('p4WFlag'), key = g('p4WKey').trim().toUpperCase();
-        const ns = this._noSet(), all = this._data().vehicles, rb = this._riskVinMap();
-        const rows = all.map(v => ({ v, why: this._blockReasons(v, ns), over: this._isOverWarranty(v) }))
-            .filter(({ v, why, over }) => (!oem || v.oem === oem) && (!cap || v.cell === cap) && (!pn || v.pn === pn)
-                && (!stat || (stat === '过保') === over) && (!flag || (flag === 'send' ? !why.length : why.length))
-                && (!key || v.vin.includes(key) || v.deviceid.toUpperCase().includes(key)));
-        const LIMIT = 200;
-        body.innerHTML = rows.slice(0, LIMIT).map(({ v, why, over }) => `<tr>
-            <td class="mono" style="font-size:11px;"><span class="lk" onclick="Page4.showVehicle('${v.vin}')">${v.vin}</span></td><td>${v.deviceid}</td><td><b>${v.oem}</b></td><td>${v.cell}</td><td class="mono">${v.pn}</td><td>${Utils.esc(v.model)}</td>
-            <td>${v.deliver}</td><td>${v.wYears} 年 / ${(v.wKm / 10000).toFixed(0)} 万km</td><td>${this._wEnd(v)}</td><td class="num">${v.mileage.toLocaleString()}</td>
-            <td>${over ? `<span class="badge badge-warning" title="${this._overWhy(v)}">过保</span>` : '<span class="badge badge-success">在保</span>'}</td>
-            <td>${v.wo3m ? '<span class="badge badge-info">有</span>' : '-'}</td>
-            <td>${v.lastSend || '-'}</td>
-            <td>${(rb[v.vin] || []).map(no => `<span class="badge badge-danger">${no}</span>`).join(' ') || '-'}</td>
-            <td>${why.length ? `<span class="badge badge-warning" title="${why.join('、')}">不外发 · ${why.join('、')}</span>` : '<span class="badge badge-success">可外发</span>'}</td>
-            <td>${ns.has(v.vin) ? `<button class="btn btn-sm btn-secondary" onclick="Page4.delNoSendByVin('${v.vin}')">移出不外发</button>` : `<button class="btn btn-sm btn-secondary" onclick="Page4.addNoSend('${v.vin}','${v.oem}')">加入不外发</button>`}</td></tr>`).join('')
-            || '<tr><td colspan="16" class="empty-state">无匹配车辆</td></tr>';
-        document.getElementById('p4WTitle').textContent = `质保信息管理（${rows.length} 台）`;
-        document.getElementById('p4WCount').textContent = rows.length > LIMIT ? `显示前 ${LIMIT} 台，共 ${rows.length} 台` : '';
-        if (Utils.enableTableSort) Utils.enableTableSort(document.getElementById('p4WTable'));
+        const list = this._data().policies.filter(p => this._wFilter(p));
+        body.innerHTML = list.map(p => `<tr>
+            <td><b>${p.oem}</b></td><td>${p.cell}</td><td class="mono">${Utils.esc(p.pn)}</td><td class="num">${p.years} 年</td><td class="num">${p.km.toLocaleString()}</td><td class="num">≥ ${p.soh}%</td>
+            <td>${Utils.esc(p.by)}</td><td>${p.at}</td>
+            <td style="white-space:nowrap;"><button class="btn btn-sm btn-secondary" onclick="Page4.editPolicy('${p.id}')">编辑</button>
+                <button class="btn btn-sm btn-danger" onclick="Page4.delPolicy('${p.id}')">删除</button></td></tr>`).join('')
+            || '<tr><td colspan="9" class="empty-state">暂无质保信息</td></tr>';
+        if (Utils.enableTableSort) Utils.enableTableSort(document.getElementById('p4WPol'));
     },
     _renderWarrantyLog() {
         const el = document.getElementById('p4WLogCard'), list = this._data().warrantyLog;
         if (!el) return;
-        el.innerHTML = `<div class="card-title">质保更新记录</div>
-            <div class="table-wrapper"><table class="dash-table" style="font-size:12px;">
-            <thead><tr><th>更新时间</th><th>方式</th><th>来源</th><th class="num">更新车辆</th><th class="num">过保变化</th><th>操作人</th></tr></thead>
-            <tbody>${list.map(x => `<tr><td>${x.at}</td><td>${x.mode}</td><td>${Utils.esc(x.src)}</td><td class="num">${x.n}</td>
+        el.innerHTML = `<div class="card-title">更新记录</div>
+            <div class="table-wrapper" style="max-height:30vh;overflow:auto;"><table class="dash-table" style="font-size:12px;">
+            <thead><tr><th>更新时间</th><th>方式</th><th>内容</th><th class="num">过保变化</th><th>操作人</th></tr></thead>
+            <tbody>${list.map(x => `<tr><td>${x.at}</td><td>${x.mode}</td><td>${Utils.esc(x.src)}</td>
                 <td class="num">${x.delta > 0 ? `<span style="color:var(--warning);">+${x.delta}</span>` : x.delta < 0 ? `<span style="color:var(--success);">${x.delta}</span>` : '0'}</td><td>${Utils.esc(x.by)}</td></tr>`).join('')}</tbody>
             </table></div>`;
     },
     _overCount() { return this._data().vehicles.filter(v => this._isOverWarranty(v)).length; },
-    // 上传质保更新文件：离线演示随机挑当前筛选范围内 20 台车，按文件更新质保政策（延保）
-    uploadWarranty(fileName) {
-        const d = this._data(), oem = document.getElementById('p4WOem').value, before = this._overCount(), r = this._rnd(fileName.length * 53 + d.warrantyLog.length);
-        const pool = d.vehicles.filter(v => !oem || v.oem === oem);
-        const picked = pool.filter(() => r() < 20 / Math.max(20, pool.length)).slice(0, 20);
-        picked.forEach(v => { v.wYears += 2; v.wKm += 50000; });
+    _logWarranty(mode, src, before) {
+        const d = this._data();
         d.warrantyUpdatedAt = this._now();
-        d.warrantyLog.unshift({ at: d.warrantyUpdatedAt, mode: '文件导入', src: fileName, n: picked.length, delta: this._overCount() - before, by: this._me() });
-        document.getElementById('p4WUpd').textContent = '质保数据更新于 ' + d.warrantyUpdatedAt;
+        d.warrantyLog.unshift({ at: d.warrantyUpdatedAt, mode, src, delta: this._overCount() - before, by: this._me() });
+        const el = document.getElementById('p4WUpd');
+        if (el) el.textContent = '更新于 ' + d.warrantyUpdatedAt;
         this._renderWarrantyAll();
-        Toast.success(`质保信息已更新 ${picked.length} 台（延保）`);
     },
-    // 同步质保信息：模拟从数据平台拉取最新里程，部分车辆因里程超限转为过保
-    syncWarranty() {
-        const d = this._data(), before = this._overCount(), r = this._rnd(Date.now());
-        let n = 0;
-        d.vehicles.forEach(v => { if (r() < 0.3) { v.mileage += Math.round(500 + r() * 6000); n++; } if (!v.wo3m && r() < 0.01) v.wo3m = true; });
-        d.warrantyUpdatedAt = this._now();
-        d.warrantyLog.unshift({ at: d.warrantyUpdatedAt, mode: '平台同步', src: '数据平台 · 里程 / 交付 / 售后工单', n, delta: this._overCount() - before, by: this._me() });
-        document.getElementById('p4WUpd').textContent = '质保数据更新于 ' + d.warrantyUpdatedAt;
-        this._renderWarrantyAll();
-        Toast.success(`已同步 ${n} 台车辆的里程与工单信息`);
+    editPolicy(id) {
+        const p = id ? this._data().policies.find(x => x.id === id) : null;
+        const caps = ['153Ah', '100Ah', '75Ah', '50Ah'];
+        Modal.open(`<div class="modal-header"><h3>${p ? '编辑质保信息' : '新增质保信息'}</h3><button class="modal-close" onclick="Modal.close()">&times;</button></div>
+            <div class="form-row">
+                <div class="form-group"><label>OEM *</label><select id="p4POem" ${p ? 'disabled' : ''}>${this._oemOpts(p ? p.oem : this._oem() || this._OEMS[0])}</select></div>
+                <div class="form-group"><label>电芯容量 *</label><select id="p4PCap" ${p ? 'disabled' : ''}>${caps.map(c => `<option${p && p.cell === c ? ' selected' : ''}>${c}</option>`).join('')}</select></div>
+                <div class="form-group"><label>PN *</label><input type="text" id="p4PPn" value="${p ? Utils.esc(p.pn) : ''}" ${p ? 'disabled' : ''} placeholder="如 P153-SHA"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>质保年限（年）*</label><input type="number" id="p4PYears" min="1" value="${p ? p.years : 8}"></div>
+                <div class="form-group"><label>质保里程（km）*</label><input type="number" id="p4PKm" min="1" value="${p ? p.km : 150000}"></div>
+                <div class="form-group"><label>质保SOH（%）*</label><input type="number" id="p4PSoh" min="1" max="100" value="${p ? p.soh : 70}"></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="Modal.close()">取消</button><button class="btn btn-primary" id="p4PSave" onclick="Page4.savePolicy(${p ? `'${p.id}'` : 'null'})">保存</button></div>`);
+    },
+    savePolicy(id) {
+        const d = this._data(), g = k => document.getElementById(k).value.trim();
+        const years = +g('p4PYears'), km = +g('p4PKm'), soh = +g('p4PSoh');
+        if (!(years > 0) || !(km > 0)) { Toast.error('质保年限和质保里程需大于 0'); return; }
+        if (!(soh > 0 && soh <= 100)) { Toast.error('质保SOH 需在 1–100 之间'); return; }
+        const before = this._overCount();
+        let p;
+        if (id) {
+            p = d.policies.find(x => x.id === id);
+        } else {
+            const oem = g('p4POem'), cell = g('p4PCap'), pn = g('p4PPn').toUpperCase();
+            if (!pn) { Toast.error('请填写 PN'); return; }
+            const key = oem + '|' + cell + '|' + pn;
+            if (d.policies.some(x => x.id === key)) { Toast.error('该 OEM / 电芯容量 / PN 已有质保信息，请直接编辑'); return; }
+            p = { id: key, oem, cell, pn };
+            d.policies.push(p);
+        }
+        const old = id ? `${p.years}年/${p.km}km/${p.soh}%` : '';
+        Object.assign(p, { years, km, soh, by: this._me(), at: this._now() });
+        Modal.close();
+        this._logWarranty(id ? '编辑' : '新增', `${p.oem} ${p.cell} ${p.pn}：${old ? old + ' → ' : ''}${years}年/${km}km/${soh}%`, before);
+        Toast.success('质保信息已保存');
+    },
+    async delPolicy(id) {
+        const d = this._data(), p = d.policies.find(x => x.id === id);
+        if (!p) return;
+        const n = d.vehicles.filter(v => this._pkey(v) === id).length;
+        if (!await Dialog.confirm(`删除 ${p.oem} ${p.cell} ${p.pn} 的质保信息？${n ? `\n该 PN 下 ${n} 台车将无法判定在保 / 过保。` : ''}`)) return;
+        const before = this._overCount();
+        d.policies = d.policies.filter(x => x.id !== id);
+        this._logWarranty('删除', `${p.oem} ${p.cell} ${p.pn}`, before);
+        Toast.success('已删除');
+    },
+    // 上传质保信息：离线演示随机挑当前范围内 3 个 PN 按文件更新（延长年限 / 里程）
+    uploadWarranty(fileName) {
+        const d = this._data(), before = this._overCount(), r = this._rnd(fileName.length * 53 + d.warrantyLog.length);
+        const pool = d.policies.filter(p => this._wFilter(p)).slice().sort(() => r() - 0.5).slice(0, 3);
+        pool.forEach(p => { p.years += 2; p.km += 50000; p.by = this._me(); p.at = this._now(); });
+        this._logWarranty('文件导入', `${fileName}：${pool.map(p => p.pn).join('、')}`, before);
+        Toast.success(`质保信息已更新 ${pool.length} 个 PN`);
     },
     _refreshVehicleViews() {
         this._renderWarrantyAll();
