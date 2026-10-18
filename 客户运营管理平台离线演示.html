@@ -5726,16 +5726,18 @@ const ThreeView = (() => {
     return { labels, alarm: split(q.alarm), closed: split(q.closed), complaint: split(q.complaint), workorder: split(q.workorder), workorder_type: wt };
   }
   // 顶部「失效模式」下拉：按当前电芯的失效模式填充，切换后整页按该模式重算
+  // 「全部」用非空值（__all__），这样它是可搜索、可选回的正式选项，而不是占位项
+  const MODE_ALL = '__all__';
   function syncModeSelect(modes) {
     const sel = document.getElementById('p1CellMode');
     if (!sel) return;
-    const want = ['', ...modes].join('|');
+    const want = modes.join('|');
     if (sel.dataset.opts !== want) {
-      sel.innerHTML = '<option value="">全部失效模式</option>' + modes.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+      sel.innerHTML = `<option value="${MODE_ALL}">全部</option>` + modes.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
       sel.dataset.opts = want;
     }
-    sel.value = state.cellMode;
-    sel.onchange = () => { state.cellMode = sel.value; reframe(); };
+    sel.value = state.cellMode || MODE_ALL;
+    sel.onchange = () => { state.cellMode = sel.value === MODE_ALL ? '' : sel.value; reframe(); };
   }
 
   // ==========================================================================
@@ -5929,7 +5931,7 @@ const Page1 = {
                     <span class="p1-flab">电芯容量</span>
                     <select id="p1CellProduct"><option value="">选择电芯产品...</option></select>
                     <span class="p1-flab">失效模式</span>
-                    <select id="p1CellMode"><option value="">全部失效模式</option></select>
+                    <select id="p1CellMode"><option value="__all__">全部</option></select>
                 </span>
                 <span class="p1-sep"></span>
                 <div class="t3-timefilter" id="p1TimeFilter" style="flex:0 0 auto;" title="时间范围作用于：接入走势趋势图 + 质量分析面板。顶部 KPI 为历史累计，不随时间筛选变化">
