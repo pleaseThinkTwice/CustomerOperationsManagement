@@ -3008,7 +3008,7 @@ const App = {
             page17: ['我的待办', '会议任务 · 认领预警 · 部门需求'],
             page18: ['知识中心', '统一入口：常用速查 · 查询手册 · 知识库 · 数据洞察'],
             page19: ['工具箱', '常用查询工具 · 管理员可配置'],
-            page3: ['会议纪要', '会议记录 · 共识 · 任务'], page4: ['预警闭环', '预警外发 · 复核闭环 · 预警记录'],
+            page3: ['会议纪要', '会议记录 · 共识 · 任务'], page4: ['预警闭环', '常规预警 · 非常规外发 · 复核闭环'],
             page5: ['阶段总结', '服务阶段性数据汇总'], page6: ['Q&A知识库', '智能问答 · 知识库管理'],
             page7: ['文档管理', '文档上传 · 下载 · 分类'], page8: ['OEM映射', 'OEM ↔ 客户集团映射'],
             page9: ['数智分析', 'NL2SQL · Agent多步分析'], page10: ['需求管理', '提报 · 审批 · AI拆解'],
@@ -5004,7 +5004,7 @@ const ThreeView = (() => {
     const fq = filterQuality(q);            // 走势图：随「月增量 / 累积量」
     const fqi = filterQuality(q, false);    // 占比、合计、明细表：固定按区间内月增量求和
     const qkeys = Object.keys(QMETA).filter(k => !QMETA[k].only || QMETA[k].only === key);
-    // 预警规则：跳到「预警闭环 → 预警外发规则」，按当前客户 / 容量 / 失效模式预筛
+    // 预警规则：跳到「预警闭环 → 常规预警 → 预警外发规则」，按当前客户 / 容量 / 失效模式预筛
     const ruleOem = state.view === 'cell' ? '' : (state.oem || ''), ruleCap = state.view === 'customer' ? '' : (state.cellCap || '');
     const ruleTd = (mode, extra = '') => `<td${extra}><span class="lk" onclick="ThreeView.gotoRule('${esc(ruleOem)}','${esc(ruleCap)}','${esc(mode)}')" title="跳到预警闭环 · 预警外发规则（${esc(mode)}）">查看规则 →</span></td>`;
     const m = qkeys.includes(state.qmetric) ? state.qmetric : 'alarm', meta = QMETA[m];
@@ -5624,10 +5624,10 @@ const ThreeView = (() => {
     if (onSwitch) onSwitch('project', { oem, cellCap: cap });
     else { const host = document.getElementById('p1Dashboard'); if (host) loadProject(host, oem, cap); }
   }
-  // 跳到「预警闭环 → 预警外发规则」，按客户 / 容量预筛
+  // 跳到「预警闭环 → 常规预警 → 预警外发规则」，按客户 / 容量预筛
   function gotoRule(oem, cap, algo) {
     App.navigate('page4');
-    if (typeof Page4 !== 'undefined' && Page4.initialized) Page4.showTab('send', 'rules');
+    if (typeof Page4 !== 'undefined' && Page4.initialized) Page4.showTab('regular', 'rules');
     let n = 0;
     const t = setInterval(() => {
       const o = document.getElementById('p4RuleOem'), c = document.getElementById('p4RuleCap');
@@ -10806,15 +10806,17 @@ const Page4 = {
         if (!this.initialized) {
             container.innerHTML = this.renderLayout();
             this.initialized = true;
-            this.showTab('send', 'rules');
+            this.showTab('regular', 'rules');
         }
         this.bindEvents();
         this.loadRules();
     },
 
-    // 二级 Tab：预警外发 / 复核闭环 / 预警记录（每个子页首次进入时才渲染）
+    // 二级 Tab：常规预警 / 非常规外发 / 复核闭环 / 预警记录（每个子页首次进入时才渲染）
+    // 人为脱保已在 GSS 实现，这里不单独展示，只作为外发排除条件
     _TABS: {
-        send: { name: '预警外发', subs: [['rules', '外发规则管理'], ['batch', '批量外发'], ['vehicle', '车辆信息管理'], ['nosend', '不外发车辆管理'], ['risk', '风险机制管理']] },
+        regular: { name: '常规预警', subs: [['rules', '预警外发规则'], ['warranty', '质保信息管理'], ['nosend', '不外发车辆管理'], ['riskbatch', '风险批次管理']] },
+        irregular: { name: '非常规外发', subs: [['batch', '非常规外发']] },
         review: { name: '复核闭环', subs: [['rvrule', '复核规则管理'], ['rvreg', '复核登记'], ['rvconfirm', '复核确认']] },
         records: { name: '预警记录', subs: [['records', '预警记录']] },
     },
@@ -10914,8 +10916,8 @@ const Page4 = {
         if (this._rendered[sub]) { this._refresh(sub); return; }
         this._rendered[sub] = true;
         const render = {
-            batch: () => this.renderBatch(), vehicle: () => this.renderVehicles(), nosend: () => this.renderNoSend(),
-            risk: () => this.renderRisk(), rvrule: () => this.renderRvRules(), rvreg: () => this.renderRvReg(),
+            batch: () => this.renderBatch(), warranty: () => this.renderWarranty(), nosend: () => this.renderNoSend(),
+            riskbatch: () => this.renderRiskBatch(), rvrule: () => this.renderRvRules(), rvreg: () => this.renderRvReg(),
             rvconfirm: () => this.renderRvTasks(),
             records: () => { this._warnLoaded = true; this.loadList(); },
         }[sub];
@@ -10925,9 +10927,9 @@ const Page4 = {
     _refresh(sub) {
         const fn = {
             batch: () => { this._renderBatchHistory(); this._renderBatchSource(); },
-            vehicle: () => this._renderVehicles && this._renderVehicles(),
+            warranty: () => this._renderWarrantyAll(),
             nosend: () => this._renderNoSendTable(),
-            risk: () => this._renderRiskTable(),
+            riskbatch: () => this._renderRiskBatchTable(),
             rvrule: () => this._renderRvRuleTable(),
             rvreg: () => this._renderRvRegTable(),
             rvconfirm: () => (this._openTaskCode ? this.openTask(this._openTaskCode) : this.renderRvTasks()),
@@ -10935,7 +10937,7 @@ const Page4 = {
         if (fn) fn();
     },
 
-    // 顶部客户选择：外发规则 / 车辆 / 不外发 / 风险报告 / 批量外发清单统一按该客户筛选
+    // 顶部客户选择：外发规则 / 质保 / 不外发 / 风险批次 / 非常规外发清单统一按该客户筛选
     _oem() { const el = document.getElementById('p4Customer'); return (el && el.value) || ''; },
 
     bindEvents() {
@@ -10954,8 +10956,6 @@ const Page4 = {
                 ruleOem.dispatchEvent(new Event('change'));
             }
             if (this._warnLoaded) this.loadList();
-            const vo = document.getElementById('p4VOem');
-            if (vo) vo.value = [...vo.options].some(o => o.value === cust.value) ? cust.value : '';
             Object.keys(this._rendered || {}).forEach(k => this._refresh(k));
         };
     },
@@ -11164,13 +11164,14 @@ const Page4 = {
         }
     },
 
-    // ============ 预警外发 / 复核闭环：离线演示数据（内存态，刷新即重置） ============
+    // ============ 常规预警 / 非常规外发 / 复核闭环：离线演示数据（内存态，刷新即重置） ============
     // 联动关系：
-    //   不外发车辆 ⇄ 车辆信息（外发判定 / 一键加入移出）⇄ 批量外发（排除规则实时取数）
-    //   批量外发确认 → 车辆「最近外发」→ 下次批量的「近 N 日已外发」排除
-    //   风险报告「发起复核」→ 复核登记（预填车辆 / 复核类别 / 备注）
+    //   不外发车辆 ⇄ 质保信息（外发判定 / 一键加入移出）⇄ 非常规外发（排除规则实时取数）
+    //   质保信息更新 / 同步 → 质保统览、外发判定的「过保」实时变化
+    //   非常规外发确认 → 车辆「最近外发」→ 下次外发的「近 N 日已外发」排除
+    //   风险批次 → 发起复核（预填车辆 / 备注）或导入非常规外发
     //   复核规则启停 → 复核登记可选类别；复核规则默认处置 → 任务详情选结论后自动带出
-    //   复核任务提交（勾选外发）→ 批量外发「导入复核外发车辆」
+    //   复核任务提交（勾选外发）→ 非常规外发「导入复核外发车辆」
     //   顶部客户选择 → 各子页按客户筛选
     _OEMS: ['SHEV', 'CNEV', 'BYD', 'XMS', 'NIO'],
     _GROUPS: ['售后服务组', '电芯研发组', 'BMS 算法组', '质量工程组', '客户项目组'],
@@ -11187,7 +11188,14 @@ const Page4 = {
         'SOH 衰减过快': '电池健康度下降较快，建议进店检测',
     },
     _ITEM_REASON: { 绝缘: '绝缘阻值持续偏低', 自放电: '自放电率超阈值', 温差: '单体温差偏大', 电压: '单体压差扩大' },
-    _RISK_ITEM: { 绝缘故障: '绝缘', 自放电异常: '自放电', 压差报警: '电压', 热失控预警: '温差', 'SOC 一致性': '电压', 容量衰减: '自放电' },
+    // 基地 → 拉线 → 该线供货的客户（风险批次按此圈定范围）
+    _BASES: {
+        宁德基地: { 'L1 线': ['SHEV', 'XMS'], 'L2 线': ['BYD', 'NIO', 'SHEV'], 'L3 线': ['CNEV'] },
+        溧阳基地: { 'L1 线': ['XMS', 'NIO'], 'L2 线': ['SHEV', 'CNEV'] },
+        宜宾基地: { 'L1 线': ['BYD', 'CNEV'], 'L2 线': ['XMS', 'BYD'], 'L3 线': ['NIO', 'SHEV'] },
+    },
+    // 各客户质保政策（年限 / 里程，取先到者）
+    _WARRANTY: { SHEV: [8, 160000], CNEV: [8, 120000], BYD: [8, 150000], XMS: [8, 160000], NIO: [8, 120000] },
     _TPL_COLS: ['VIN', 'deviceid', 'OEM', 'LSS风险分', '预警次数', '里程(km)', '车龄(年)'],
 
     _rnd(seed) { let x = Math.abs(Math.floor(seed)) % 233280; return () => (x = (x * 9301 + 49297) % 233280) / 233280; },
@@ -11208,33 +11216,40 @@ const Page4 = {
         const r = this._rnd(20261018);
         const models = { SHEV: 'L6', CNEV: 'eπ007', BYD: '海豹', XMS: 'SU7', NIO: 'ET5' };
         const caps = ['153Ah', '100Ah', '75Ah', '50Ah'];
-        const vehicles = Array.from({ length: 60 }, (_, i) => {
-            const oem = this._OEMS[i % 5], mileage = Math.round(3000 + r() * 170000), age = +(0.5 + r() * 9).toFixed(1);
+        const capOf = { SHEV: ['153Ah', '100Ah'], CNEV: ['100Ah', '75Ah'], BYD: ['153Ah', '75Ah'], XMS: ['100Ah', '50Ah'], NIO: ['75Ah', '50Ah'] };
+        const lines = [];
+        Object.entries(this._BASES).forEach(([base, ls]) => Object.entries(ls).forEach(([line, oems]) => oems.forEach(oem => lines.push({ base, line, oem }))));
+        const vehicles = Array.from({ length: 600 }, (_, i) => {
+            const oem = this._OEMS[i % 5], cell = capOf[oem][Math.floor(r() * 2)], age = +(0.5 + r() * 9).toFixed(1);
+            const mileage = Math.round(age * (8000 + r() * 14000));
+            const ln = lines.filter(x => x.oem === oem), pick = ln[Math.floor(r() * ln.length)];
+            const pol = this._WARRANTY[oem];
             return {
                 vin: this._vin(r), deviceid: 'DEV' + (810000 + i * 37), oem, model: models[oem],
-                ecm: 'ECM-' + (2300 + Math.floor(r() * 600)), cell: caps[i % 4], soh: +(84 + r() * 15).toFixed(1),
-                mileage, age, deliver: this._day(-Math.round(age * 365)),
-                wo3m: r() < 0.18, human: r() < 0.06, lastSend: r() < 0.22 ? this._day(-Math.ceil(r() * 20)) : '',
+                ecm: 'ECM-' + (2300 + Math.floor(r() * 600)), cell, pn: `P${parseInt(cell)}-${oem.slice(0, 2)}${r() < 0.5 ? 'A' : 'B'}`, soh: +(84 + r() * 15).toFixed(1),
+                mileage, age, deliver: this._day(-Math.round(age * 365)), prodDate: this._day(-Math.round(age * 365) - 30 - Math.floor(r() * 60)),
+                base: pick.base, line: pick.line, wYears: pol[0], wKm: pol[1],
+                wo3m: r() < 0.12, human: r() < 0.04, lastSend: r() < 0.15 ? this._day(-Math.ceil(r() * 20)) : '',
             };
         });
-        const nosend = vehicles.filter((_, i) => i % 9 === 4).map((v, i) => ({
+        const nosend = vehicles.slice(0, 60).filter((_, i) => i % 9 === 4).map((v, i) => ({
             id: i + 1, vin: v.vin, oem: v.oem, reason: ['客户要求暂缓外发', '车辆已报废', '在库维修中', '试验车/工程车', '已签保密协议'][i % 5],
             until: this._day(30 + i * 15), source: i % 2 ? '手动新增' : '不外发清单_1015.xlsx', by: this._PEOPLE[i % 6], at: this._day(-i - 2) + ' 10:2' + i,
         }));
-        const risks = [
-            { id: 1, title: '153Ah 铁锂批次自放电偏大专项报告', oem: 'SHEV', type: '自放电异常', level: '高', file: '153Ah自放电专项_v2.pdf', by: '李娜', at: this._day(-3), status: '待评审', task: '' },
-            { id: 2, title: '海豹车型绝缘告警复盘', oem: 'BYD', type: '绝缘故障', level: '中', file: '海豹绝缘复盘.pptx', by: '王磊', at: this._day(-9), status: '已评审', task: '' },
-            { id: 3, title: 'SU7 热管理温差问题 8D', oem: 'XMS', type: '热失控预警', level: '高', file: 'SU7温差8D.docx', by: '陈静', at: this._day(-15), status: '已评审', task: '' },
-            { id: 4, title: '50Ah 圆柱压差扩大趋势分析', oem: 'NIO', type: '压差报警', level: '低', file: '50Ah压差趋势.xlsx', by: '刘洋', at: this._day(-21), status: '已关闭', task: '' },
-        ];
         const rvRules = [
             { id: 1, item: '自放电', logic: '静置段 ΔSOC / 静置时长', threshold: '> 3 %/天', window: '近 30 天', suggest: '建议外发', send: '是', on: true },
             { id: 2, item: '绝缘', logic: '绝缘阻值最小值 & 下降斜率', threshold: '< 500 Ω/V', window: '近 14 天', suggest: '建议外发', send: '是', on: true },
             { id: 3, item: '温差', logic: '充电段单体最大温差', threshold: '> 8 ℃', window: '近 7 天', suggest: '持续观察', send: '否', on: true },
             { id: 4, item: '电压', logic: '末端压差 & 压差扩大速率', threshold: '> 80 mV', window: '近 30 天', suggest: '远程 OTA 修复', send: '否', on: false },
         ];
-        this._d = { vehicles, nosend, risks, rvRules, tasks: [], batches: [], sentLog: {}, vehUpdatedAt: this._day(-1) + ' 02:00', seq: 3 };
-        // 预置 3 个复核任务：1 个已完成（含外发项，可导入批量外发）、1 个进行中、1 个已逾期
+        this._d = { vehicles, nosend, rvRules, tasks: [], batches: [], sentLog: {}, seq: 3, riskBatches: [], rbSeq: 0,
+            warrantyUpdatedAt: this._day(-1) + ' 02:00',
+            warrantyLog: [{ at: this._day(-1) + ' 02:00', mode: '平台同步', src: '数据平台 · 里程 / 交付 / 售后工单', n: 600, delta: 0, by: '系统定时任务' }] };
+        // 预置 1 个风险批次（宁德 L2 线）
+        const seedVins = vehicles.filter(v => v.base === '宁德基地' && v.line === 'L2 线' && v.oem === 'BYD').slice(0, 9).map(v => v.vin);
+        this._d.riskBatches.push({ no: 'RB' + this._day(-4).replace(/-/g, '').slice(2) + '-01', src: '生产信息圈定', base: '宁德基地', line: 'L2 线', start: this._day(-900), end: this._day(-700), oem: 'BYD', vins: seedVins, desc: '注液工序设备异常，批次自放电偏大风险', by: '李娜', at: this._day(-4) + ' 15:12', task: '' });
+        this._d.rbSeq = 1;
+        // 预置 3 个复核任务：1 个已完成（含外发项，可导入非常规外发）、1 个进行中、1 个已逾期
         [[-2, ['自放电', '绝缘'], 6, true], [3, ['绝缘', '温差'], 8, false], [-1, ['自放电', '电压'], 5, false]].forEach((t, i) => {
             const task = this._newTask(this._day(-6 + i * 2), t[0], t[1], vehicles.slice(i * 10, i * 10 + t[2]), this._PEOPLE[i], this._PEOPLE[i + 3], r);
             if (t[3]) {
@@ -11260,10 +11275,13 @@ const Page4 = {
 
     _veh(vin) { return this._data().vehicles.find(v => v.vin === vin); },
     _noSet() { const today = this._day(0); return new Set(this._data().nosend.filter(x => x.until >= today).map(x => x.vin)); },
-    _isOverWarranty(v) { return v.mileage > 120000 || v.age > 8; },
-    // 车辆外发判定：车辆信息 / 批量外发共用一套口径
+    // 质保到期：交付日 + 质保年限；过保 = 超过到期日或里程超出质保里程（取先到者）
+    _wEnd(v) { const d = new Date(v.deliver + 'T00:00:00'); d.setFullYear(d.getFullYear() + v.wYears); return this._day(0, d.toISOString().slice(0, 10)); },
+    _isOverWarranty(v) { return this._wEnd(v) < this._day(0) || v.mileage > v.wKm; },
+    _overWhy(v) { return [this._wEnd(v) < this._day(0) && '超过质保年限', v.mileage > v.wKm && '里程超出质保'].filter(Boolean).join('、'); },
+    // 车辆外发判定：质保信息 / 非常规外发共用一套口径
     _blockReasons(v, ns) {
-        return [v.human && '人为损坏', (ns || this._noSet()).has(v.vin) && '不外发清单', this._isOverWarranty(v) && '过保', v.wo3m && '售后工单'].filter(Boolean);
+        return [v.human && '人为脱保', (ns || this._noSet()).has(v.vin) && '不外发清单', this._isOverWarranty(v) && '过保', v.wo3m && '售后工单'].filter(Boolean);
     },
 
     showVehicle(vin) {
@@ -11273,9 +11291,11 @@ const Page4 = {
         const tasks = this._data().tasks.filter(t => t.rows.some(x => x.vin === vin));
         const kv = (k, val) => `<div><span>${k}：</span>${val}</div>`;
         Modal.open(`<div class="modal-header"><h3>车辆信息 · <span class="mono">${v.vin}</span></h3><button class="modal-close" onclick="Modal.close()">&times;</button></div>
-            <div class="p4-kv">${kv('deviceid', v.deviceid)}${kv('OEM', v.oem)}${kv('车型', Utils.esc(v.model))}${kv('ECM', v.ecm)}${kv('Cell', v.cell)}${kv('SOH', v.soh + '%')}
-                ${kv('里程', v.mileage.toLocaleString() + ' km')}${kv('交付日期', v.deliver)}${kv('质保', this._isOverWarranty(v) ? '过保' : '在保')}
-                ${kv('近3月售后工单', v.wo3m ? '有' : '无')}${kv('人为损坏(ASS)', v.human ? '是' : '否')}${kv('最近外发', v.lastSend || '-')}</div>
+            <div class="p4-kv">${kv('deviceid', v.deviceid)}${kv('OEM', v.oem)}${kv('车型', Utils.esc(v.model))}${kv('ECM', v.ecm)}${kv('电芯容量', v.cell)}${kv('PN', v.pn)}${kv('SOH', v.soh + '%')}
+                ${kv('生产', `${v.base} ${v.line} · ${v.prodDate}`)}${kv('交付日期', v.deliver)}${kv('里程', v.mileage.toLocaleString() + ' km')}</div>
+            <div class="p4-kv">${kv('质保政策', `${v.wYears} 年 / ${(v.wKm / 10000).toFixed(0)} 万km`)}${kv('质保到期', this._wEnd(v))}${kv('质保状态', this._isOverWarranty(v) ? `过保（${this._overWhy(v)}）` : '在保')}
+                ${kv('近3月售后工单', v.wo3m ? '有' : '无')}${kv('人为脱保(GSS)', v.human ? '是' : '否')}${kv('最近外发', v.lastSend || '-')}
+                ${kv('风险批次', (this._riskVinMap()[v.vin] || []).join('、') || '-')}</div>
             <div class="p4-kv"><div><span>外发判定：</span>${why.length ? `<span class="badge badge-warning">不外发 · ${why.join('、')}</span>` : '<span class="badge badge-success">可外发</span>'}</div>
                 <div><span>关联复核任务：</span>${tasks.length ? tasks.map(t => `<span class="lk mono" onclick="Modal.close();Page4.showTab('review','rvconfirm');Page4.openTask('${t.code}')">${t.code}</span>`).join('、') : '-'}</div></div>
             <div class="modal-footer"><button class="btn btn-secondary" onclick="Modal.close()">关闭</button></div>`);
@@ -11313,15 +11333,15 @@ const Page4 = {
         if (el) el.onchange = () => { const f = el.files[0]; if (f) cb(f); el.value = ''; };
     },
 
-    // ---------- 批量外发：上传清单 → 外发规则过滤 → 排序 → 按日排程 ----------
+    // ---------- 非常规外发：上传清单 → 外发规则过滤 → 排序 → 按日排程 ----------
     renderBatch() {
         const box = document.getElementById('p4Pane-batch');
         const reasons = Object.keys(this._REASONS);
         box.innerHTML = `<div class="card">
-            <div class="card-title">批量外发（非常规外发）</div>
+            <div class="card-title">非常规外发</div>
             <div class="p4-form">
                 <label>上传清单</label>
-                <div>${this._fileBox('p4BFile', '批量外发清单模板', this._TPL_COLS, `固定模板列：${this._TPL_COLS.join(' / ')}`)}
+                <div>${this._fileBox('p4BFile', '非常规外发清单模板', this._TPL_COLS, `固定模板列：${this._TPL_COLS.join(' / ')}`)}
                     <div class="p4-row" style="margin-top:6px;gap:6px 14px;">
                         <span class="p4-hint">离线演示：选择任意文件即按模板生成 1000 条示例车辆</span>
                         <span class="lk" onclick="Page4._loadBatch('示例清单.xlsx')">载入示例清单</span>
@@ -11331,10 +11351,10 @@ const Page4 = {
                 <label>外发规则</label>
                 <div class="p4-col">
                     <label class="p4-chk"><input type="checkbox" id="p4BWo" checked>排除售后工单（近 <input class="p4-in" id="p4BWoM" type="number" value="3" min="1" style="width:56px;"> 个月内有工单）</label>
-                    <label class="p4-chk"><input type="checkbox" id="p4BHuman" checked>排除人为损坏（ASS 判定）</label>
+                    <label class="p4-chk"><input type="checkbox" id="p4BHuman" checked>排除人为脱保（GSS 判定）</label>
                     <label class="p4-chk"><input type="checkbox" id="p4BWar" checked>排除过保：里程 ≥ <input class="p4-in" id="p4BMile" type="number" value="120000" style="width:96px;"> km，或年限 ≥ <input class="p4-in" id="p4BAge" type="number" value="8" style="width:56px;"> 年</label>
                     <label class="p4-chk"><input type="checkbox" id="p4BRecent" checked>排除近 <input class="p4-in" id="p4BRecentD" type="number" value="7" min="1" style="width:56px;"> 日已外发车辆</label>
-                    <label class="p4-chk"><input type="checkbox" id="p4BNo" checked>排除「不外发车辆管理」清单内车辆（<span class="lk" onclick="Page4.showTab('send','nosend')">查看清单</span>）</label>
+                    <label class="p4-chk"><input type="checkbox" id="p4BNo" checked>排除「不外发车辆管理」清单内车辆（<span class="lk" onclick="Page4.showTab('regular','nosend')">查看清单</span>）</label>
                 </div>
 
                 <label>排序依据列</label>
@@ -11414,7 +11434,7 @@ const Page4 = {
     _loadBatch(fileName) {
         const d = this._data(), r = this._rnd(fileName.length * 7919 + 17);
         const rows = Array.from({ length: 1000 }, (_, i) => {
-            const v = i < d.vehicles.length ? d.vehicles[i] : null;
+            const v = i < 300 ? d.vehicles[i] : null;
             if (v) return this._rowFromVeh(v, r);
             return {
                 vin: this._vin(r), deviceid: 'DEV' + (900000 + i), oem: this._OEMS[i % 5],
@@ -11442,7 +11462,7 @@ const Page4 = {
         if (!start || !end || end < start) { Toast.error('最晚外发结束日期不能早于最早开始外发日期'); return; }
         if (per <= 0) { Toast.error('外发数量需大于 0'); return; }
         const d = this._data(), ns = this._noSet(), today = this._day(0);
-        // 排除口径实时取：车辆库内的车用车辆信息（工单 / ASS / 最近外发），其余用清单字段 + 外发日志
+        // 排除口径实时取：车辆库内的车用质保信息（工单 / 人为脱保 / 最近外发），其余用清单字段 + 外发日志
         const live = x => {
             const v = x.inVeh ? this._veh(x.vin) : null;
             const last = (v && v.lastSend) || d.sentLog[x.vin] || x.lastSent || '';
@@ -11460,7 +11480,7 @@ const Page4 = {
         };
         const woM = +val('p4BWoM') || 3, mile = +val('p4BMile') || Infinity, age = +val('p4BAge') || Infinity, recent = +val('p4BRecentD') || 0;
         cut(`售后工单(近${woM}月)`, on('p4BWo'), (x, l) => l.wo && l.wo <= woM);
-        cut('人为损坏', on('p4BHuman'), (x, l) => l.human);
+        cut('人为脱保', on('p4BHuman'), (x, l) => l.human);
         cut('过保', on('p4BWar'), x => x['里程(km)'] >= mile || x['车龄(年)'] >= age);
         cut(`近${recent}日已外发`, on('p4BRecent'), (x, l) => l.lastDays != null && l.lastDays <= recent);
         cut('不外发清单', on('p4BNo'), (x, l) => l.inNo);
@@ -11534,60 +11554,170 @@ const Page4 = {
             </table></div></div>` : '';
     },
 
-    // ---------- 车辆信息管理 ----------
-    renderVehicles() {
-        const box = document.getElementById('p4Pane-vehicle'), d = this._data();
+    // ---------- 质保信息管理：质保统览（OEM × 电芯容量 × PN）+ 质保信息明细 / 更新 ----------
+    renderWarranty() {
+        const box = document.getElementById('p4Pane-warranty'), d = this._data();
+        const caps = [...new Set(d.vehicles.map(v => v.cell))];
         box.innerHTML = `<div class="card">
             <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <span id="p4VTitle">车辆信息管理</span>
+                <span id="p4WSumTitle">质保统览</span>
+                <span class="p4-hint">按 OEM × 电芯容量 × PN 汇总 · 点击行查看该组车辆明细</span>
+            </div>
+            <div class="table-wrapper" style="max-height:40vh;overflow:auto;"><table class="dash-table" id="p4WSum" style="font-size:12px;">
+                <thead><tr><th>OEM</th><th>电芯容量</th><th>PN</th><th class="num">车辆数</th><th class="num">进保</th><th class="num">过保</th><th class="num">过保率</th></tr></thead>
+                <tbody id="p4WSumBody"></tbody>
+            </table></div>
+        </div>
+        <div class="card" id="p4WDetailCard">
+            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <span id="p4WTitle">质保信息管理</span>
                 <div class="p4-row" style="gap:8px;">
-                    <select class="p4-in" id="p4VOem">${this._oemOpts(this._oem(), '全部客户')}</select>
-                    <select class="p4-in" id="p4VFlag"><option value="">全部车辆</option><option value="send">可外发</option><option value="block">不可外发</option></select>
-                    <input class="p4-in" id="p4VKey" placeholder="VIN / deviceid" style="width:170px;">
-                    <span class="p4-hint" id="p4VUpd">数据更新于 ${d.vehUpdatedAt}</span>
-                    <button class="btn btn-sm btn-primary" id="p4VRefresh" onclick="Page4.refreshVehicles()">⟳ 更新车辆信息</button>
+                    <span class="p4-hint" id="p4WUpd">质保数据更新于 ${d.warrantyUpdatedAt}</span>
+                    <label class="btn btn-sm btn-secondary" style="cursor:pointer;">上传质保更新文件<input type="file" id="p4WFile" accept=".xlsx,.xls,.csv" style="display:none;"></label>
+                    <button class="btn btn-sm btn-secondary" onclick="Page4.downloadTpl('质保信息更新模板','VIN,质保起始日,质保年限(年),质保里程(km)')">下载模板</button>
+                    <button class="btn btn-sm btn-primary" id="p4WSync" onclick="Page4.syncWarranty()">⟳ 同步质保信息</button>
                 </div>
             </div>
-            <div class="table-wrapper" style="max-height:62vh;overflow:auto;"><table class="dash-table" id="p4VTable" style="font-size:12px;">
-                <thead><tr><th>VIN</th><th>deviceid</th><th>OEM</th><th>车型</th><th>ECM</th><th>Cell</th><th class="num">SOH%</th><th class="num">里程(km)</th><th>交付日期</th><th>质保</th><th>近3月售后工单</th><th>人为损坏(ASS)</th><th>最近外发</th><th>外发判定</th><th data-no-sort>操作</th></tr></thead>
-                <tbody id="p4VBody"></tbody>
+            <div class="p4-row" style="gap:8px;margin-bottom:10px;">
+                <select class="p4-in" id="p4WOem">${this._oemOpts(this._oem(), '全部客户')}</select>
+                <select class="p4-in" id="p4WCap"><option value="">全部容量</option>${caps.map(c => `<option>${c}</option>`).join('')}</select>
+                <select class="p4-in" id="p4WPn"><option value="">全部 PN</option></select>
+                <select class="p4-in" id="p4WStat"><option value="">全部质保状态</option><option>在保</option><option>过保</option></select>
+                <select class="p4-in" id="p4WFlag"><option value="">全部外发判定</option><option value="send">可外发</option><option value="block">不外发</option></select>
+                <input class="p4-in" id="p4WKey" placeholder="VIN / deviceid" style="width:170px;">
+                <button class="btn btn-sm btn-secondary" onclick="Page4.resetWarrantyFilter()">清空筛选</button>
+            </div>
+            <div class="table-wrapper" style="max-height:56vh;overflow:auto;"><table class="dash-table" id="p4WTable" style="font-size:12px;">
+                <thead><tr><th>VIN</th><th>deviceid</th><th>OEM</th><th>电芯容量</th><th>PN</th><th>车型</th><th>交付日期</th><th>质保政策</th><th>质保到期</th><th class="num">里程(km)</th><th>质保状态</th><th>近3月售后工单</th><th>最近外发</th><th>风险批次</th><th>外发判定</th><th data-no-sort>操作</th></tr></thead>
+                <tbody id="p4WBody"></tbody>
             </table></div>
-            <div class="p4-hint" id="p4VCount" style="padding:6px 2px;"></div>
-        </div>`;
-        const render = () => {
-            if (!document.getElementById('p4VBody')) return;
-            const oem = document.getElementById('p4VOem').value, flag = document.getElementById('p4VFlag').value, key = document.getElementById('p4VKey').value.trim().toUpperCase();
-            const ns = this._noSet(), all = this._data().vehicles;
-            const rows = all.map(v => ({ v, why: this._blockReasons(v, ns) }))
-                .filter(({ v, why }) => (!oem || v.oem === oem) && (!key || v.vin.includes(key) || v.deviceid.toUpperCase().includes(key))
-                    && (!flag || (flag === 'send' ? !why.length : why.length)));
-            document.getElementById('p4VTitle').textContent = `车辆信息管理（共 ${all.length} 台）`;
-            document.getElementById('p4VBody').innerHTML = rows.map(({ v, why }) => `<tr>
-                <td class="mono" style="font-size:11px;"><span class="lk" onclick="Page4.showVehicle('${v.vin}')">${v.vin}</span></td><td>${v.deviceid}</td><td><b>${v.oem}</b></td><td>${Utils.esc(v.model)}</td><td>${v.ecm}</td><td>${v.cell}</td>
-                <td class="num" style="color:${v.soh < 88 ? 'var(--warning)' : 'inherit'}">${v.soh}</td><td class="num">${v.mileage.toLocaleString()}</td><td>${v.deliver}</td>
-                <td>${this._isOverWarranty(v) ? '<span class="badge badge-warning">过保</span>' : '<span class="badge badge-success">在保</span>'}</td>
-                <td>${v.wo3m ? '<span class="badge badge-info">有</span>' : '-'}</td>
-                <td>${v.human ? '<span class="badge badge-danger">是</span>' : '-'}</td>
-                <td>${v.lastSend || '-'}</td>
-                <td>${why.length ? `<span class="badge badge-warning" title="${why.join('、')}">不外发 · ${why.join('、')}</span>` : '<span class="badge badge-success">可外发</span>'}</td>
-                <td>${ns.has(v.vin) ? `<button class="btn btn-sm btn-secondary" onclick="Page4.delNoSendByVin('${v.vin}')">移出不外发</button>` : `<button class="btn btn-sm btn-secondary" onclick="Page4.addNoSend('${v.vin}','${v.oem}')">加入不外发</button>`}</td></tr>`).join('')
-                || '<tr><td colspan="15" class="empty-state">无匹配车辆</td></tr>';
-            document.getElementById('p4VCount').textContent = `匹配 ${rows.length} 台 · 人为损坏（ASS）/ 不外发清单 / 过保 / 近 3 月售后工单的车辆不外发 · 点击 VIN 看详情 · 点击表头可排序`;
-            if (Utils.enableTableSort) Utils.enableTableSort(document.getElementById('p4VTable'));
+            <div class="p4-hint" id="p4WCount" style="padding:6px 2px;"></div>
+        </div>
+        <div class="card" id="p4WLogCard"></div>`;
+        const pnFill = () => {
+            const oem = document.getElementById('p4WOem').value, cap = document.getElementById('p4WCap').value, sel = document.getElementById('p4WPn'), cur = sel.value;
+            const pns = [...new Set(this._data().vehicles.filter(v => (!oem || v.oem === oem) && (!cap || v.cell === cap)).map(v => v.pn))].sort();
+            sel.innerHTML = '<option value="">全部 PN</option>' + pns.map(p => `<option${p === cur ? ' selected' : ''}>${p}</option>`).join('');
         };
-        this._renderVehicles = render;
-        ['p4VOem', 'p4VFlag'].forEach(id => { document.getElementById(id).onchange = render; });
-        document.getElementById('p4VKey').oninput = render;
-        render();
+        this._pnFill = pnFill;
+        ['p4WOem', 'p4WCap'].forEach(id => { document.getElementById(id).onchange = () => { pnFill(); this._renderWarrantyAll(); }; });
+        ['p4WPn', 'p4WStat', 'p4WFlag'].forEach(id => { document.getElementById(id).onchange = () => this._renderWarrantyTable(); });
+        document.getElementById('p4WKey').oninput = () => this._renderWarrantyTable();
+        this._onFile('p4WFile', f => this.uploadWarranty(f.name));
+        pnFill();
+        this._renderWarrantyAll();
     },
-    refreshVehicles() {
-        const d = this._data(), r = this._rnd(Date.now());
-        // 模拟从数据平台同步：SOH 随机小幅回落、少量车辆新增售后工单
-        d.vehicles.forEach(v => { v.soh = +Math.max(70, v.soh - r() * 0.3).toFixed(1); if (!v.wo3m && r() < 0.03) v.wo3m = true; });
-        d.vehUpdatedAt = this._now();
-        document.getElementById('p4VUpd').textContent = '数据更新于 ' + d.vehUpdatedAt;
-        if (this._renderVehicles) this._renderVehicles();
-        Toast.success('车辆信息已更新（ECM / Cell / SOH / 里程 / 售后工单 / ASS）');
+    _renderWarrantyAll() {
+        if (!document.getElementById('p4WBody')) return;
+        // 顶部客户切换时同步明细的 OEM 筛选
+        const wo = document.getElementById('p4WOem'), top = this._oem();
+        if (top && wo.value !== top) { wo.value = top; this._pnFill(); }
+        this._renderWarrantySummary();
+        this._renderWarrantyTable();
+        this._renderWarrantyLog();
+    },
+    _renderWarrantySummary() {
+        const body = document.getElementById('p4WSumBody');
+        if (!body) return;
+        const oem = this._oem(), cap = document.getElementById('p4WCap').value, groups = {};
+        this._data().vehicles.filter(v => (!oem || v.oem === oem) && (!cap || v.cell === cap)).forEach(v => {
+            const k = v.oem + '|' + v.cell + '|' + v.pn;
+            const g = groups[k] || (groups[k] = { oem: v.oem, cell: v.cell, pn: v.pn, n: 0, over: 0 });
+            g.n++; if (this._isOverWarranty(v)) g.over++;
+        });
+        const list = Object.values(groups).sort((a, b) => a.oem.localeCompare(b.oem) || parseInt(b.cell) - parseInt(a.cell) || a.pn.localeCompare(b.pn));
+        const tot = list.reduce((s, g) => ({ n: s.n + g.n, over: s.over + g.over }), { n: 0, over: 0 });
+        const rate = (o, n) => n ? (o / n * 100).toFixed(1) : '0.0';
+        const bar = (o, n) => `<span style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;"><span style="display:inline-block;width:60px;height:6px;border-radius:3px;background:var(--bg-input);overflow:hidden;"><span style="display:block;height:100%;width:${rate(o, n)}%;background:${o / n > 0.3 ? 'var(--danger)' : 'var(--warning)'};"></span></span>${rate(o, n)}%</span>`;
+        const sel = this._wPick || {};
+        body.innerHTML = list.map(g => `<tr style="cursor:pointer;${sel.pn === g.pn ? 'background:var(--brand-soft);' : ''}" onclick="Page4.pickWarrantyGroup('${g.oem}','${g.cell}','${g.pn}')">
+            <td><b>${g.oem}</b></td><td>${g.cell}</td><td class="mono">${g.pn}</td><td class="num">${g.n}</td><td class="num">${g.n - g.over}</td>
+            <td class="num" style="color:var(--warning);">${g.over}</td><td class="num">${bar(g.over, g.n)}</td></tr>`).join('')
+            + `<tr style="font-weight:700;"><td colspan="3">合计</td><td class="num">${tot.n}</td><td class="num">${tot.n - tot.over}</td><td class="num">${tot.over}</td><td class="num">${rate(tot.over, tot.n)}%</td></tr>`;
+        document.getElementById('p4WSumTitle').textContent = `质保统览（${list.length} 个 PN · ${tot.n} 台${this._oemNote()}）`;
+    },
+    pickWarrantyGroup(oem, cap, pn) {
+        this._wPick = { oem, cap, pn };
+        document.getElementById('p4WOem').value = oem;
+        document.getElementById('p4WCap').value = cap;
+        this._pnFill();
+        document.getElementById('p4WPn').value = pn;
+        this._renderWarrantySummary();
+        this._renderWarrantyTable();
+        document.getElementById('p4WDetailCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+    resetWarrantyFilter() {
+        this._wPick = null;
+        ['p4WCap', 'p4WPn', 'p4WStat', 'p4WFlag'].forEach(id => { document.getElementById(id).value = ''; });
+        document.getElementById('p4WOem').value = this._oem();
+        document.getElementById('p4WKey').value = '';
+        this._pnFill();
+        this._renderWarrantySummary();
+        this._renderWarrantyTable();
+    },
+    _renderWarrantyTable() {
+        const body = document.getElementById('p4WBody');
+        if (!body) return;
+        const g = id => document.getElementById(id).value;
+        const oem = g('p4WOem'), cap = g('p4WCap'), pn = g('p4WPn'), stat = g('p4WStat'), flag = g('p4WFlag'), key = g('p4WKey').trim().toUpperCase();
+        const ns = this._noSet(), all = this._data().vehicles, rb = this._riskVinMap();
+        const rows = all.map(v => ({ v, why: this._blockReasons(v, ns), over: this._isOverWarranty(v) }))
+            .filter(({ v, why, over }) => (!oem || v.oem === oem) && (!cap || v.cell === cap) && (!pn || v.pn === pn)
+                && (!stat || (stat === '过保') === over) && (!flag || (flag === 'send' ? !why.length : why.length))
+                && (!key || v.vin.includes(key) || v.deviceid.toUpperCase().includes(key)));
+        const LIMIT = 200;
+        body.innerHTML = rows.slice(0, LIMIT).map(({ v, why, over }) => `<tr>
+            <td class="mono" style="font-size:11px;"><span class="lk" onclick="Page4.showVehicle('${v.vin}')">${v.vin}</span></td><td>${v.deviceid}</td><td><b>${v.oem}</b></td><td>${v.cell}</td><td class="mono">${v.pn}</td><td>${Utils.esc(v.model)}</td>
+            <td>${v.deliver}</td><td>${v.wYears} 年 / ${(v.wKm / 10000).toFixed(0)} 万km</td><td>${this._wEnd(v)}</td><td class="num">${v.mileage.toLocaleString()}</td>
+            <td>${over ? `<span class="badge badge-warning" title="${this._overWhy(v)}">过保</span>` : '<span class="badge badge-success">在保</span>'}</td>
+            <td>${v.wo3m ? '<span class="badge badge-info">有</span>' : '-'}</td>
+            <td>${v.lastSend || '-'}</td>
+            <td>${(rb[v.vin] || []).map(no => `<span class="badge badge-danger">${no}</span>`).join(' ') || '-'}</td>
+            <td>${why.length ? `<span class="badge badge-warning" title="${why.join('、')}">不外发 · ${why.join('、')}</span>` : '<span class="badge badge-success">可外发</span>'}</td>
+            <td>${ns.has(v.vin) ? `<button class="btn btn-sm btn-secondary" onclick="Page4.delNoSendByVin('${v.vin}')">移出不外发</button>` : `<button class="btn btn-sm btn-secondary" onclick="Page4.addNoSend('${v.vin}','${v.oem}')">加入不外发</button>`}</td></tr>`).join('')
+            || '<tr><td colspan="16" class="empty-state">无匹配车辆</td></tr>';
+        document.getElementById('p4WTitle').textContent = `质保信息管理（${rows.length} / ${all.length} 台）`;
+        document.getElementById('p4WCount').textContent = (rows.length > LIMIT ? `显示前 ${LIMIT} 台，共 ${rows.length} 台，可用筛选缩小范围 · ` : `共 ${rows.length} 台 · `)
+            + '人为脱保（GSS 判定）/ 不外发清单 / 过保 / 近 3 月售后工单的车辆不外发 · 点击 VIN 看详情';
+        if (Utils.enableTableSort) Utils.enableTableSort(document.getElementById('p4WTable'));
+    },
+    _renderWarrantyLog() {
+        const el = document.getElementById('p4WLogCard'), list = this._data().warrantyLog;
+        if (!el) return;
+        el.innerHTML = `<div class="card-title">质保更新记录</div>
+            <div class="table-wrapper"><table class="dash-table" style="font-size:12px;">
+            <thead><tr><th>更新时间</th><th>方式</th><th>来源</th><th class="num">更新车辆</th><th class="num">过保变化</th><th>操作人</th></tr></thead>
+            <tbody>${list.map(x => `<tr><td>${x.at}</td><td>${x.mode}</td><td>${Utils.esc(x.src)}</td><td class="num">${x.n}</td>
+                <td class="num">${x.delta > 0 ? `<span style="color:var(--warning);">+${x.delta}</span>` : x.delta < 0 ? `<span style="color:var(--success);">${x.delta}</span>` : '0'}</td><td>${Utils.esc(x.by)}</td></tr>`).join('')}</tbody>
+            </table></div>`;
+    },
+    _overCount() { return this._data().vehicles.filter(v => this._isOverWarranty(v)).length; },
+    // 上传质保更新文件：离线演示随机挑当前筛选范围内 20 台车，按文件更新质保政策（延保）
+    uploadWarranty(fileName) {
+        const d = this._data(), oem = document.getElementById('p4WOem').value, before = this._overCount(), r = this._rnd(fileName.length * 53 + d.warrantyLog.length);
+        const pool = d.vehicles.filter(v => !oem || v.oem === oem);
+        const picked = pool.filter(() => r() < 20 / Math.max(20, pool.length)).slice(0, 20);
+        picked.forEach(v => { v.wYears += 2; v.wKm += 50000; });
+        d.warrantyUpdatedAt = this._now();
+        d.warrantyLog.unshift({ at: d.warrantyUpdatedAt, mode: '文件导入', src: fileName, n: picked.length, delta: this._overCount() - before, by: this._me() });
+        document.getElementById('p4WUpd').textContent = '质保数据更新于 ' + d.warrantyUpdatedAt;
+        this._renderWarrantyAll();
+        Toast.success(`质保信息已更新 ${picked.length} 台（延保）`);
+    },
+    // 同步质保信息：模拟从数据平台拉取最新里程，部分车辆因里程超限转为过保
+    syncWarranty() {
+        const d = this._data(), before = this._overCount(), r = this._rnd(Date.now());
+        let n = 0;
+        d.vehicles.forEach(v => { if (r() < 0.3) { v.mileage += Math.round(500 + r() * 6000); n++; } if (!v.wo3m && r() < 0.01) v.wo3m = true; });
+        d.warrantyUpdatedAt = this._now();
+        d.warrantyLog.unshift({ at: d.warrantyUpdatedAt, mode: '平台同步', src: '数据平台 · 里程 / 交付 / 售后工单', n, delta: this._overCount() - before, by: this._me() });
+        document.getElementById('p4WUpd').textContent = '质保数据更新于 ' + d.warrantyUpdatedAt;
+        this._renderWarrantyAll();
+        Toast.success(`已同步 ${n} 台车辆的里程与工单信息`);
+    },
+    _refreshVehicleViews() {
+        this._renderWarrantyAll();
+        this._renderNoSendTable();
     },
 
     // ---------- 不外发车辆管理 ----------
@@ -11596,7 +11726,7 @@ const Page4 = {
         box.innerHTML = `<div class="card">
             <div class="card-title">上传不外发车辆清单</div>
             ${this._fileBox('p4NFile', '不外发车辆清单模板', ['VIN', 'OEM', '不外发原因', '有效期至'], '固定模板列：VIN / OEM / 不外发原因 / 有效期至')}
-            <div class="p4-hint" style="margin-top:6px;">清单内车辆在「批量外发」与「车辆信息管理」的外发判定中自动排除，过有效期后自动恢复。</div>
+            <div class="p4-hint" style="margin-top:6px;">清单内车辆在「非常规外发」与「质保信息管理」的外发判定中自动排除，过有效期后自动恢复。</div>
         </div>
         <div class="card"><div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
             <span id="p4NTitle"></span><button class="btn btn-sm btn-secondary" id="p4NAdd" onclick="Page4.addNoSend()">+ 手动新增</button></div>
@@ -11643,7 +11773,7 @@ const Page4 = {
             until: document.getElementById('p4NUntil').value, source: '手动新增', by: this._me(), at: this._now() });
         Modal.close();
         this._renderNoSendTable();
-        if (this._renderVehicles) this._renderVehicles();
+        this._renderWarrantyAll();
         Toast.success('已加入不外发清单');
     },
     async delNoSend(id) {
@@ -11651,7 +11781,7 @@ const Page4 = {
         const d = this._data();
         d.nosend = d.nosend.filter(x => x.id !== id);
         this._renderNoSendTable();
-        if (this._renderVehicles) this._renderVehicles();
+        this._renderWarrantyAll();
         Toast.success('已移出不外发清单');
     },
     async delNoSendByVin(vin) {
@@ -11659,95 +11789,213 @@ const Page4 = {
         const d = this._data();
         d.nosend = d.nosend.filter(x => x.vin !== vin);
         this._renderNoSendTable();
-        if (this._renderVehicles) this._renderVehicles();
+        this._renderWarrantyAll();
         Toast.success('已移出不外发清单');
     },
 
-    // ---------- 风险机制管理：问题报告上传 ----------
-    renderRisk() {
-        const box = document.getElementById('p4Pane-risk');
+    // ---------- 风险批次管理：按 基地 → 拉线 → 生产时间 圈定车辆，或上传风险批次清单 ----------
+    renderRiskBatch() {
+        const box = document.getElementById('p4Pane-riskbatch'), bases = Object.keys(this._BASES);
         box.innerHTML = `<div class="card">
-            <div class="card-title">问题报告上传</div>
+            <div class="card-title">按生产信息圈定风险批次</div>
             <div class="p4-form">
-                <label>报告标题 *</label><div><input type="text" id="p4RTitle" placeholder="如：153Ah 批次自放电专项分析" style="max-width:520px;"></div>
-                <label>客户 / 风险类型</label>
+                <label>基地 / 拉线</label>
                 <div class="p4-row">
-                    <select class="p4-in" id="p4ROem">${this._oemOpts(this._oem())}</select>
-                    <select class="p4-in" id="p4RType">${Object.keys(this._RISK_ITEM).map(o => `<option>${o}</option>`).join('')}</select>
-                    <span class="p4-hint">风险等级</span>
-                    ${['高', '中', '低'].map((l, i) => `<label class="p4-chk"><input type="radio" name="p4RLevel" value="${l}" ${i === 1 ? 'checked' : ''}>${l}</label>`).join('')}
+                    <select class="p4-in" id="p4KBase">${bases.map(b => `<option>${b}</option>`).join('')}</select>
+                    <select class="p4-in" id="p4KLine"></select>
                 </div>
-                <label>报告文件 *</label>
-                <div class="p4-row"><div class="p4-drop" id="p4RFileName">支持 pdf / docx / pptx / xlsx</div>
-                    <label class="btn btn-sm btn-secondary" style="cursor:pointer;">选择文件<input type="file" id="p4RFile" style="display:none;"></label></div>
-                <label></label><div><button class="btn btn-primary" id="p4RUpload" onclick="Page4.uploadRisk()">上 传</button></div>
+                <label>生产时间</label>
+                <div class="p4-row">
+                    <input class="p4-in" type="date" id="p4KStart" value="${this._day(-1095)}"><span class="p4-hint">至</span><input class="p4-in" type="date" id="p4KEnd" value="${this._day(0)}">
+                    <button class="btn btn-sm btn-secondary" id="p4KQuery" onclick="Page4.queryRiskScope()">查询涉及客户</button>
+                </div>
+                <label>涉及客户（OEM）</label>
+                <div class="p4-row" id="p4KOems"><span class="p4-hint">先选择基地、拉线和生产时间，再点「查询涉及客户」</span></div>
+                <label>风险描述 *</label>
+                <div><input type="text" id="p4KDesc" placeholder="如：L2 线 2025-05 批次注液量偏低" style="max-width:520px;"></div>
+                <label></label>
+                <div class="p4-row">
+                    <button class="btn btn-secondary" id="p4KDownload" onclick="Page4.downloadRiskScope()">下载清单</button>
+                    <button class="btn btn-primary" id="p4KSubmit" onclick="Page4.submitRiskScope()">提 交</button>
+                    <span class="p4-hint" id="p4KInfo"></span>
+                </div>
             </div>
         </div>
-        <div class="card"><div class="card-title" id="p4RTitleBar">风险问题报告</div>
+        <div class="card">
+            <div class="card-title">上传风险批次清单</div>
+            <div class="p4-form">
+                <label>风险批次清单 *</label>
+                <div>${this._fileBox('p4KFile', '风险批次清单模板', ['VIN', 'OEM', 'Pack编码', '生产日期', '风险描述'], '固定模板列：VIN / OEM / Pack编码 / 生产日期 / 风险描述')}</div>
+                <label>风险描述 *</label>
+                <div><input type="text" id="p4KUpDesc" placeholder="如：供应商来料批次异常" style="max-width:520px;"></div>
+                <label></label>
+                <div><button class="btn btn-primary" id="p4KUpSubmit" onclick="Page4.submitRiskUpload()">提 交</button></div>
+            </div>
+        </div>
+        <div class="card"><div class="card-title" id="p4KListTitle">风险批次</div>
             <div class="table-wrapper"><table class="dash-table" style="font-size:12px;">
-            <thead><tr><th>报告标题</th><th>客户</th><th>风险类型</th><th>等级</th><th>文件</th><th>上传人</th><th>上传日期</th><th>状态</th><th>关联复核</th><th data-no-sort>操作</th></tr></thead>
-            <tbody id="p4RBody"></tbody></table></div></div>`;
-        this._onFile('p4RFile', f => { this._riskFile = f.name; document.getElementById('p4RFileName').innerHTML = `已选择 <b>${Utils.esc(f.name)}</b>`; });
-        this._renderRiskTable();
+            <thead><tr><th>批次号</th><th>来源</th><th>基地 / 拉线</th><th>生产时间</th><th>OEM</th><th class="num">车辆数</th><th>风险描述</th><th>提交人</th><th>提交时间</th><th>关联复核</th><th data-no-sort>操作</th></tr></thead>
+            <tbody id="p4KBody"></tbody></table></div></div>`;
+        const lineFill = () => {
+            const base = document.getElementById('p4KBase').value;
+            document.getElementById('p4KLine').innerHTML = Object.keys(this._BASES[base]).map(l => `<option>${l}</option>`).join('');
+            this._resetRiskScope();
+        };
+        document.getElementById('p4KBase').onchange = lineFill;
+        ['p4KLine', 'p4KStart', 'p4KEnd'].forEach(id => { document.getElementById(id).onchange = () => this._resetRiskScope(); });
+        this._onFile('p4KFile', f => {
+            const d = this._data(), r = this._rnd(f.name.length * 71 + d.riskBatches.length), oem = this._oem();
+            const pool = d.vehicles.filter(v => !oem || v.oem === oem);
+            const start = Math.floor(r() * Math.max(1, pool.length - 30));
+            this._riskUpload = { file: f.name, vehs: pool.slice(start, start + 12 + Math.floor(r() * 18)) };
+            document.getElementById('p4KFileName').innerHTML = `已解析 <b>${Utils.esc(f.name)}</b>：<b>${this._riskUpload.vehs.length}</b> 台车辆，字段校验通过`;
+        });
+        lineFill();
+        this._renderRiskBatchTable();
     },
-    _renderRiskTable() {
-        const body = document.getElementById('p4RBody');
+    _resetRiskScope() {
+        this._riskScope = null;
+        const el = document.getElementById('p4KOems');
+        if (el) el.innerHTML = '<span class="p4-hint">条件已变化，请重新「查询涉及客户」</span>';
+        const info = document.getElementById('p4KInfo');
+        if (info) info.textContent = '';
+    },
+    _scopeVehs(oem) {
+        const s = this._riskScope;
+        return s ? s.vehs.filter(v => !oem || v.oem === oem) : [];
+    },
+    queryRiskScope() {
+        const g = id => document.getElementById(id).value;
+        const base = g('p4KBase'), line = g('p4KLine'), start = g('p4KStart'), end = g('p4KEnd');
+        if (!start || !end || end < start) { Toast.error('请填写正确的生产时间范围'); return; }
+        const vehs = this._data().vehicles.filter(v => v.base === base && v.line === line && v.prodDate >= start && v.prodDate <= end);
+        this._riskScope = { base, line, start, end, vehs };
+        const cnt = {};
+        vehs.forEach(v => { cnt[v.oem] = (cnt[v.oem] || 0) + 1; });
+        const oems = Object.keys(cnt);
+        const el = document.getElementById('p4KOems');
+        if (!oems.length) { el.innerHTML = '<span class="p4-hint">该范围内没有生产记录，请调整时间</span>'; return; }
+        const pre = this._oem() && cnt[this._oem()] ? this._oem() : oems[0];
+        el.innerHTML = `<select class="p4-in" id="p4KOem">${oems.map(o => `<option value="${o}"${o === pre ? ' selected' : ''}>${o}（${cnt[o]} 台）</option>`).join('')}</select>
+            <span class="p4-hint">${base} ${line} 在该时间段只给这 ${oems.length} 个客户供货</span>`;
+        const upd = () => { document.getElementById('p4KInfo').textContent = `将圈定 ${this._scopeVehs(document.getElementById('p4KOem').value).length} 台车辆`; };
+        document.getElementById('p4KOem').onchange = upd;
+        upd();
+    },
+    _scopeReady() {
+        if (!this._riskScope) { Toast.error('请先「查询涉及客户」'); return null; }
+        const oem = document.getElementById('p4KOem') && document.getElementById('p4KOem').value;
+        const vehs = this._scopeVehs(oem);
+        if (!vehs.length) { Toast.error('该范围内没有车辆'); return null; }
+        return { oem, vehs };
+    },
+    _vehCsv(vehs, desc) {
+        return '﻿VIN,deviceid,OEM,电芯容量,PN,基地,拉线,生产日期,风险描述\r\n' + vehs.map(v => [v.vin, v.deviceid, v.oem, v.cell, v.pn, v.base, v.line, v.prodDate, desc || ''].join(',')).join('\r\n') + '\r\n';
+    },
+    downloadRiskScope() {
+        const s = this._scopeReady();
+        if (!s) return;
+        const sc = this._riskScope;
+        FileSaver.save(new Blob([this._vehCsv(s.vehs, document.getElementById('p4KDesc').value.trim())], { type: 'text/csv;charset=utf-8' }), `风险批次清单_${sc.base}${sc.line}_${s.oem}.csv`)
+            .then(ok => { if (ok) Toast.success(`已下载 ${s.vehs.length} 台车辆清单`); });
+    },
+    _addRiskBatch(b) {
+        const d = this._data();
+        b.no = 'RB' + this._day(0).replace(/-/g, '').slice(2) + '-' + String(++d.rbSeq).padStart(2, '0');
+        Object.assign(b, { by: this._me(), at: this._now(), task: '' });
+        d.riskBatches.unshift(b);
+        this._renderRiskBatchTable();
+        this._renderWarrantyAll();
+        return b;
+    },
+    submitRiskScope() {
+        const s = this._scopeReady();
+        if (!s) return;
+        const desc = document.getElementById('p4KDesc').value.trim();
+        if (!desc) { Toast.error('请填写风险描述'); return; }
+        const sc = this._riskScope;
+        const b = this._addRiskBatch({ src: '生产信息圈定', base: sc.base, line: sc.line, start: sc.start, end: sc.end, oem: s.oem, vins: s.vehs.map(v => v.vin), desc });
+        document.getElementById('p4KDesc').value = '';
+        Toast.success(`风险批次 ${b.no} 已提交：${b.vins.length} 台`);
+    },
+    submitRiskUpload() {
+        const u = this._riskUpload;
+        if (!u) { Toast.error('请先上传风险批次清单'); return; }
+        const desc = document.getElementById('p4KUpDesc').value.trim();
+        if (!desc) { Toast.error('请填写风险描述'); return; }
+        const oems = [...new Set(u.vehs.map(v => v.oem))];
+        const b = this._addRiskBatch({ src: '清单上传 · ' + u.file, base: '-', line: '-', start: '', end: '', oem: oems.join('、'), vins: u.vehs.map(v => v.vin), desc });
+        this._riskUpload = null;
+        document.getElementById('p4KUpDesc').value = '';
+        document.getElementById('p4KFileName').textContent = '固定模板列：VIN / OEM / Pack编码 / 生产日期 / 风险描述';
+        Toast.success(`风险批次 ${b.no} 已提交：${b.vins.length} 台`);
+    },
+    _riskVinMap() {
+        const m = {};
+        this._data().riskBatches.forEach(b => b.vins.forEach(vin => { (m[vin] = m[vin] || []).push(b.no); }));
+        return m;
+    },
+    _renderRiskBatchTable() {
+        const body = document.getElementById('p4KBody');
         if (!body) return;
-        const lv = { 高: 'danger', 中: 'warning', 低: 'info' }, st = { 待评审: 'warning', 已评审: 'success', 已关闭: 'secondary' };
-        const oem = this._oem(), list = this._data().risks.filter(x => !oem || x.oem === oem);
-        document.getElementById('p4RTitleBar').textContent = `风险问题报告（共 ${list.length} 份${this._oemNote()}）`;
-        body.innerHTML = list.map(x => `<tr>
-            <td><b>${Utils.esc(x.title)}</b></td><td>${x.oem}</td><td>${Utils.esc(x.type)}</td><td><span class="badge badge-${lv[x.level]}">${x.level}</span></td>
-            <td><span class="lk" onclick="Page4.downloadRisk(${x.id})">📎 ${Utils.esc(x.file)}</span></td><td>${Utils.esc(x.by)}</td><td>${x.at}</td>
-            <td><span class="badge badge-${st[x.status]}">${x.status}</span></td>
-            <td>${x.task ? `<span class="lk mono" onclick="Page4.showTab('review','rvconfirm');Page4.openTask('${x.task}')">${x.task}</span>` : '-'}</td>
-            <td style="white-space:nowrap;">${x.status === '待评审' ? `<button class="btn btn-sm btn-secondary" onclick="Page4.reviewRisk(${x.id})">评审通过</button> ` : ''}${x.status !== '已关闭' ? `<button class="btn btn-sm btn-primary" onclick="Page4.riskToReview(${x.id})">发起复核</button> ` : ''}<button class="btn btn-sm btn-danger" onclick="Page4.delRisk(${x.id})">删除</button></td></tr>`).join('')
-            || '<tr><td colspan="10" class="empty-state">暂无报告</td></tr>';
+        const oem = this._oem(), list = this._data().riskBatches.filter(b => !oem || b.oem.includes(oem));
+        document.getElementById('p4KListTitle').textContent = `风险批次（共 ${list.length} 个${this._oemNote()}）`;
+        body.innerHTML = list.map(b => `<tr>
+            <td class="mono"><b>${b.no}</b></td><td>${Utils.esc(b.src)}</td><td>${b.base} / ${b.line}</td><td>${b.start ? b.start + ' ~ ' + b.end : '-'}</td><td>${b.oem}</td>
+            <td class="num"><span class="lk" onclick="Page4.showRiskBatch('${b.no}')">${b.vins.length}</span></td><td>${Utils.esc(b.desc)}</td><td>${Utils.esc(b.by)}</td><td>${b.at}</td>
+            <td>${b.task ? `<span class="lk mono" onclick="Page4.showTab('review','rvconfirm');Page4.openTask('${b.task}')">${b.task}</span>` : '-'}</td>
+            <td style="white-space:nowrap;"><button class="btn btn-sm btn-secondary" onclick="Page4.showRiskBatch('${b.no}')">清单</button>
+                <button class="btn btn-sm btn-primary" onclick="Page4.riskToReview('${b.no}')">发起复核</button>
+                <button class="btn btn-sm btn-secondary" onclick="Page4.riskToBatch('${b.no}')">导入非常规外发</button>
+                <button class="btn btn-sm btn-danger" onclick="Page4.delRiskBatch('${b.no}')">删除</button></td></tr>`).join('')
+            || '<tr><td colspan="11" class="empty-state">暂无风险批次</td></tr>';
     },
-    downloadRisk(id) {
-        const x = this._data().risks.find(r => r.id === id);
-        if (x) FileSaver.fromUrl(`/api/risk_reports/${id}/file`, x.file);
+    _rb(no) { return this._data().riskBatches.find(b => b.no === no); },
+    showRiskBatch(no) {
+        const b = this._rb(no);
+        if (!b) return;
+        const vehs = b.vins.map(vin => this._veh(vin)).filter(Boolean);
+        Modal.open(`<div class="modal-header"><h3>风险批次 ${b.no}（${vehs.length} 台）</h3><button class="modal-close" onclick="Modal.close()">&times;</button></div>
+            <div class="p4-kv"><div><span>来源：</span>${Utils.esc(b.src)}</div><div><span>基地 / 拉线：</span>${b.base} / ${b.line}</div><div><span>风险描述：</span>${Utils.esc(b.desc)}</div></div>
+            <div class="table-wrapper" style="max-height:56vh;overflow:auto;"><table class="dash-table" style="font-size:12px;">
+            <thead><tr><th>VIN</th><th>OEM</th><th>电芯容量</th><th>PN</th><th>生产日期</th><th>质保状态</th></tr></thead>
+            <tbody>${vehs.map(v => `<tr><td class="mono"><span class="lk" onclick="Page4.showVehicle('${v.vin}')">${v.vin}</span></td><td>${v.oem}</td><td>${v.cell}</td><td class="mono">${v.pn}</td><td>${v.prodDate}</td><td>${this._isOverWarranty(v) ? '过保' : '在保'}</td></tr>`).join('')}</tbody>
+            </table></div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="Page4.downloadRiskBatch('${b.no}')">下载清单</button><button class="btn btn-secondary" onclick="Modal.close()">关闭</button></div>`);
     },
-    uploadRisk() {
-        const title = document.getElementById('p4RTitle').value.trim();
-        if (!title) { Toast.error('请填写报告标题'); return; }
-        if (!this._riskFile) { Toast.error('请选择报告文件'); return; }
+    downloadRiskBatch(no) {
+        const b = this._rb(no);
+        FileSaver.save(new Blob([this._vehCsv(b.vins.map(v => this._veh(v)).filter(Boolean), b.desc)], { type: 'text/csv;charset=utf-8' }), `风险批次_${b.no}.csv`)
+            .then(ok => { if (ok) Toast.success('清单已下载'); });
+    },
+    async delRiskBatch(no) {
+        if (!await Dialog.confirm(`删除风险批次 ${no}？`)) return;
         const d = this._data();
-        d.risks.unshift({ id: Date.now(), title, oem: document.getElementById('p4ROem').value, type: document.getElementById('p4RType').value,
-            level: document.querySelector('input[name="p4RLevel"]:checked').value, file: this._riskFile, by: this._me(), at: this._day(0), status: '待评审', task: '' });
-        this._riskFile = null;
-        document.getElementById('p4RTitle').value = '';
-        document.getElementById('p4RFileName').textContent = '支持 pdf / docx / pptx / xlsx';
-        this._renderRiskTable();
-        Toast.success('问题报告已上传，待评审');
-    },
-    reviewRisk(id) {
-        const x = this._data().risks.find(r => r.id === id);
-        if (x) x.status = '已评审';
-        this._renderRiskTable();
-        Toast.success('已评审通过');
-    },
-    async delRisk(id) {
-        if (!await Dialog.confirm('删除该问题报告？')) return;
-        const d = this._data();
-        d.risks = d.risks.filter(x => x.id !== id);
-        this._renderRiskTable();
+        d.riskBatches = d.riskBatches.filter(b => b.no !== no);
+        this._renderRiskBatchTable();
+        this._renderWarrantyAll();
         Toast.success('已删除');
     },
-    // 风险报告 → 复核登记：按客户取车辆、按风险类型映射复核类别
-    riskToReview(id) {
-        const x = this._data().risks.find(r => r.id === id);
-        if (!x) return;
+    // 风险批次 → 复核登记：带入批次车辆与风险描述
+    riskToReview(no) {
+        const b = this._rb(no);
+        if (!b) return;
         this.showTab('review', 'rvreg');
-        const vehs = this._data().vehicles.filter(v => v.oem === x.oem).slice(0, 8);
-        this._rvVehs = vehs;
-        this._rvFromRisk = id;
-        document.getElementById('p4GFileName').innerHTML = `来源：风险报告 <b>${Utils.esc(x.title)}</b> · ${x.oem} 车辆 <b>${vehs.length}</b> 台`;
-        const item = this._RISK_ITEM[x.type];
-        document.querySelectorAll('input[name="p4GItem"]').forEach(cb => { if (!cb.disabled) cb.checked = cb.value === item; });
-        if (item && !document.querySelector('input[name="p4GItem"]:checked')) Toast.info(`复核规则「${item}」已停用，请在复核规则管理中启用或手动选择类别`);
-        document.getElementById('p4GNote').value = `风险报告：${x.title}`;
-        Toast.success('已带入风险报告车辆，确认复核人和交付日期后提交');
+        this._rvVehs = b.vins.map(v => this._veh(v)).filter(Boolean);
+        this._rvFromRisk = no;
+        document.getElementById('p4GFileName').innerHTML = `来源：风险批次 <b>${b.no}</b> · ${b.oem} 车辆 <b>${this._rvVehs.length}</b> 台`;
+        document.getElementById('p4GNote').value = `风险批次 ${b.no}：${b.desc}`;
+        Toast.success('已带入风险批次车辆，确认复核类别、复核人和交付日期后提交');
+    },
+    // 风险批次 → 非常规外发：批次车辆作为外发清单
+    riskToBatch(no) {
+        const b = this._rb(no);
+        if (!b) return;
+        this.showTab('irregular', 'batch');
+        const r = this._rnd(no.length * 13 + b.vins.length);
+        this._batchFromRv = null;
+        this._setBatchRows(b.vins.map(v => this._veh(v)).filter(Boolean).map(v => this._rowFromVeh(v, r)), '风险批次 ' + b.no);
+        Toast.success(`已导入风险批次 ${b.no}：${b.vins.length} 台`);
     },
 
     // ---------- 复核闭环 · 复核规则管理 ----------
@@ -11810,7 +12058,7 @@ const Page4 = {
             <div class="p4-form">
                 <label>批量复核文件 *</label>
                 <div>${this._fileBox('p4GFile', '复核登记模板', ['deviceid', 'VIN', 'ECM', '复核原因'], '固定字段模板：deviceid / VIN / ECM / 复核原因')}
-                    <div class="p4-hint" style="margin-top:6px;">离线演示：选择任意文件即生成示例车辆，或 <span class="lk" onclick="Page4._loadRvFile('示例复核清单.xlsx')">载入示例</span>；也可在「风险机制管理」里对报告「发起复核」</div></div>
+                    <div class="p4-hint" style="margin-top:6px;">离线演示：选择任意文件即生成示例车辆，或 <span class="lk" onclick="Page4._loadRvFile('示例复核清单.xlsx')">载入示例</span>；也可在「风险批次管理」里对批次「发起复核」</div></div>
                 <label>复核类别 *</label><div class="p4-row" id="p4GItems"></div>
                 <label>PM</label><div><select class="p4-in" id="p4GPm" style="min-width:160px;">${this._PEOPLE.map(p => `<option>${p}</option>`).join('')}</select></div>
                 <label>指定复核人 *</label><div><select class="p4-in" id="p4GReviewer" style="min-width:160px;">${this._PEOPLE.map((p, i) => `<option${i === 3 ? ' selected' : ''}>${p}</option>`).join('')}</select></div>
@@ -11858,14 +12106,14 @@ const Page4 = {
         const task = this._newTask(this._day(0), this._daysBetween(this._day(0), deadline), items, this._rvVehs, document.getElementById('p4GPm').value, document.getElementById('p4GReviewer').value);
         task.note = document.getElementById('p4GNote').value.trim();
         d.tasks.unshift(task);
-        if (this._rvFromRisk) { const rk = d.risks.find(x => x.id === this._rvFromRisk); if (rk) rk.task = task.code; }
+        if (this._rvFromRisk) { const rk = d.riskBatches.find(x => x.no === this._rvFromRisk); if (rk) rk.task = task.code; }
         this._rvVehs = null;
         this._rvFromRisk = null;
         document.getElementById('p4GFileName').textContent = '固定字段模板：deviceid / VIN / ECM / 复核原因';
         document.getElementById('p4GNote').value = '';
         document.getElementById('p4GDone').innerHTML = `✅ 已生成任务 <b class="mono">${task.code}</b>（${task.count} 台 · ${items.join('、')}）→ <span class="lk" onclick="Page4.showTab('review','rvconfirm');Page4.openTask('${task.code}')">去复核确认</span>`;
         this._renderRvRegTable();
-        this._renderRiskTable();
+        this._renderRiskBatchTable();
         Toast.success('复核任务已生成：' + task.code);
     },
     _taskBadge(t) {
@@ -11944,7 +12192,7 @@ const Page4 = {
             </table></div>
             <div class="p4-foot">
                 <span class="p4-hint">点击策略图可放大 · 选结论后按复核规则自动带出处置建议 · 挂起的复核项不计入完成校验</span>
-                ${ro ? (t.rows.some(x => x.send) && !t.imported ? `<button class="btn btn-primary" onclick="Page4.showTab('send','batch');Page4.pickRvImport()">去批量外发</button>` : '')
+                ${ro ? (t.rows.some(x => x.send) && !t.imported ? `<button class="btn btn-primary" onclick="Page4.showTab('irregular','batch');Page4.pickRvImport()">去非常规外发</button>` : '')
                     : `<button class="btn btn-secondary" id="p4TSave" onclick="Page4.saveTask('${t.code}',false)">暂存</button><button class="btn btn-primary" id="p4TSubmit" onclick="Page4.saveTask('${t.code}',true)">确认提交</button>`}
             </div>
         </div>`;
@@ -11998,7 +12246,7 @@ const Page4 = {
             t.status = '已完成';
             t.doneAt = this._now();
             const send = t.rows.filter(x => x.send).length, fwd = t.rows.filter(x => x.group).length, hold = t.rows.filter(x => x.hold).length;
-            Toast.success(`任务 ${code} 已提交：外发 ${send} 项 · 转发 ${fwd} 项 · 挂起 ${hold} 项${send ? '，外发车辆可在批量外发中导入' : ''}`);
+            Toast.success(`任务 ${code} 已提交：外发 ${send} 项 · 转发 ${fwd} 项 · 挂起 ${hold} 项${send ? '，外发车辆可在非常规外发中导入' : ''}`);
             this.openTask(code);
             this._renderRvRegTable();
             this._renderBatchSource();
