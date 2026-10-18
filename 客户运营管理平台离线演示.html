@@ -2039,6 +2039,21 @@ tbody tr:hover { background: var(--bg-card-hover); }
 .legend .lg-tg{cursor:pointer;user-select:none;border-radius:6px;padding:1px 4px;}
 .legend .lg-tg:hover{background:var(--bg-secondary);}
 .legend .lg-tg.off{opacity:.38;text-decoration:line-through;}
+/* 失效模式构成：横向百分比堆叠条（整体 + 各客户） */
+.mm{display:flex;flex-direction:column;gap:9px;padding:6px 2px 4px;}
+.mm-row{display:grid;grid-template-columns:52px 1fr 54px;align-items:center;gap:10px;font-size:12px;}
+.mm-row.main{padding-bottom:9px;border-bottom:1px dashed var(--line-strong);}
+.mm-row.main .mm-name,.mm-row.main .mm-val{font-weight:700;color:var(--text-primary);}
+.mm-name{color:var(--text-secondary);font-weight:600;}
+.mm-val{text-align:right;font-variant-numeric:tabular-nums;color:var(--text-secondary);}
+.mm-bar{display:flex;height:20px;border-radius:5px;overflow:hidden;background:var(--bg-input);}
+.mm-row.main .mm-bar{height:26px;}
+.mm-seg{display:flex;align-items:center;justify-content:center;color:#fff;font-size:10.5px;font-weight:600;cursor:pointer;border-right:1px solid var(--bg-input);transition:opacity .15s;white-space:nowrap;overflow:hidden;}
+.mm-seg:last-child{border-right:0;}
+.mm-seg:hover{filter:brightness(1.12);}
+.mm-empty{margin:auto;color:var(--muted);}
+.mm-head{font-size:11px;margin-bottom:-4px;}
+.mm-head .mm-val{color:var(--muted);}
 .t3-tbl th.t3-sortable{cursor:pointer;user-select:none;}
 .t3-tbl th.t3-sortable:hover{color:var(--text-primary);}
 .t3-tbl .t3-sa{margin-left:4px;font-size:10px;opacity:.35;}
@@ -5569,6 +5584,34 @@ const ThreeView = (() => {
       <td class="num"><b>${fmt(info.closed)}</b></td><td class="num"><b>${failVal(info)}</b></td><td></td><td></td></tr>` : '';
 
 
+    // 失效模式构成：失效电芯按失效模式的占比（整体 + 各客户）；后端给 d.failModes 时直接用
+    // 不随顶部失效模式筛选缩小，只高亮选中的模式，保留「它占多少」的背景
+    const mixRows = (d.failModes && d.failModes.length ? d.failModes : (d.rows || []).map((r, i) => {
+      const base = (d.modes || []).map((m, k) => (m.count || 0) * (0.7 + 0.6 * (((i * 5 + k * 3) % 7) / 6)));
+      const W = base.reduce((a, x) => a + x, 0) || 1, tot = failOf(r) || 0;
+      let left = tot;
+      const counts = {};
+      (d.modes || []).forEach((m, k) => { const v = k === d.modes.length - 1 ? Math.max(0, left) : Math.min(left, Math.round(tot * base[k] / W)); counts[m.name] = v; left -= v; });
+      return { oem: r.oem, counts };
+    }));
+    const mixAll = { oem: '整体', counts: {} };
+    mixRows.forEach(x => Object.entries(x.counts).forEach(([m, v]) => { mixAll.counts[m] = (mixAll.counts[m] || 0) + v; }));
+    const mixModes = Object.keys(mixAll.counts).sort((a, b) => mixAll.counts[b] - mixAll.counts[a]);
+    const mixBar = (x, main) => {
+      const tot = mixModes.reduce((a, m) => a + (x.counts[m] || 0), 0);
+      const segs = mixModes.map(m => {
+        const v = x.counts[m] || 0; if (!v) return '';
+        const pct = 100 * v / tot, dim = state.cellMode && state.cellMode !== m;
+        return `<span class="mm-seg" style="width:${pct}%;background:${modeColor(m)};opacity:${dim ? 0.22 : 1};" onclick="ThreeView.setCellMode('${esc(m)}')" title="${esc(x.oem)} · ${esc(m)}：${fmt(v)}（${pct.toFixed(1)}%）">${pct >= 9 ? pct.toFixed(0) + '%' : ''}</span>`;
+      }).join('');
+      const sel = state.cellMode ? x.counts[state.cellMode] || 0 : null;
+      return `<div class="mm-row${main ? ' main' : ''}"><span class="mm-name">${esc(x.oem)}</span><span class="mm-bar">${segs || '<span class="mm-empty">-</span>'}</span>
+        <span class="mm-val">${sel == null ? fmt(tot) : `${(tot ? 100 * sel / tot : 0).toFixed(1)}%`}</span></div>`;
+    };
+    const modeMixHtml = mixModes.length ? `<div class="mm"><div class="mm-row mm-head"><span></span><span></span><span class="mm-val">${state.cellMode ? '占比' : '失效电芯'}</span></div>${mixBar(mixAll, true)}${mixRows.map(x => mixBar(x)).join('')}</div>
+      <div class="legend lg-c">${mixModes.map(m => `<span class="lg-tg${state.cellMode && state.cellMode !== m ? ' off' : ''}" onclick="ThreeView.setCellMode('${esc(m)}')" title="按该失效模式筛选整页"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${modeColor(m)};margin-right:4px;"></i>${esc(m)}</span>`).join('')}</div>
+` : '<div class="t3-empty">暂无失效数据</div>';
+
     // SOH 分布：各客户用车习惯不同，按客户分组画（每个客户各区间占比合计 100%）；后端给 d.sohDist 时用后端数据
     const sohLabels = ['<90', '90~92', '92~94', '94~96', '96~98', '98~100'];
     const sohBase = [0.1, 0.6, 3.1, 9.8, 34.5, 51.9];
@@ -5578,7 +5621,7 @@ const ThreeView = (() => {
       const tot = raw.reduce((x, y) => x + y, 0);
       return { oem: r.oem, data: raw.map(v => +(100 * v / tot).toFixed(1)) };
     })).map((x, i) => ({ name: x.oem, color: CUST_COLORS[i % CUST_COLORS.length], data: x.data }));
-    const sohHtml = () => multiBarChart(sohLabels, sohSeries, 520, 'soh', ' %');
+    const sohHtml = () => multiBarChart(sohLabels, sohSeries, 1000, 'soh', ' %');
     legendRedraw.soh = () => { const el = document.getElementById('t3SohBar'); if (el) { el.innerHTML = sohHtml(); addChartDownloads(el); } };
 
     // ppm 走势（近似）
@@ -5649,17 +5692,23 @@ const ThreeView = (() => {
           <th class="num">预警外发</th><th class="num">已闭环(率)</th><th class="num">失效车辆数</th><th class="num" title="横条按各客户最大值缩放；百分比为相对整体失效率的高低">失效率(ppm) · 较整体</th><th class="ctr">操作</th>
         </tr></thead><tbody>${custRows}${sumRow}</tbody></table></div>
       </div>
-      <!-- SOH 分布 + 失效率走势（失效模式占比在质量分析里，不再单独成卡） -->
+      <!-- 失效率走势 + 失效模式构成：同一批失效电芯，左看高低与变化，右看坏在哪 -->
       <div class="t3-grid2 equal">
-        <div class="t3-card">
-          <div class="chead"><div><div class="ctitle" title="按客户分组 · 横轴 SOH 区间(%) · 纵轴该客户接入车辆占比(%)">📶 SOH 分布</div></div></div>
-          <div id="t3SohBar">${sohHtml()}</div>
-        </div>
         <div class="t3-card">
           <div class="chead"><div><div class="ctitle" title="累积量 = 累计失效车辆数 / 累计接入车辆数 × 10⁶；月增量 = 当月新增失效 / 当月接入 × 10⁶">📉 电芯失效率走势（ppm）</div></div>
             <div class="seg" id="t3PpmAcc"><button data-pa="0" class="${!state.ppmAcc ? 'on' : ''}">月增量</button><button data-pa="1" class="${state.ppmAcc ? 'on' : ''}">累积量</button></div></div>
           <div id="t3PpmLine">${ppmHtml()}</div>
         </div>
+        <div class="t3-card">
+          <div class="chead"><div><div class="ctitle" title="失效电芯按失效模式的占比（分母 = 失效电芯数，与失效车辆数 / ppm 同口径）· 点色块按该失效模式筛选整页">🧩 失效模式构成</div></div>
+            ${state.cellMode ? `<button class="btn btn-sm btn-secondary" onclick="ThreeView.setCellMode('')">显示全部</button>` : ''}</div>
+          <div id="t3ModeMix">${modeMixHtml}</div>
+        </div>
+      </div>
+      <!-- SOH 分布（按客户分组） -->
+      <div class="t3-card">
+        <div class="chead"><div><div class="ctitle" title="按客户分组 · 横轴 SOH 区间(%) · 纵轴该客户接入车辆占比(%)">📶 SOH 分布</div></div></div>
+        <div id="t3SohBar">${sohHtml()}</div>
       </div>
       <!-- 电芯质量分析 -->
       <div class="t3-card">
@@ -5839,6 +5888,7 @@ const ThreeView = (() => {
     loadCustomer, loadProject, loadCell,
     renderCustomer, renderProject, renderCell,
     gotoProject, gotoCell, gotoCustomer, gotoRule, showEvents,
+    setCellMode(m) { state.cellMode = state.cellMode === m ? '' : (m || ''); reframe(); },
     setSwitch(fn) { onSwitch = fn; },
     setTimeRange(tr) { if (tr) state.timeRange = { mode: tr.mode || 'all', start: tr.start || '', end: tr.end || '' }; },
     getState() { return { view: state.view, oem: state.oem, cellCap: state.cellCap, timeRange: state.timeRange.mode || 'all' }; },
