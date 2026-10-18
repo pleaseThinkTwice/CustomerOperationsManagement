@@ -3001,7 +3001,7 @@ const App = {
             page17: ['我的待办', '会议任务 · 认领预警 · 部门需求'],
             page18: ['知识中心', '统一入口：常用速查 · 查询手册 · 知识库 · 数据洞察'],
             page19: ['工具箱', '常用查询工具 · 管理员可配置'],
-            page3: ['会议纪要', '会议记录 · 共识 · 任务'], page4: ['预警闭环', '预警记录 · 不外发规则 · AI分析'],
+            page3: ['会议纪要', '会议记录 · 共识 · 任务'], page4: ['预警闭环', '预警外发 · 复核闭环 · 预警记录'],
             page5: ['阶段总结', '服务阶段性数据汇总'], page6: ['Q&A知识库', '智能问答 · 知识库管理'],
             page7: ['文档管理', '文档上传 · 下载 · 分类'], page8: ['OEM映射', 'OEM ↔ 客户集团映射'],
             page9: ['数智分析', 'NL2SQL · Agent多步分析'], page10: ['需求管理', '提报 · 审批 · AI拆解'],
@@ -5550,6 +5550,7 @@ const ThreeView = (() => {
   // 跳到「预警闭环 → 预警外发规则」，按客户 / 容量预筛
   function gotoRule(oem, cap, algo) {
     App.navigate('page4');
+    if (typeof Page4 !== 'undefined' && Page4.initialized) Page4.showTab('send', 'rules');
     let n = 0;
     const t = setInterval(() => {
       const o = document.getElementById('p4RuleOem'), c = document.getElementById('p4RuleCap');
@@ -10733,50 +10734,115 @@ const Page4 = {
         if (!this.initialized) {
             container.innerHTML = this.renderLayout();
             this.initialized = true;
+            this.showTab('send', 'rules');
         }
         this.bindEvents();
         this.loadRules();
     },
 
+    // 二级 Tab：预警外发 / 复核闭环 / 预警记录（每个子页首次进入时才渲染）
+    _TABS: {
+        send: { name: '预警外发', subs: [['rules', '外发规则管理'], ['batch', '批量外发'], ['vehicle', '车辆信息管理'], ['nosend', '不外发车辆管理'], ['risk', '风险机制管理']] },
+        review: { name: '复核闭环', subs: [['rvrule', '复核规则管理'], ['rvreg', '复核登记'], ['rvconfirm', '复核确认']] },
+        records: { name: '预警记录', subs: [['records', '预警记录']] },
+    },
+
     renderLayout() {
+        const panes = Object.values(this._TABS).flatMap(t => t.subs.map(s => s[0]))
+            .filter(k => k !== 'rules' && k !== 'records')
+            .map(k => `<div class="p4-pane" id="p4Pane-${k}" style="display:none;"></div>`).join('');
         return `
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+        <style>
+            #page4 .lk{color:var(--accent);cursor:pointer;}
+            #page4 .mono{font-family:var(--font-mono);}
+            #p4MainTabs,#p4SubTabs{overflow-x:auto;}
+            #page4 .qa6-tab{white-space:nowrap;}
+            #page4 .p4-pane:not(#p4Pane-rules):not(#p4Pane-records) .dash-table :is(th,td){white-space:nowrap;}
+            .p4-form{display:grid;grid-template-columns:150px 1fr;gap:12px 14px;align-items:center;font-size:13px;}
+            .p4-form>label{color:var(--text-secondary);text-align:right;}
+            .p4-row{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;}
+            .p4-col{display:flex;flex-direction:column;gap:8px;}
+            .p4-chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;}
+            .p4-chk input{width:auto;margin:0;}
+            .p4-pane input.p4-in,.p4-pane select.p4-in{width:auto;padding:5px 8px;display:inline-block;}
+            .p4-drop{flex:1;min-width:240px;max-width:520px;border:1px dashed var(--border-card-hover);border-radius:var(--radius-sm);padding:8px 12px;color:var(--text-muted);font-size:12px;}
+            .p4-drop b{color:var(--text-primary);}
+            .p4-hint{font-size:12px;color:var(--text-muted);}
+            .p4-funnel{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;margin-bottom:12px;}
+            .p4-funnel .st{padding:4px 10px;border-radius:999px;border:1px solid var(--border-card);background:var(--bg-input);white-space:nowrap;}
+            .p4-funnel .st b{color:var(--text-primary);}
+            .p4-funnel .minus b{color:var(--warning);}
+            .p4-funnel .ok b{color:var(--success);}
+            .p4-kv{display:flex;flex-wrap:wrap;gap:8px 28px;font-size:13px;margin-bottom:12px;align-items:center;}
+            .p4-kv span{color:var(--text-muted);}
+            .p4-spark{cursor:zoom-in;display:block;}
+            .p4-detail td{vertical-align:middle;}
+            .p4-detail tr.vfirst td{border-top:1px solid var(--border-card);}
+            .p4-detail select{padding:4px 6px;font-size:12px;min-width:96px;}
+            .p4-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;align-items:center;}
+            @media (max-width:760px){.p4-form{grid-template-columns:1fr}.p4-form>label{text-align:left}}
+        </style>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
             <div style="font-size:15px;color:var(--text-secondary);">预警闭环管理</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 <select id="p4Customer" style="width:150px;">${Utils.customerOptions()}</select>
                 <button class="btn btn-sm btn-secondary" id="p4AiAnalyze">&#9889; AI 分析</button>
             </div>
         </div>
-        <div id="p4Rules" style="margin-bottom:16px;"></div>
-        <details id="p4WarnDetails" style="margin-bottom:16px;">
-            <summary style="cursor:pointer;font-size:14px;font-weight:700;color:var(--text-secondary);padding:8px 4px;user-select:none;">
-                📋 预警记录（按 容量 × 失效模式 聚合 · 本地闭环维护，点击展开）
-            </summary>
-            <div style="padding:6px 4px 0;">
-                <div class="filter-bar">
-                    <div class="form-group">
-                        <label>容量Ah</label>
-                        <input type="text" id="p4Capacity" placeholder="如 116">
-                    </div>
-                    <div class="form-group">
-                        <label>闭环状态</label>
-                        <select id="p4Status">
-                            <option value="">全部</option>
-                            <option value="已闭环">已闭环</option>
-                            <option value="未闭环">未闭环</option>
-                            <option value="处理中">处理中</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>失效模式</label>
-                        <input type="text" id="p4FailureMode" placeholder="关键词...">
-                    </div>
-                    <button class="btn btn-primary" id="p4Search">查 询</button>
-                    <button class="btn btn-success" id="p4Add">+ 新增</button>
+        <div class="qa6-tab-bar" id="p4MainTabs">
+            ${Object.entries(this._TABS).map(([k, t]) => `<button class="qa6-tab" data-main="${k}" onclick="Page4.showTab('${k}')">${t.name}</button>`).join('')}
+        </div>
+        <div class="qa6-tab-bar-sub" id="p4SubTabs"></div>
+        <div class="p4-pane" id="p4Pane-rules"><div id="p4Rules" style="margin-bottom:16px;"></div></div>
+        ${panes}
+        <div class="p4-pane" id="p4Pane-records" style="display:none;">
+            <div class="filter-bar">
+                <div class="form-group">
+                    <label>容量Ah</label>
+                    <input type="text" id="p4Capacity" placeholder="如 116">
                 </div>
-                <div id="p4List"></div>
+                <div class="form-group">
+                    <label>闭环状态</label>
+                    <select id="p4Status">
+                        <option value="">全部</option>
+                        <option value="已闭环">已闭环</option>
+                        <option value="未闭环">未闭环</option>
+                        <option value="处理中">处理中</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>失效模式</label>
+                    <input type="text" id="p4FailureMode" placeholder="关键词...">
+                </div>
+                <button class="btn btn-primary" id="p4Search">查 询</button>
+                <button class="btn btn-success" id="p4Add">+ 新增</button>
             </div>
-        </details>`;
+            <div id="p4List"></div>
+        </div>`;
+    },
+
+    showTab(main, sub) {
+        const tab = this._TABS[main];
+        if (!tab) return;
+        sub = sub || (this._lastSub && this._lastSub[main]) || tab.subs[0][0];
+        this._lastSub = Object.assign(this._lastSub || {}, { [main]: sub });
+        this._main = main;
+        document.querySelectorAll('#p4MainTabs .qa6-tab').forEach(b => b.classList.toggle('qa6-tab-active', b.dataset.main === main));
+        const subBar = document.getElementById('p4SubTabs');
+        subBar.style.display = tab.subs.length > 1 ? '' : 'none';
+        subBar.innerHTML = tab.subs.map(([k, n]) =>
+            `<button class="qa6-tab${k === sub ? ' qa6-tab-active' : ''}" onclick="Page4.showTab('${main}','${k}')">${n}</button>`).join('');
+        document.querySelectorAll('#page4 .p4-pane').forEach(p => { p.style.display = p.id === 'p4Pane-' + sub ? '' : 'none'; });
+        this._rendered = this._rendered || {};
+        if (this._rendered[sub]) return;
+        this._rendered[sub] = true;
+        const render = {
+            batch: () => this.renderBatch(), vehicle: () => this.renderVehicles(), nosend: () => this.renderNoSend(),
+            risk: () => this.renderRisk(), rvrule: () => this.renderRvRules(), rvreg: () => this.renderRvReg(),
+            rvconfirm: () => this.renderRvTasks(),
+            records: () => { this._warnLoaded = true; this.loadList(); },
+        }[sub];
+        if (render) render();
     },
 
     bindEvents() {
@@ -10786,14 +10852,6 @@ const Page4 = {
         if (add) add.onclick = () => this.openForm();
         const aiBtn = document.getElementById('p4AiAnalyze');
         if (aiBtn) aiBtn.onclick = () => this.aiAnalyze();
-        // 折叠区首次展开时才加载预警记录
-        const details = document.getElementById('p4WarnDetails');
-        if (details) details.addEventListener('toggle', () => {
-            if (details.open && !this._warnLoaded) {
-                this._warnLoaded = true;
-                this.loadList();
-            }
-        });
         // 顶部客户切换 → 联动外发规则筛选 + 重查预警记录
         const cust = document.getElementById('p4Customer');
         if (cust) cust.onchange = () => {
@@ -11008,6 +11066,667 @@ const Page4 = {
         } else {
             Toast.error((res && res.error) || '删除失败');
         }
+    },
+
+    // ============ 预警外发 / 复核闭环：离线演示数据（内存态，刷新即重置） ============
+    _GROUPS: ['售后服务组', '电芯研发组', 'BMS 算法组', '质量工程组', '客户项目组'],
+    _SUGGESTS: ['建议外发', '持续观察', '远程 OTA 修复', '返厂拆解', '无需处置'],
+    _CONCLUSIONS: ['异常', '疑似异常', '正常', '数据不足'],
+    _RV_ITEMS: ['自放电', '绝缘', '温差', '电压'],
+    _PEOPLE: ['张伟', '李娜', '王磊', '刘洋', '陈静', '赵敏'],
+    // 内部复核预警原因 → 客户预警原因（下拉选择后自动带出）
+    _REASONS: {
+        '绝缘阻值持续偏低': '电池包绝缘性能下降，建议尽快进店检测',
+        '自放电率超阈值': '电池存在自放电偏大风险，建议进店检测',
+        '单体温差偏大': '电池温度一致性异常，建议进店检查热管理系统',
+        '单体压差扩大': '电池电压一致性下降，建议进店做均衡维护',
+        'SOH 衰减过快': '电池健康度下降较快，建议进店检测',
+    },
+    _TPL_COLS: ['VIN', 'deviceid', 'OEM', 'LSS风险分', '预警次数', '里程(km)', '车龄(年)'],
+
+    _rnd(seed) { let x = seed % 233280; return () => (x = (x * 9301 + 49297) % 233280) / 233280; },
+    _day(offset, base) { const d = base ? new Date(base) : new Date(); d.setDate(d.getDate() + (offset || 0)); return d.toISOString().slice(0, 10); },
+    _vin(r) { const cs = 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789'; let s = 'LGX'; for (let i = 0; i < 14; i++) s += cs[Math.floor(r() * cs.length)]; return s; },
+    _me() { return (window.App && App.user && (App.user.name || App.user.username)) || '系统管理员'; },
+
+    _data() {
+        if (this._d) return this._d;
+        const r = this._rnd(20261018);
+        const oems = ['SHEV', 'CNEV', 'BYD', 'XMS', 'NIO'];
+        const models = { SHEV: 'L6', CNEV: 'eπ007', BYD: '海豹', XMS: 'SU7', NIO: 'ET5' };
+        const caps = ['153Ah', '100Ah', '75Ah', '50Ah'];
+        const vehicles = Array.from({ length: 60 }, (_, i) => {
+            const oem = oems[i % 5], mileage = Math.round(3000 + r() * 170000), age = +(0.5 + r() * 9).toFixed(1);
+            return {
+                vin: this._vin(r), deviceid: 'DEV' + (810000 + i * 37), oem, model: models[oem],
+                ecm: 'ECM-' + (2300 + Math.floor(r() * 600)), cell: caps[i % 4], soh: +(84 + r() * 15).toFixed(1),
+                mileage, age, deliver: this._day(-Math.round(age * 365)),
+                warranty: mileage > 120000 || age > 8 ? '过保' : '在保',
+                wo3m: r() < 0.18, human: r() < 0.06, lastSend: r() < 0.22 ? this._day(-Math.ceil(r() * 20)) : '',
+            };
+        });
+        const nosend = vehicles.filter((_, i) => i % 9 === 4).map((v, i) => ({
+            id: i + 1, vin: v.vin, oem: v.oem, reason: ['客户要求暂缓外发', '车辆已报废', '在库维修中', '试验车/工程车', '已签保密协议'][i % 5],
+            until: this._day(30 + i * 15), source: i % 2 ? '手动新增' : '不外发清单_1015.xlsx', by: this._PEOPLE[i % 6], at: this._day(-i - 2) + ' 10:2' + i,
+        }));
+        const risks = [
+            { id: 1, title: '153Ah 铁锂批次自放电偏大专项报告', oem: 'SHEV', type: '自放电异常', level: '高', file: '153Ah自放电专项_v2.pdf', by: '李娜', at: this._day(-3), status: '待评审' },
+            { id: 2, title: '海豹车型绝缘告警复盘', oem: 'BYD', type: '绝缘故障', level: '中', file: '海豹绝缘复盘.pptx', by: '王磊', at: this._day(-9), status: '已评审' },
+            { id: 3, title: 'SU7 热管理温差问题 8D', oem: 'XMS', type: '热失控预警', level: '高', file: 'SU7温差8D.docx', by: '陈静', at: this._day(-15), status: '已评审' },
+            { id: 4, title: '50Ah 圆柱压差扩大趋势分析', oem: 'NIO', type: '压差报警', level: '低', file: '50Ah压差趋势.xlsx', by: '刘洋', at: this._day(-21), status: '已关闭' },
+        ];
+        const rvRules = [
+            { id: 1, item: '自放电', logic: '静置段 ΔSOC / 静置时长', threshold: '> 3 %/天', window: '近 30 天', suggest: '建议外发', send: '是', on: true },
+            { id: 2, item: '绝缘', logic: '绝缘阻值最小值 & 下降斜率', threshold: '< 500 Ω/V', window: '近 14 天', suggest: '建议外发', send: '是', on: true },
+            { id: 3, item: '温差', logic: '充电段单体最大温差', threshold: '> 8 ℃', window: '近 7 天', suggest: '持续观察', send: '否', on: true },
+            { id: 4, item: '电压', logic: '末端压差 & 压差扩大速率', threshold: '> 80 mV', window: '近 30 天', suggest: '远程 OTA 修复', send: '否', on: false },
+        ];
+        this._d = { vehicles, nosend, risks, rvRules, tasks: [], batches: [], vehUpdatedAt: this._day(-1) + ' 02:00', seq: 3 };
+        // 预置 3 个复核任务：1 个已完成、1 个进行中、1 个已逾期
+        [[-2, ['自放电', '绝缘'], 6, true], [3, ['绝缘', '温差'], 8, false], [-1, ['自放电', '电压'], 5, false]].forEach((t, i) => {
+            const task = this._newTask(this._day(-6 + i * 2), t[0], t[1], vehicles.slice(i * 10, i * 10 + t[2]), this._PEOPLE[i], this._PEOPLE[i + 3], r);
+            if (t[3]) { task.status = '已完成'; task.rows.forEach((x, k) => { x.conclusion = this._CONCLUSIONS[k % 3]; x.suggest = x.conclusion === '正常' ? '无需处置' : this._SUGGESTS[k % 2]; x.send = x.suggest === '建议外发'; }); }
+            else if (i === 1) task.rows.slice(0, 5).forEach((x, k) => { x.conclusion = this._CONCLUSIONS[k % 3]; x.suggest = this._SUGGESTS[k % 3]; });
+            this._d.tasks.unshift(task);
+        });
+        return this._d;
+    },
+
+    _newTask(createdDay, deadlineOffset, items, vehs, pm, reviewer, r) {
+        r = r || this._rnd(Date.now());
+        const d = this._d;
+        const code = createdDay.replace(/-/g, '') + '-' + String(++d.seq).padStart(3, '0');
+        const rows = [];
+        vehs.forEach(v => items.forEach(it => rows.push({
+            vin: v.vin, deviceid: v.deviceid, ecm: v.ecm, item: it, seed: Math.floor(r() * 1e6), abn: r() < 0.45,
+            conclusion: '', suggest: '', send: false, group: '', hold: false,
+        })));
+        return { code, created: createdDay, deadline: this._day(deadlineOffset), items, pm, reviewer, count: vehs.length, rows, status: '未完成', note: '' };
+    },
+
+    _fileBox(id, tplName, cols, hint) {
+        return `<div class="p4-row">
+            <div class="p4-drop" id="${id}Name">${hint || '支持 .xlsx / .csv，需使用固定模板'}</div>
+            <label class="btn btn-sm btn-primary" style="cursor:pointer;">选择文件<input type="file" id="${id}" accept=".xlsx,.xls,.csv" style="display:none;"></label>
+            <button class="btn btn-sm btn-secondary" onclick="Page4.downloadTpl('${tplName}','${cols.join(',')}')">下载模板</button>
+        </div>`;
+    },
+    downloadTpl(name, cols) {
+        const blob = new Blob(['﻿' + cols + '\n'], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = name + '.csv'; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    },
+    _onFile(id, cb) {
+        const el = document.getElementById(id);
+        if (el) el.onchange = () => { const f = el.files[0]; if (f) cb(f); };
+    },
+
+    // ---------- 批量外发：上传清单 → 外发规则过滤 → 排序 → 按日排程 ----------
+    renderBatch() {
+        const box = document.getElementById('p4Pane-batch');
+        const reasons = Object.keys(this._REASONS);
+        box.innerHTML = `<div class="card">
+            <div class="card-title">批量外发（非常规外发）</div>
+            <div class="p4-form">
+                <label>上传清单</label>
+                <div>${this._fileBox('p4BFile', '批量外发清单模板', this._TPL_COLS, `固定模板列：${this._TPL_COLS.join(' / ')}`)}
+                    <div class="p4-hint" style="margin-top:6px;">离线演示：选择任意文件即按模板生成 1000 条示例车辆，或 <span class="lk" onclick="Page4._loadBatch('示例清单.xlsx')">直接载入示例清单</span></div></div>
+
+                <label>外发规则</label>
+                <div class="p4-col">
+                    <label class="p4-chk"><input type="checkbox" id="p4BWo" checked>排除售后工单（近 <input class="p4-in" id="p4BWoM" type="number" value="3" style="width:56px;"> 个月内有工单）</label>
+                    <label class="p4-chk"><input type="checkbox" id="p4BHuman">排除人为损坏（ASS 判定）</label>
+                    <label class="p4-chk"><input type="checkbox" id="p4BWar" checked>排除过保：里程 ≥ <input class="p4-in" id="p4BMile" type="number" value="120000" style="width:96px;"> km，或年限 ≥ <input class="p4-in" id="p4BAge" type="number" value="8" style="width:56px;"> 年</label>
+                    <label class="p4-chk"><input type="checkbox" id="p4BRecent" checked>排除近 <input class="p4-in" id="p4BRecentD" type="number" value="7" style="width:56px;"> 日已外发车辆</label>
+                    <label class="p4-chk"><input type="checkbox" id="p4BNo" checked>排除「不外发车辆管理」清单内车辆</label>
+                </div>
+
+                <label>排序依据列</label>
+                <div class="p4-row">
+                    <select class="p4-in" id="p4BSort">${this._TPL_COLS.slice(3).map(c => `<option>${c}</option>`).join('')}</select>
+                    <span class="p4-hint">排序方式</span>
+                    <label class="p4-chk"><input type="radio" name="p4BOrd" value="desc" checked>从大到小</label>
+                    <label class="p4-chk"><input type="radio" name="p4BOrd" value="asc">从小到大</label>
+                </div>
+
+                <label>外发数量</label>
+                <div class="p4-row"><input class="p4-in" id="p4BPer" type="number" value="8" min="1" style="width:80px;"> <span>条 / 日</span></div>
+
+                <label>外发日期</label>
+                <div class="p4-row">
+                    <span class="p4-hint">最早开始外发</span><input class="p4-in" type="date" id="p4BStart" value="${this._day(0)}">
+                    <span class="p4-hint">最晚外发结束</span><input class="p4-in" type="date" id="p4BEnd" value="${this._day(7)}">
+                </div>
+
+                <label>内部复核预警原因</label>
+                <div><select class="p4-in" id="p4BReason" style="min-width:260px;">${reasons.map(x => `<option>${x}</option>`).join('')}</select></div>
+
+                <label>客户预警原因</label>
+                <div class="p4-row"><input type="text" id="p4BCust" readonly style="max-width:520px;" value="${Utils.esc(this._REASONS[reasons[0]])}"><span class="p4-hint">根据内部原因自动带出</span></div>
+
+                <label></label>
+                <div><button class="btn btn-primary" onclick="Page4.submitBatch()">提 交</button></div>
+            </div>
+        </div>
+        <div id="p4BResult"></div>
+        <div id="p4BHistory"></div>`;
+        this._onFile('p4BFile', f => this._loadBatch(f.name));
+        document.getElementById('p4BReason').onchange = e => { document.getElementById('p4BCust').value = this._REASONS[e.target.value] || ''; };
+        this._renderBatchHistory();
+    },
+
+    _loadBatch(fileName) {
+        const d = this._data(), r = this._rnd(fileName.length * 7919 + 17);
+        const noSet = new Set(d.nosend.map(x => x.vin));
+        const rows = Array.from({ length: 1000 }, (_, i) => {
+            const v = i < d.vehicles.length ? d.vehicles[i] : null;
+            const mileage = v ? v.mileage : Math.round(2000 + r() * 180000), age = v ? v.age : +(0.3 + r() * 10).toFixed(1);
+            const lastDays = v ? (v.lastSend ? Math.round((Date.now() - new Date(v.lastSend)) / 864e5) : null) : (r() < 0.1 ? Math.ceil(r() * 20) : null);
+            return {
+                vin: v ? v.vin : this._vin(r), deviceid: v ? v.deviceid : 'DEV' + (900000 + i), oem: v ? v.oem : ['SHEV', 'CNEV', 'BYD', 'XMS', 'NIO'][i % 5],
+                'LSS风险分': +(r() * 100).toFixed(1), '预警次数': 1 + Math.floor(r() * 30), '里程(km)': mileage, '车龄(年)': age,
+                woMonths: (v ? v.wo3m : r() < 0.15) ? 1 + Math.floor(r() * 5) : null, human: v ? v.human : r() < 0.05,
+                lastDays, inNo: v ? noSet.has(v.vin) : r() < 0.02,
+            };
+        });
+        this._batchRows = rows;
+        this._batchFile = fileName;
+        document.getElementById('p4BFileName').innerHTML = `已解析 <b>${Utils.esc(fileName)}</b>：共 <b>${rows.length}</b> 条车辆，字段校验通过`;
+        Toast.success(`清单已上传：${rows.length} 条`);
+    },
+
+    submitBatch() {
+        const rows = this._batchRows;
+        if (!rows) { Toast.error('请先上传外发清单'); return; }
+        const val = id => document.getElementById(id).value, on = id => document.getElementById(id).checked;
+        const start = val('p4BStart'), end = val('p4BEnd'), per = parseInt(val('p4BPer'), 10) || 0;
+        if (!start || !end || end < start) { Toast.error('请填写正确的外发起止日期'); return; }
+        if (per <= 0) { Toast.error('外发数量需大于 0'); return; }
+        const steps = [];
+        let left = rows;
+        const cut = (label, enabled, fn) => {
+            if (!enabled) return;
+            const before = left.length;
+            left = left.filter(x => !fn(x));
+            steps.push([label, before - left.length]);
+        };
+        const woM = +val('p4BWoM') || 3, mile = +val('p4BMile') || Infinity, age = +val('p4BAge') || Infinity, recent = +val('p4BRecentD') || 0;
+        cut(`售后工单(近${woM}月)`, on('p4BWo'), x => x.woMonths && x.woMonths <= woM);
+        cut('人为损坏', on('p4BHuman'), x => x.human);
+        cut('过保', on('p4BWar'), x => x['里程(km)'] >= mile || x['车龄(年)'] >= age);
+        cut(`近${recent}日已外发`, on('p4BRecent'), x => x.lastDays != null && x.lastDays <= recent);
+        cut('不外发清单', on('p4BNo'), x => x.inNo);
+        const col = val('p4BSort'), desc = document.querySelector('input[name="p4BOrd"]:checked').value === 'desc';
+        left = left.slice().sort((a, b) => desc ? b[col] - a[col] : a[col] - b[col]);
+        const days = Math.round((new Date(end) - new Date(start)) / 864e5) + 1;
+        const cap = days * per, planned = left.slice(0, cap);
+        const plan = Array.from({ length: days }, (_, i) => ({ date: this._day(i, start), rows: planned.slice(i * per, (i + 1) * per) })).filter(p => p.rows.length);
+        this._batchPlan = { plan, reason: val('p4BReason'), cust: val('p4BCust'), col, desc, total: rows.length, cand: left.length, file: this._batchFile };
+        const fmt = n => n.toLocaleString();
+        document.getElementById('p4BResult').innerHTML = `<div class="card">
+            <div class="card-title">外发预览</div>
+            <div class="p4-funnel">
+                <span class="st">上传 <b>${fmt(rows.length)}</b></span>
+                ${steps.map(([l, n]) => `<span>→</span><span class="st minus">排除${l} <b>-${fmt(n)}</b></span>`).join('')}
+                <span>→</span><span class="st">候选 <b>${fmt(left.length)}</b></span>
+                <span>→</span><span class="st ok">排程 <b>${fmt(planned.length)}</b></span>
+                ${left.length > cap ? `<span class="st minus">超出产能未排 <b>${fmt(left.length - cap)}</b></span>` : ''}
+            </div>
+            <div class="p4-kv"><div><span>排序：</span>${Utils.esc(col)} ${desc ? '从大到小' : '从小到大'}</div><div><span>产能：</span>${days} 天 × ${per} 条/日 = ${cap} 条</div><div><span>客户预警原因：</span>${Utils.esc(this._batchPlan.cust)}</div></div>
+            <div class="table-wrapper" style="max-height:46vh;overflow:auto;"><table class="dash-table" style="font-size:12px;">
+                <thead><tr><th>外发日期</th><th class="num">条数</th><th>VIN（按排序）</th><th class="num">${Utils.esc(col)}</th><th data-no-sort>操作</th></tr></thead>
+                <tbody>${plan.map((p, i) => `<tr><td>${p.date}</td><td class="num">${p.rows.length}</td>
+                    <td class="mono" style="font-size:11px;">${p.rows.slice(0, 3).map(x => x.vin).join('、')}${p.rows.length > 3 ? ' …' : ''}</td>
+                    <td class="num">${p.rows[0][col]} ~ ${p.rows[p.rows.length - 1][col]}</td>
+                    <td><span class="lk" onclick="Page4.showPlanDay(${i})">查看明细</span></td></tr>`).join('') || '<tr><td colspan="5" class="empty-state">过滤后无可外发车辆</td></tr>'}</tbody>
+            </table></div>
+            <div class="p4-foot"><span class="p4-hint">确认后按日生成外发任务，推送客户</span><button class="btn btn-primary" ${plan.length ? '' : 'disabled'} onclick="Page4.confirmBatch()">确认外发</button></div>
+        </div>`;
+    },
+
+    showPlanDay(i) {
+        const p = this._batchPlan.plan[i], col = this._batchPlan.col;
+        Modal.open(`<div class="modal-header"><h3>${p.date} 外发明细（${p.rows.length} 条）</h3><button class="modal-close" onclick="Modal.close()">&times;</button></div>
+            <div class="table-wrapper" style="max-height:60vh;overflow:auto;"><table class="dash-table" style="font-size:12px;">
+            <thead><tr><th>#</th><th>VIN</th><th>deviceid</th><th>OEM</th><th class="num">LSS风险分</th><th class="num">预警次数</th><th class="num">里程(km)</th><th class="num">车龄(年)</th></tr></thead>
+            <tbody>${p.rows.map((x, k) => `<tr><td>${k + 1}</td><td class="mono">${x.vin}</td><td>${x.deviceid}</td><td>${x.oem}</td>
+                <td class="num"${col === 'LSS风险分' ? ' style="font-weight:700;"' : ''}>${x['LSS风险分']}</td><td class="num">${x['预警次数']}</td><td class="num">${x['里程(km)'].toLocaleString()}</td><td class="num">${x['车龄(年)']}</td></tr>`).join('')}</tbody>
+            </table></div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="Modal.close()">关闭</button></div>`);
+    },
+
+    confirmBatch() {
+        const b = this._batchPlan, d = this._data();
+        if (!b || !b.plan.length) return;
+        const n = b.plan.reduce((s, p) => s + p.rows.length, 0);
+        const sent = new Set(b.plan.flatMap(p => p.rows.map(x => x.vin)));
+        d.vehicles.forEach(v => { if (sent.has(v.vin)) v.lastSend = b.plan.find(p => p.rows.some(x => x.vin === v.vin)).date; });
+        d.batches.unshift({ no: 'WF' + this._day(0).replace(/-/g, '') + '-' + String(d.batches.length + 1).padStart(2, '0'), file: b.file, total: b.total, cand: b.cand, n,
+            start: b.plan[0].date, end: b.plan[b.plan.length - 1].date, reason: b.reason, by: this._me(), at: new Date().toTimeString().slice(0, 5) });
+        this._batchPlan = null;
+        document.getElementById('p4BResult').innerHTML = '';
+        this._renderBatchHistory();
+        Toast.success(`已生成外发任务：${n} 条，按日推送`);
+    },
+
+    _renderBatchHistory() {
+        const list = this._data().batches, el = document.getElementById('p4BHistory');
+        if (!el) return;
+        el.innerHTML = list.length ? `<div class="card"><div class="card-title">外发批次记录</div>
+            <div class="table-wrapper"><table class="dash-table" style="font-size:12px;">
+            <thead><tr><th>批次号</th><th>清单文件</th><th class="num">上传</th><th class="num">候选</th><th class="num">外发</th><th>外发周期</th><th>内部复核预警原因</th><th>提交人</th><th>提交时间</th></tr></thead>
+            <tbody>${list.map(x => `<tr><td class="mono">${x.no}</td><td>${Utils.esc(x.file)}</td><td class="num">${x.total}</td><td class="num">${x.cand}</td><td class="num"><b>${x.n}</b></td>
+                <td>${x.start} ~ ${x.end}</td><td>${Utils.esc(x.reason)}</td><td>${Utils.esc(x.by)}</td><td>今天 ${x.at}</td></tr>`).join('')}</tbody>
+            </table></div></div>` : '';
+    },
+
+    // ---------- 车辆信息管理 ----------
+    renderVehicles() {
+        const box = document.getElementById('p4Pane-vehicle'), d = this._data();
+        box.innerHTML = `<div class="card">
+            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <span>车辆信息管理（共 ${d.vehicles.length} 台）</span>
+                <div class="p4-row" style="gap:8px;">
+                    <select class="p4-in" id="p4VOem"><option value="">全部客户</option>${['SHEV', 'CNEV', 'BYD', 'XMS', 'NIO'].map(o => `<option>${o}</option>`).join('')}</select>
+                    <select class="p4-in" id="p4VFlag"><option value="">全部车辆</option><option value="send">可外发</option><option value="block">不可外发</option></select>
+                    <input class="p4-in" id="p4VKey" placeholder="VIN / deviceid" style="width:170px;">
+                    <span class="p4-hint" id="p4VUpd">数据更新于 ${d.vehUpdatedAt}</span>
+                    <button class="btn btn-sm btn-primary" onclick="Page4.refreshVehicles()">⟳ 更新车辆信息</button>
+                </div>
+            </div>
+            <div class="table-wrapper" style="max-height:62vh;overflow:auto;"><table class="dash-table" id="p4VTable" style="font-size:12px;">
+                <thead><tr><th>VIN</th><th>deviceid</th><th>OEM</th><th>车型</th><th>ECM</th><th>Cell</th><th class="num">SOH%</th><th class="num">里程(km)</th><th>交付日期</th><th>质保</th><th>近3月售后工单</th><th>人为损坏(ASS)</th><th>最近外发</th><th>外发判定</th></tr></thead>
+                <tbody id="p4VBody"></tbody>
+            </table></div>
+            <div class="p4-hint" id="p4VCount" style="padding:6px 2px;"></div>
+        </div>`;
+        const noSet = () => new Set(this._data().nosend.map(x => x.vin));
+        const render = () => {
+            const oem = document.getElementById('p4VOem').value, flag = document.getElementById('p4VFlag').value, key = document.getElementById('p4VKey').value.trim().toUpperCase();
+            const ns = noSet();
+            const rows = this._data().vehicles.map(v => {
+                const why = [v.human && '人为损坏', ns.has(v.vin) && '不外发清单', v.warranty === '过保' && '过保', v.wo3m && '售后工单'].filter(Boolean);
+                return { v, why };
+            }).filter(({ v, why }) => (!oem || v.oem === oem) && (!key || v.vin.includes(key) || v.deviceid.toUpperCase().includes(key))
+                && (!flag || (flag === 'send' ? !why.length : why.length)));
+            document.getElementById('p4VBody').innerHTML = rows.map(({ v, why }) => `<tr>
+                <td class="mono" style="font-size:11px;">${v.vin}</td><td>${v.deviceid}</td><td><b>${v.oem}</b></td><td>${Utils.esc(v.model)}</td><td>${v.ecm}</td><td>${v.cell}</td>
+                <td class="num" style="color:${v.soh < 88 ? 'var(--warning)' : 'inherit'}">${v.soh}</td><td class="num">${v.mileage.toLocaleString()}</td><td>${v.deliver}</td>
+                <td>${v.warranty === '过保' ? '<span class="badge badge-warning">过保</span>' : '<span class="badge badge-success">在保</span>'}</td>
+                <td>${v.wo3m ? '<span class="badge badge-info">有</span>' : '-'}</td>
+                <td>${v.human ? '<span class="badge badge-danger">是</span>' : '-'}</td>
+                <td>${v.lastSend || '-'}</td>
+                <td>${why.length ? `<span class="badge badge-warning" title="${why.join('、')}">不外发 · ${why[0]}</span>` : '<span class="badge badge-success">可外发</span>'}</td></tr>`).join('')
+                || '<tr><td colspan="14" class="empty-state">无匹配车辆</td></tr>';
+            document.getElementById('p4VCount').textContent = `匹配 ${rows.length} 台 · 人为损坏（ASS）车辆不外发 · 点击表头可排序`;
+            if (Utils.enableTableSort) Utils.enableTableSort(document.getElementById('p4VTable'));
+        };
+        this._renderVehicles = render;
+        ['p4VOem', 'p4VFlag'].forEach(id => { document.getElementById(id).onchange = render; });
+        document.getElementById('p4VKey').oninput = render;
+        render();
+    },
+    refreshVehicles() {
+        const d = this._data(), now = new Date();
+        d.vehUpdatedAt = this._day(0) + ' ' + now.toTimeString().slice(0, 5);
+        document.getElementById('p4VUpd').textContent = '数据更新于 ' + d.vehUpdatedAt;
+        if (this._renderVehicles) this._renderVehicles();
+        Toast.success('车辆信息已更新（ECM / Cell / SOH / 里程 / 售后工单 / ASS）');
+    },
+
+    // ---------- 不外发车辆管理 ----------
+    renderNoSend() {
+        const box = document.getElementById('p4Pane-nosend');
+        box.innerHTML = `<div class="card">
+            <div class="card-title">上传不外发车辆清单</div>
+            ${this._fileBox('p4NFile', '不外发车辆清单模板', ['VIN', 'OEM', '不外发原因', '有效期至'], '固定模板列：VIN / OEM / 不外发原因 / 有效期至')}
+            <div class="p4-hint" style="margin-top:6px;">清单内车辆在「批量外发」与日常外发中自动排除，过有效期后自动恢复。</div>
+        </div>
+        <div class="card"><div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+            <span id="p4NTitle"></span><button class="btn btn-sm btn-secondary" onclick="Page4.addNoSend()">+ 手动新增</button></div>
+            <div class="table-wrapper" style="max-height:56vh;overflow:auto;"><table class="dash-table" style="font-size:12px;">
+            <thead><tr><th>VIN</th><th>OEM</th><th>不外发原因</th><th>有效期至</th><th>来源</th><th>上传人</th><th>上传时间</th><th data-no-sort>操作</th></tr></thead>
+            <tbody id="p4NBody"></tbody></table></div></div>`;
+        this._onFile('p4NFile', f => {
+            const d = this._data(), r = this._rnd(f.name.length * 31 + d.nosend.length);
+            const add = d.vehicles.filter(v => !d.nosend.some(x => x.vin === v.vin)).slice(0, 3 + Math.floor(r() * 3));
+            add.forEach(v => d.nosend.unshift({ id: Date.now() + Math.random(), vin: v.vin, oem: v.oem, reason: '客户要求暂缓外发', until: this._day(60), source: f.name, by: this._me(), at: this._day(0) + ' ' + new Date().toTimeString().slice(0, 5) }));
+            document.getElementById('p4NFileName').innerHTML = `已导入 <b>${Utils.esc(f.name)}</b>：新增 <b>${add.length}</b> 台`;
+            this._renderNoSendTable();
+            Toast.success(`不外发清单已导入 ${add.length} 台`);
+        });
+        this._renderNoSendTable();
+    },
+    _renderNoSendTable() {
+        const list = this._data().nosend, today = this._day(0);
+        document.getElementById('p4NTitle').textContent = `不外发车辆（共 ${list.length} 台）`;
+        document.getElementById('p4NBody').innerHTML = list.map(x => `<tr>
+            <td class="mono" style="font-size:11px;">${x.vin}</td><td><b>${x.oem}</b></td><td>${Utils.esc(x.reason)}</td>
+            <td>${x.until}${x.until < today ? ' <span class="badge badge-secondary">已过期</span>' : ''}</td><td>${Utils.esc(x.source)}</td><td>${Utils.esc(x.by)}</td><td>${x.at}</td>
+            <td><button class="btn btn-sm btn-danger" onclick="Page4.delNoSend(${x.id})">移除</button></td></tr>`).join('') || '<tr><td colspan="8" class="empty-state">暂无</td></tr>';
+    },
+    addNoSend() {
+        Modal.open(`<div class="modal-header"><h3>新增不外发车辆</h3><button class="modal-close" onclick="Modal.close()">&times;</button></div>
+            <div class="form-group"><label>VIN *</label><input type="text" id="p4NVin" placeholder="17 位 VIN"></div>
+            <div class="form-row">
+                <div class="form-group"><label>OEM</label><select id="p4NOem">${['SHEV', 'CNEV', 'BYD', 'XMS', 'NIO'].map(o => `<option>${o}</option>`).join('')}</select></div>
+                <div class="form-group"><label>有效期至</label><input type="date" id="p4NUntil" value="${this._day(90)}"></div>
+            </div>
+            <div class="form-group"><label>不外发原因</label><input type="text" id="p4NReason" placeholder="如：客户要求暂缓外发"></div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="Modal.close()">取消</button><button class="btn btn-primary" onclick="Page4.saveNoSend()">保存</button></div>`);
+    },
+    saveNoSend() {
+        const vin = document.getElementById('p4NVin').value.trim().toUpperCase();
+        if (!vin) { Toast.error('请填写 VIN'); return; }
+        this._data().nosend.unshift({ id: Date.now(), vin, oem: document.getElementById('p4NOem').value, reason: document.getElementById('p4NReason').value.trim() || '-',
+            until: document.getElementById('p4NUntil').value, source: '手动新增', by: this._me(), at: this._day(0) + ' ' + new Date().toTimeString().slice(0, 5) });
+        Modal.close();
+        this._renderNoSendTable();
+        Toast.success('已加入不外发清单');
+    },
+    delNoSend(id) {
+        if (!confirm('将该车辆移出不外发清单？')) return;
+        const d = this._data();
+        d.nosend = d.nosend.filter(x => x.id !== id);
+        this._renderNoSendTable();
+    },
+
+    // ---------- 风险机制管理：问题报告上传 ----------
+    renderRisk() {
+        const box = document.getElementById('p4Pane-risk');
+        box.innerHTML = `<div class="card">
+            <div class="card-title">问题报告上传</div>
+            <div class="p4-form">
+                <label>报告标题 *</label><div><input type="text" id="p4RTitle" placeholder="如：153Ah 批次自放电专项分析" style="max-width:520px;"></div>
+                <label>客户 / 风险类型</label>
+                <div class="p4-row">
+                    <select class="p4-in" id="p4ROem">${['SHEV', 'CNEV', 'BYD', 'XMS', 'NIO'].map(o => `<option>${o}</option>`).join('')}</select>
+                    <select class="p4-in" id="p4RType">${['绝缘故障', 'SOC 一致性', '容量衰减', '自放电异常', '压差报警', '热失控预警'].map(o => `<option>${o}</option>`).join('')}</select>
+                    <span class="p4-hint">风险等级</span>
+                    ${['高', '中', '低'].map((l, i) => `<label class="p4-chk"><input type="radio" name="p4RLevel" value="${l}" ${i === 1 ? 'checked' : ''}>${l}</label>`).join('')}
+                </div>
+                <label>报告文件 *</label>
+                <div class="p4-row"><div class="p4-drop" id="p4RFileName">支持 pdf / docx / pptx / xlsx</div>
+                    <label class="btn btn-sm btn-secondary" style="cursor:pointer;">选择文件<input type="file" id="p4RFile" style="display:none;"></label></div>
+                <label></label><div><button class="btn btn-primary" onclick="Page4.uploadRisk()">上 传</button></div>
+            </div>
+        </div>
+        <div class="card"><div class="card-title">风险问题报告</div>
+            <div class="table-wrapper"><table class="dash-table" style="font-size:12px;">
+            <thead><tr><th>报告标题</th><th>客户</th><th>风险类型</th><th>等级</th><th>文件</th><th>上传人</th><th>上传日期</th><th>状态</th><th data-no-sort>操作</th></tr></thead>
+            <tbody id="p4RBody"></tbody></table></div></div>`;
+        this._onFile('p4RFile', f => { this._riskFile = f.name; document.getElementById('p4RFileName').innerHTML = `已选择 <b>${Utils.esc(f.name)}</b>`; });
+        this._renderRiskTable();
+    },
+    _renderRiskTable() {
+        const lv = { 高: 'danger', 中: 'warning', 低: 'info' }, st = { 待评审: 'warning', 已评审: 'success', 已关闭: 'secondary' };
+        document.getElementById('p4RBody').innerHTML = this._data().risks.map(x => `<tr>
+            <td><b>${Utils.esc(x.title)}</b></td><td>${x.oem}</td><td>${Utils.esc(x.type)}</td><td><span class="badge badge-${lv[x.level]}">${x.level}</span></td>
+            <td><span class="lk" onclick="Toast.success('离线演示：不提供文件预览')">📎 ${Utils.esc(x.file)}</span></td><td>${Utils.esc(x.by)}</td><td>${x.at}</td>
+            <td><span class="badge badge-${st[x.status]}">${x.status}</span></td>
+            <td style="white-space:nowrap;">${x.status === '待评审' ? `<button class="btn btn-sm btn-secondary" onclick="Page4.reviewRisk(${x.id})">评审通过</button> ` : ''}<button class="btn btn-sm btn-danger" onclick="Page4.delRisk(${x.id})">删除</button></td></tr>`).join('')
+            || '<tr><td colspan="9" class="empty-state">暂无报告</td></tr>';
+    },
+    uploadRisk() {
+        const title = document.getElementById('p4RTitle').value.trim();
+        if (!title) { Toast.error('请填写报告标题'); return; }
+        if (!this._riskFile) { Toast.error('请选择报告文件'); return; }
+        const d = this._data();
+        d.risks.unshift({ id: Date.now(), title, oem: document.getElementById('p4ROem').value, type: document.getElementById('p4RType').value,
+            level: document.querySelector('input[name="p4RLevel"]:checked').value, file: this._riskFile, by: this._me(), at: this._day(0), status: '待评审' });
+        this._riskFile = null;
+        document.getElementById('p4RTitle').value = '';
+        document.getElementById('p4RFileName').textContent = '支持 pdf / docx / pptx / xlsx';
+        this._renderRiskTable();
+        Toast.success('问题报告已上传，待评审');
+    },
+    reviewRisk(id) { const x = this._data().risks.find(r => r.id === id); if (x) x.status = '已评审'; this._renderRiskTable(); },
+    delRisk(id) {
+        if (!confirm('删除该问题报告？')) return;
+        const d = this._data();
+        d.risks = d.risks.filter(x => x.id !== id);
+        this._renderRiskTable();
+    },
+
+    // ---------- 复核闭环 · 复核规则管理 ----------
+    renderRvRules() {
+        const box = document.getElementById('p4Pane-rvrule');
+        box.innerHTML = `<div class="card">
+            <div class="card-title">复核规则管理</div>
+            <div class="table-wrapper"><table class="dash-table" style="font-size:12px;">
+            <thead><tr><th>复核项</th><th>判定逻辑</th><th>阈值</th><th>观察窗口</th><th>默认处置建议</th><th>默认外发</th><th>状态</th><th data-no-sort>操作</th></tr></thead>
+            <tbody id="p4RvRBody"></tbody></table></div>
+            <div class="p4-hint" style="padding:6px 2px;">复核登记时按所选复核项套用对应规则；停用的规则不出现在复核登记里。</div>
+        </div>`;
+        this._renderRvRuleTable();
+    },
+    _renderRvRuleTable() {
+        document.getElementById('p4RvRBody').innerHTML = this._data().rvRules.map(x => `<tr>
+            <td><b>${x.item}</b></td><td>${Utils.esc(x.logic)}</td><td class="mono">${Utils.esc(x.threshold)}</td><td>${Utils.esc(x.window)}</td>
+            <td>${Utils.esc(x.suggest)}</td><td>${x.send}</td>
+            <td>${x.on ? '<span class="badge badge-success">启用</span>' : '<span class="badge badge-secondary">停用</span>'}</td>
+            <td style="white-space:nowrap;"><button class="btn btn-sm btn-secondary" onclick="Page4.editRvRule(${x.id})">编辑</button>
+                <button class="btn btn-sm ${x.on ? 'btn-danger' : 'btn-success'}" onclick="Page4.toggleRvRule(${x.id})">${x.on ? '停用' : '启用'}</button></td></tr>`).join('');
+    },
+    editRvRule(id) {
+        const x = this._data().rvRules.find(r => r.id === id);
+        Modal.open(`<div class="modal-header"><h3>编辑复核规则 · ${x.item}</h3><button class="modal-close" onclick="Modal.close()">&times;</button></div>
+            <div class="form-group"><label>判定逻辑</label><input type="text" id="p4RvLogic" value="${Utils.esc(x.logic)}"></div>
+            <div class="form-row">
+                <div class="form-group"><label>阈值</label><input type="text" id="p4RvTh" value="${Utils.esc(x.threshold)}"></div>
+                <div class="form-group"><label>观察窗口</label><input type="text" id="p4RvWin" value="${Utils.esc(x.window)}"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>默认处置建议</label><select id="p4RvSug">${this._SUGGESTS.map(s => `<option${s === x.suggest ? ' selected' : ''}>${s}</option>`).join('')}</select></div>
+                <div class="form-group"><label>默认外发</label><select id="p4RvSend"><option${x.send === '是' ? ' selected' : ''}>是</option><option${x.send === '否' ? ' selected' : ''}>否</option></select></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="Modal.close()">取消</button><button class="btn btn-primary" onclick="Page4.saveRvRule(${id})">保存</button></div>`);
+    },
+    saveRvRule(id) {
+        const x = this._data().rvRules.find(r => r.id === id), v = k => document.getElementById(k).value.trim();
+        Object.assign(x, { logic: v('p4RvLogic'), threshold: v('p4RvTh'), window: v('p4RvWin'), suggest: v('p4RvSug'), send: v('p4RvSend') });
+        Modal.close();
+        this._renderRvRuleTable();
+        Toast.success('复核规则已保存');
+    },
+    toggleRvRule(id) {
+        const x = this._data().rvRules.find(r => r.id === id);
+        x.on = !x.on;
+        this._renderRvRuleTable();
+        if (this._rendered && this._rendered.rvreg) this._renderRvItems();
+    },
+
+    // ---------- 复核闭环 · 复核登记 ----------
+    renderRvReg() {
+        const box = document.getElementById('p4Pane-rvreg');
+        box.innerHTML = `<div class="card">
+            <div class="card-title">复核登记</div>
+            <div class="p4-form">
+                <label>批量复核文件 *</label>
+                <div>${this._fileBox('p4GFile', '复核登记模板', ['deviceid', 'VIN', 'ECM', '复核原因'], '固定字段模板：deviceid / VIN / ECM / 复核原因')}
+                    <div class="p4-hint" style="margin-top:6px;">离线演示：选择任意文件即生成示例车辆，或 <span class="lk" onclick="Page4._loadRvFile('示例复核清单.xlsx')">载入示例</span></div></div>
+                <label>复核类别 *</label><div class="p4-row" id="p4GItems"></div>
+                <label>PM</label><div><select class="p4-in" id="p4GPm" style="min-width:160px;">${this._PEOPLE.map(p => `<option>${p}</option>`).join('')}</select></div>
+                <label>指定复核人 *</label><div><select class="p4-in" id="p4GReviewer" style="min-width:160px;">${this._PEOPLE.map((p, i) => `<option${i === 3 ? ' selected' : ''}>${p}</option>`).join('')}</select></div>
+                <label>最晚交付日期 *</label><div><input class="p4-in" type="date" id="p4GDeadline" value="${this._day(7)}"></div>
+                <label>备注</label><div><input type="text" id="p4GNote" placeholder="选填" style="max-width:520px;"></div>
+                <label></label><div class="p4-row"><button class="btn btn-primary" onclick="Page4.submitRvReg()">确认提交</button><span id="p4GDone" class="p4-hint"></span></div>
+            </div>
+        </div>
+        <div class="card"><div class="card-title">登记记录</div>
+            <div class="table-wrapper"><table class="dash-table" style="font-size:12px;">
+            <thead><tr><th>任务编码</th><th>登记日期</th><th class="num">车辆数</th><th>复核项</th><th>PM</th><th>复核人</th><th>最晚交付日期</th><th>状态</th></tr></thead>
+            <tbody id="p4GBody"></tbody></table></div></div>`;
+        this._renderRvItems();
+        this._onFile('p4GFile', f => this._loadRvFile(f.name));
+        this._renderRvRegTable();
+    },
+    _renderRvItems() {
+        const el = document.getElementById('p4GItems');
+        if (!el) return;
+        const rules = this._data().rvRules;
+        el.innerHTML = this._RV_ITEMS.map((it, i) => {
+            const on = (rules.find(r => r.item === it) || {}).on;
+            return `<label class="p4-chk" style="${on ? '' : 'opacity:.45;cursor:not-allowed;'}" title="${on ? '' : '该复核规则已停用'}"><input type="checkbox" name="p4GItem" value="${it}" ${on && i < 2 ? 'checked' : ''} ${on ? '' : 'disabled'}>${it}</label>`;
+        }).join('');
+    },
+    _loadRvFile(name) {
+        const vs = this._data().vehicles, r = this._rnd(name.length * 131 + Date.now() % 997);
+        const start = Math.floor(r() * (vs.length - 20));
+        this._rvVehs = vs.slice(start, start + 8 + Math.floor(r() * 12));
+        this._rvFile = name;
+        document.getElementById('p4GFileName').innerHTML = `已解析 <b>${Utils.esc(name)}</b>：<b>${this._rvVehs.length}</b> 台车辆，字段校验通过`;
+    },
+    submitRvReg() {
+        if (!this._rvVehs) { Toast.error('请先上传批量复核文件'); return; }
+        const items = [...document.querySelectorAll('input[name="p4GItem"]:checked')].map(x => x.value);
+        if (!items.length) { Toast.error('请至少选择一个复核类别'); return; }
+        const deadline = document.getElementById('p4GDeadline').value;
+        if (!deadline) { Toast.error('请填写最晚交付日期'); return; }
+        const d = this._data();
+        const off = Math.round((new Date(deadline) - new Date(this._day(0))) / 864e5);
+        const task = this._newTask(this._day(0), off, items, this._rvVehs, document.getElementById('p4GPm').value, document.getElementById('p4GReviewer').value);
+        task.note = document.getElementById('p4GNote').value.trim();
+        d.tasks.unshift(task);
+        this._rvVehs = null;
+        document.getElementById('p4GFileName').textContent = '固定字段模板：deviceid / VIN / ECM / 复核原因';
+        document.getElementById('p4GDone').innerHTML = `✅ 已生成任务 <b class="mono">${task.code}</b>（${task.count} 台 · ${items.join('、')}）→ <span class="lk" onclick="Page4.showTab('review','rvconfirm');Page4.openTask('${task.code}')">去复核确认</span>`;
+        this._renderRvRegTable();
+        if (this._rendered.rvconfirm) this.renderRvTasks();
+        Toast.success('复核任务已生成：' + task.code);
+    },
+    _taskBadge(t) {
+        if (t.status === '已完成') return '<span class="badge badge-success">已完成</span>';
+        return t.deadline < this._day(0) ? '<span class="badge badge-danger">已逾期</span>' : '<span class="badge badge-warning">未完成</span>';
+    },
+    _renderRvRegTable() {
+        document.getElementById('p4GBody').innerHTML = this._data().tasks.map(t => `<tr>
+            <td class="mono">${t.code}</td><td>${t.created}</td><td class="num">${t.count}</td><td>${t.items.join('、')}</td><td>${t.pm}</td><td>${t.reviewer}</td><td>${t.deadline}</td><td>${this._taskBadge(t)}</td></tr>`).join('');
+    },
+
+    // ---------- 复核闭环 · 复核确认：任务列表 → 任务详情 ----------
+    renderRvTasks() {
+        const box = document.getElementById('p4Pane-rvconfirm'), tasks = this._data().tasks;
+        box.innerHTML = `<div class="card">
+            <div class="card-title">复核确认（共 ${tasks.length} 个任务）</div>
+            <div class="table-wrapper"><table class="dash-table" style="font-size:12px;">
+            <thead><tr><th>任务编码</th><th>最晚交付日期</th><th class="num">车辆数</th><th>复核项</th><th>PM</th><th>复核人</th><th>进度</th><th>状态</th><th data-no-sort>操作</th></tr></thead>
+            <tbody>${tasks.map(t => {
+                const done = t.rows.filter(x => x.conclusion || x.hold).length;
+                return `<tr><td class="mono"><b>${t.code}</b></td><td>${t.deadline}</td><td class="num">${t.count} 台</td><td>${t.items.join('、')}</td><td>${t.pm}</td><td>${t.reviewer}</td>
+                    <td>${done} / ${t.rows.length}</td><td>${this._taskBadge(t)}</td>
+                    <td><button class="btn btn-sm ${t.status === '已完成' ? 'btn-secondary' : 'btn-primary'}" onclick="Page4.openTask('${t.code}')">${t.status === '已完成' ? '查看详情' : '进入任务'}</button></td></tr>`;
+            }).join('')}</tbody></table></div>
+        </div>`;
+    },
+
+    openTask(code) {
+        const t = this._data().tasks.find(x => x.code === code);
+        if (!t) return;
+        this._rendered.rvconfirm = true;
+        const box = document.getElementById('p4Pane-rvconfirm'), ro = t.status === '已完成', dis = ro ? 'disabled' : '';
+        const opt = (list, v, ph) => `<option value="">${ph}</option>` + list.map(x => `<option${x === v ? ' selected' : ''}>${x}</option>`).join('');
+        let lastVin = '', seq = 0;
+        const span = {};
+        t.rows.forEach(x => { span[x.vin] = (span[x.vin] || 0) + 1; });
+        const body = t.rows.map((x, i) => {
+            const first = x.vin !== lastVin;
+            if (first) { lastVin = x.vin; seq++; }
+            const n = span[x.vin];
+            return `<tr class="${first ? 'vfirst' : ''}">
+                ${first ? `<td rowspan="${n}">${seq}</td><td rowspan="${n}">${x.deviceid}</td><td rowspan="${n}" class="mono" style="font-size:11px;">${x.vin}</td><td rowspan="${n}">${x.ecm}</td>` : ''}
+                <td><b>${x.item}</b></td>
+                <td>${this._spark(x, 120, 34, i)}</td>
+                <td><select data-r="${i}" data-f="conclusion" ${dis}>${opt(this._CONCLUSIONS, x.conclusion, '请选择')}</select></td>
+                <td><select data-r="${i}" data-f="suggest" ${dis}>${opt(this._SUGGESTS, x.suggest, '请选择')}</select></td>
+                <td style="text-align:center;"><input type="checkbox" data-r="${i}" data-f="send" ${x.send ? 'checked' : ''} ${dis}></td>
+                <td><select data-r="${i}" data-f="group" ${dis}>${opt(this._GROUPS, x.group, '不转发')}</select></td>
+                <td style="text-align:center;"><input type="checkbox" data-r="${i}" data-f="hold" ${x.hold ? 'checked' : ''} ${dis}></td>
+            </tr>`;
+        }).join('');
+        box.innerHTML = `<div class="card">
+            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <span>复核任务详情</span><button class="btn btn-sm btn-secondary" onclick="Page4.renderRvTasks()">← 返回任务列表</button></div>
+            <div class="p4-kv">
+                <div><span>任务编码：</span><b class="mono">${t.code}</b></div>
+                <div><span>最晚完成日期：</span>${t.deadline}</div>
+                <div><span>复核项：</span>${t.items.join('、')}</div>
+                <div><span>PM：</span>${t.pm}</div><div><span>复核人：</span>${t.reviewer}</div>
+                <div><span>状态：</span>${this._taskBadge(t)}</div>
+                ${t.note ? `<div><span>备注：</span>${Utils.esc(t.note)}</div>` : ''}
+            </div>
+            <div class="table-wrapper" style="max-height:62vh;overflow:auto;"><table class="dash-table p4-detail" style="font-size:12px;">
+                <thead><tr><th>序号</th><th>deviceid</th><th>VIN</th><th>ECM</th><th>复核项</th><th>策略图</th><th>结论</th><th>处置建议</th><th>外发</th><th>转发给组</th><th>挂起</th></tr></thead>
+                <tbody id="p4TBody">${body}</tbody>
+            </table></div>
+            <div class="p4-foot">
+                <span class="p4-hint">点击策略图可放大 · 挂起的复核项不计入完成校验</span>
+                ${ro ? '' : `<button class="btn btn-secondary" onclick="Page4.saveTask('${t.code}',false)">暂存</button><button class="btn btn-primary" onclick="Page4.saveTask('${t.code}',true)">确认提交</button>`}
+            </div>
+        </div>`;
+        if (ro) return;
+        document.querySelectorAll('#p4TBody [data-r]').forEach(el => {
+            el.onchange = () => {
+                const row = t.rows[+el.dataset.r], f = el.dataset.f;
+                row[f] = el.type === 'checkbox' ? el.checked : el.value;
+                // 处置建议选「建议外发」时自动勾选外发
+                if (f === 'suggest' && el.value === '建议外发' && !row.send) {
+                    row.send = true;
+                    const cb = document.querySelector(`#p4TBody [data-r="${el.dataset.r}"][data-f="send"]`);
+                    if (cb) cb.checked = true;
+                }
+            };
+        });
+    },
+
+    saveTask(code, submit) {
+        const t = this._data().tasks.find(x => x.code === code);
+        if (submit) {
+            const miss = t.rows.filter(x => !x.hold && (!x.conclusion || !x.suggest)).length;
+            if (miss) { Toast.error(`还有 ${miss} 个复核项未填写结论 / 处置建议（或勾选挂起）`); return; }
+            t.status = '已完成';
+            const send = t.rows.filter(x => x.send).length, fwd = t.rows.filter(x => x.group).length, hold = t.rows.filter(x => x.hold).length;
+            Toast.success(`任务 ${code} 已提交：外发 ${send} 项 · 转发 ${fwd} 项 · 挂起 ${hold} 项`);
+            this.renderRvTasks();
+            if (this._rendered.rvreg) this._renderRvRegTable();
+        } else {
+            Toast.success('已暂存');
+        }
+    },
+
+    // 策略图：按复核项生成示意曲线（绝缘↓ / 自放电↑ / 温差、电压波动），虚线为阈值
+    _spark(x, w, h, idx) {
+        const r = this._rnd(x.seed), n = 40, pts = [];
+        for (let i = 0; i < n; i++) {
+            const t = i / (n - 1), noise = (r() - 0.5) * 0.12;
+            let y;
+            if (x.item === '绝缘') y = 0.85 - (x.abn ? 0.65 : 0.15) * t * t + noise;
+            else if (x.item === '自放电') y = 0.15 + (x.abn ? 0.7 : 0.2) * t + noise;
+            else if (x.item === '温差') y = 0.35 + (x.abn ? 0.35 : 0.1) * Math.sin(t * 9) * t + noise + (x.abn ? 0.2 * t : 0);
+            else y = 0.2 + (x.abn ? 0.6 : 0.15) * Math.pow(t, 1.6) + noise;
+            pts.push([2 + t * (w - 4), Math.max(2, Math.min(h - 2, h - 2 - Math.max(0, Math.min(1, y)) * (h - 4)))]);
+        }
+        const th = x.item === '绝缘' ? h - 2 - 0.3 * (h - 4) : h - 2 - 0.7 * (h - 4);
+        const color = x.abn ? 'var(--danger)' : 'var(--accent)';
+        const click = idx == null ? '' : ` onclick="Page4.zoomSpark(${idx})"`;
+        const size = idx == null ? `width="100%" height="${h}" preserveAspectRatio="none"` : `width="${w}" height="${h}"`;
+        return `<svg class="p4-spark" ${size} viewBox="0 0 ${w} ${h}"${click}><title>${x.item}${x.abn ? '：超阈值' : '：阈值内'}</title>
+            <line x1="0" x2="${w}" y1="${th}" y2="${th}" stroke="var(--warning)" stroke-dasharray="3 3" stroke-width="1" opacity=".7"/>
+            <polyline fill="none" stroke="${color}" stroke-width="${w > 200 ? 2 : 1.4}" vector-effect="non-scaling-stroke" points="${pts.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ')}"/></svg>`;
+    },
+    zoomSpark(idx) {
+        const tb = document.getElementById('p4TBody');
+        const code = tb && tb.closest('.card').querySelector('.p4-kv b.mono').textContent;
+        const t = this._data().tasks.find(x => x.code === code), x = t && t.rows[idx];
+        if (!x) return;
+        const unit = { 绝缘: '绝缘阻值 Ω/V', 自放电: '自放电率 %/天', 温差: '单体温差 ℃', 电压: '单体压差 mV' }[x.item];
+        Modal.open(`<div class="modal-header"><h3>策略图 · ${x.item}（${x.vin}）</h3><button class="modal-close" onclick="Modal.close()">&times;</button></div>
+            <div style="padding:8px 0;">${this._spark(x, 640, 240)}</div>
+            <div class="p4-kv"><div><span>指标：</span>${unit}</div><div><span>窗口：</span>${(this._data().rvRules.find(r => r.item === x.item) || {}).window || '-'}</div>
+                <div><span>阈值：</span>${(this._data().rvRules.find(r => r.item === x.item) || {}).threshold || '-'}（橙色虚线）</div>
+                <div><span>算法判定：</span>${x.abn ? '<span class="badge badge-danger">超阈值</span>' : '<span class="badge badge-success">阈值内</span>'}</div></div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="Modal.close()">关闭</button></div>`);
     },
 
     async loadList(page) {
