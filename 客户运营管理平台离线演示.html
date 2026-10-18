@@ -3543,17 +3543,31 @@ const Dialog = {
 };
 
 // 表格对齐：表头标了 .ctr 的列（状态 / 操作），同列单元格自动居中；其余保持左对齐。
-// 只处理单元格数与表头一致的行（rowspan 合并的行跳过，需要时在单元格上自己加 .ctr）
+// 按 rowspan / colspan 换算每个单元格实际所在的列，合并单元格的表（如 PN × 客户）也能对齐
 const TableAlign = {
     apply(root) {
         (root || document).querySelectorAll('table').forEach(t => {
-            const ths = t.tHead ? [...t.tHead.rows[0] ? t.tHead.rows[t.tHead.rows.length - 1].cells : []] : [];
-            const idx = ths.map((th, i) => th.classList.contains('ctr') ? i : -1).filter(i => i >= 0);
-            if (!idx.length) return;
-            [...t.tBodies].forEach(tb => [...tb.rows].forEach(tr => {
-                if (tr.cells.length !== ths.length) return;
-                idx.forEach(i => { if (!tr.cells[i].classList.contains('ctr')) tr.cells[i].classList.add('ctr'); });
-            }));
+            if (!t.tHead || !t.tHead.rows.length) return;
+            const head = t.tHead.rows[t.tHead.rows.length - 1];
+            const ctr = new Set();
+            let col = 0;
+            [...head.cells].forEach(th => { const span = th.colSpan || 1; if (th.classList.contains('ctr')) for (let k = 0; k < span; k++) ctr.add(col + k); col += span; });
+            if (!ctr.size) return;
+            [...t.tBodies].forEach(tb => {
+                const carry = [];   // carry[列] = 该列还被上方 rowspan 占用的行数
+                [...tb.rows].forEach(tr => {
+                    let c = 0;
+                    [...tr.cells].forEach(td => {
+                        while (carry[c] > 0) c++;
+                        const cs = td.colSpan || 1, rs = td.rowSpan || 1;
+                        // 跨多列的单元格（如合计说明）不动；单列且落在居中列上的加 .ctr
+                        if (cs === 1 && ctr.has(c) && !td.classList.contains('ctr')) td.classList.add('ctr');
+                        for (let k = 0; k < cs; k++) carry[c + k] = Math.max(carry[c + k] || 0, rs);
+                        c += cs;
+                    });
+                    for (let k = 0; k < carry.length; k++) if (carry[k] > 0) carry[k]--;
+                });
+            });
         });
     },
 };
@@ -5691,7 +5705,7 @@ const ThreeView = (() => {
     legendRedraw.pn = () => { const el = document.getElementById('t3PnBar'); if (el) { el.innerHTML = pnBarHtml(); addChartDownloads(el); } };
     const batchRows = pnList.map(pn => {
       const items = pnTrace.filter(x => x.pn === pn);
-      return items.map((b, k) => `<tr>${k === 0 ? `<td rowspan="${items.length}"><b class="mono">${esc(pn)}</b><div class="wo-tot">${items.length} 个客户</div></td>` : ''}
+      return items.map((b, k) => `<tr>${k === 0 ? `<td rowspan="${items.length}"><b class="mono">${esc(pn)}</b><div class="wo-tot" style="padding-left:0;">${items.length} 个客户</div></td>` : ''}
         <td><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${CUST_COLORS[state.custOrder.indexOf(b.cust) % CUST_COLORS.length]};margin-right:7px"></i><b>${esc(b.cust)}</b></td><td>${esc(b.plant)}</td>
         <td class="num">${fmt(b.qty)}</td><td class="num">${fmt(b.failed)}</td><td class="num"><b>${fmt(b.ppm)}</b></td>
         <td><span class="pill ${b.status === '预警中' ? 'r' : b.status === '关注' ? 'o' : 'g'}">${esc(b.status)}</span></td></tr>`).join('');
