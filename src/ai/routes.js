@@ -278,7 +278,7 @@ function createRoutes(ctx) {
         const allow = await catalog.allowList();
         const t = allow.find(x => x.toLowerCase() === table.toLowerCase());
         if (!t) return sendJson(res, 200, { ok: false, error: '表不存在或不在可查范围内' });
-        const q = catalog.dialect() === 'mysql' ? `\`${t}\`` : `"${t}"`;
+        const q = t.split('.').map(x => (catalog.dialect() === 'mysql' ? `\`${x}\`` : `"${x}"`)).join('.');
         const r = await catalog.run(`SELECT * FROM ${q} LIMIT ${limit}`, { maxRows: limit });
         sendJson(res, 200, r.ok ? { ok: true, table: t, columns: r.columns, rows: r.rows, row_count: r.row_count } : { ok: false, error: r.error });
       } catch (e) { sendJson(res, 200, { ok: false, error: e.message }); }
