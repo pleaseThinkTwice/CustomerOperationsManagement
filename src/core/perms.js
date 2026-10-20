@@ -6,7 +6,7 @@ const PAGES = [
   { perm: 'page5.view', name: '阶段总结' }, { perm: 'page6.view', name: 'Q&A知识库' }, { perm: 'page9.view', name: '数智分析' },
   { perm: 'page19.view', name: '工具箱' }, { perm: 'page18.view', name: '知识中心' }, { perm: 'page14.view', name: '数据洞察' },
   { perm: 'page7.view', name: '文档管理' }, { perm: 'page8.view', name: 'OEM映射' }, { perm: 'page10.view', name: '需求管理' },
-  { perm: 'page16.view', name: '需求池' }, { perm: 'page12.view', name: '合同管理' }, { perm: 'page13.view', name: '项目日志' },
+  { perm: 'page16.view', name: '需求池' }, { perm: 'page12.view', name: '合同管理' },
   { perm: 'user.manage', name: '系统管理' },
 ];
 const EDITS = [

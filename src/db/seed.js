@@ -119,12 +119,6 @@ async function seed(db, repo) {
     params: [{ name: 'oem', label: '客户', type: 'text' }],
     sql_template: 'SELECT warning_id, vin, fault_type, warning_time FROM {{dwd_warning}} WHERE is_outgoing = 1 AND is_closed = 0 AND (:oem = \'\' OR oem = :oem) ORDER BY warning_time DESC',
     result_columns: ['warning_id', 'vin', 'fault_type', 'warning_time'] });
-  await repo.insert('opinions', { content: '首页加载能否再快一点', category: '体验', module: '首页看板', submitter: '李强', status: '待处理' });
-  const p1 = await repo.insert('devlogs', { title: '客户运营平台 V2', entry_type: 'task', owner: '冯瑾奕', status: '进行中', priority: '高', start_date: dayOffset(-60), due_date: dayOffset(30), direction: '平台', iteration: 'S10', created_by: 'admin' });
-  await repo.insert('devlogs', { title: '后端接口落地', entry_type: 'task', parent_id: p1, owner: '李强', status: '进行中', priority: '高', start_date: dayOffset(-5), due_date: dayOffset(5), direction: '平台', iteration: 'S10', created_by: 'admin' });
-  await repo.insert('devlogs', { title: '看板口径确认', entry_type: 'task', parent_id: p1, owner: '冯瑾奕', status: '已完成', priority: '中', start_date: dayOffset(-20), due_date: dayOffset(-10), actual_date: dayOffset(-9), direction: '数据', iteration: 'S9', created_by: 'admin' });
-  await repo.insert('devlogs', { title: 'V2 周会', entry_type: 'meeting', meeting_date: dayOffset(-2), attendees: '冯瑾奕,李强', topics: '接口进度', minutes: '本周完成鉴权与客户档案', created_by: 'admin' });
-  await repo.insert('devlog_todos', { title: '合同导入模板确认', detail: '与商务确认字段', source: '周会', priority: '中', status: '待完善', tag: '合同', oem: 'XMS', created_by: 'admin' });
   const adg = [['数据中台', 'https://example.com/dp', '数仓查询与报表', '在用', '内网', '数据组'], ['BMS 云平台', 'https://example.com/bms', '车辆实时监控', '在用', 'VPN', '平台组']];
   for (const [i, [name, url, purpose, status, access, owner]] of adg.entries()) await repo.insert('adg_systems', { name, url, purpose, status, access, owner, sort_order: i + 1 });
   return true;

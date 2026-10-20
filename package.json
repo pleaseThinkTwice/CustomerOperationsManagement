@@ -13,8 +13,7 @@
     "reset-data": "node -e \"require('fs').rmSync('data',{recursive:true,force:true})\"",
     "check-analytics": "node scripts/check-analytics.js",
     "docs": "node scripts/gen-api-doc.js && node scripts/gen-ddl-doc.js",
-    "ai:demo": "node --disable-warning=ExperimentalWarning src/ai/serve.js",
-    "ai:seed": "node --disable-warning=ExperimentalWarning src/ai/demo/seed.js"
+    "ai:demo": "node --disable-warning=ExperimentalWarning src/ai/serve.js"
   },
   "keywords": [
     "customer",

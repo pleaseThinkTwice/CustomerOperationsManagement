@@ -146,10 +146,10 @@ test('其余页面 GET 接口全部可用', async () => {
     '/api/warnings?page=1&page_size=50', '/api/warnings/analyses?oem=XMS', '/api/warning_rules', '/api/stage_summary', '/api/documents', '/api/oem_mapping',
     '/api/doris/oem_list', '/api/doris/cust_grp_list', '/api/demands', '/api/demand-pool/meta', '/api/demand-pool', '/api/contracts', '/api/users',
     '/api/users/all-detail', '/api/users/1/module-perms', '/api/roles', '/api/permissions/pages', '/api/roles/1/permissions', '/api/login_logs',
-    '/api/operation_logs', '/api/activity/stats?type=page', '/api/devlogs', '/api/devlogs/tree', '/api/devlogs/todo', '/api/devlogs/stats',
-    '/api/devlogs/weekly', '/api/devlogs/weekly-brief', '/api/devlogs/weekly-meeting', '/api/insights', '/api/insights/overview', '/api/insights/signals',
+    '/api/operation_logs', '/api/activity/stats?type=page',
+    '/api/insights', '/api/insights/overview', '/api/insights/signals',
     '/api/insights/followups', '/api/insights/learnable', '/api/insights/learnable/columns?table=dwd_warning', '/api/insights/assets-by-domain',
-    '/api/insights/search?q=预警', '/api/insights/export', '/api/tools', '/api/opinions', '/api/adg/systems', '/api/handbook/list', '/api/dataview',
+    '/api/insights/search?q=预警', '/api/insights/export', '/api/tools', '/api/adg/systems', '/api/handbook/list', '/api/dataview',
     '/api/dataview/customers', '/api/dashboard/modules', '/api/visit_plans'];
   for (const u of urls) await ok('GET', u);
   const tools = await ok('GET', '/api/tools');
@@ -158,7 +158,7 @@ test('其余页面 GET 接口全部可用', async () => {
 });
 
 test('下载类接口返回文件', async () => {
-  for (const u of ['/api/meetings/1/export/xlsx', '/api/stage_summary/export', '/api/devlogs/report?kind=week', '/api/devlogs/export-md', '/api/devlogs/todo/export', '/api/key_persons/template?oem=XMS', '/api/documents/1/download', '/api/devlogs/4/meeting-export']) {
+  for (const u of ['/api/meetings/1/export/xlsx', '/api/stage_summary/export', '/api/key_persons/template?oem=XMS', '/api/documents/1/download']) {
     const r = await call('GET', u, undefined, { raw: true });
     assert.strictEqual(r.status, 200, u);
     assert.ok(/attachment|inline/.test(r.headers.get('content-disposition') || ''), u);

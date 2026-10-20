@@ -7,7 +7,7 @@ const { tables: OPS } = require('../db/schema');
 const { hasPerm } = require('../core/perms');
 
 // 数据查看可浏览的运营表（不含账号/日志类敏感表）
-const VIEWABLE = ['customers', 'key_persons', 'visit_plans', 'meetings', 'tasks', 'events', 'warnings', 'warning_rules', 'stage_summary', 'warranty_settings', 'documents', 'oem_mapping', 'demands', 'demand_pool', 'contracts', 'devlogs', 'devlog_todos'];
+const VIEWABLE = ['customers', 'key_persons', 'visit_plans', 'meetings', 'tasks', 'events', 'warnings', 'warning_rules', 'stage_summary', 'warranty_settings', 'documents', 'oem_mapping', 'demands', 'demand_pool', 'contracts'];
 
 function register(r, { repo, analytics, config, HttpError }) {
   // ---------- 工具箱 ----------
@@ -33,19 +33,6 @@ function register(r, { repo, analytics, config, HttpError }) {
   }, { perm: 'tool.manage' });
   r.put('/api/tools/manage/:id', async (req, res, x) => { await repo.update('tools', x.params.id, x.body); return { success: true }; }, { perm: 'tool.manage' });
   r.delete('/api/tools/manage/:id', async (req, res, x) => { await repo.remove('tools', x.params.id); return { success: true }; }, { perm: 'tool.manage' });
-
-  // ---------- 意见箱 ----------
-  r.get('/api/opinions', async (req, res, x) => {
-    const all = await repo.find('opinions', {}, { order: 'id DESC' });
-    return hasPerm(x.user, 'user.manage') ? all : all.filter((o) => o.submitter === x.user.name);
-  });
-  r.post('/api/opinions', async (req, res, x) => {
-    if (!String(x.body.content || '').trim()) return { ok: false, error: '请填写意见内容' };
-    const id = await repo.insert('opinions', { ...x.body, submitter: x.body.submitter || x.user.name, status: '待处理' });
-    return { ok: true, success: true, id, message: '提交成功，感谢反馈' };
-  });
-  r.put('/api/opinions/:id', async (req, res, x) => { await repo.update('opinions', x.params.id, { status: x.body.status, reply: x.body.reply }); return { success: true }; }, { perm: 'user.manage' });
-  r.delete('/api/opinions/:id', async (req, res, x) => { await repo.remove('opinions', x.params.id); return { success: true }; }, { perm: 'user.manage' });
 
   // ---------- 系统导航（ADG） ----------
   r.get('/api/adg/systems', async () => repo.find('adg_systems', {}, { order: 'sort_order, id' }));

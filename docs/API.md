@@ -1,4 +1,4 @@
-# 接口清单（共 201 个）
+# 接口清单（共 176 个）
 
 > 由 `node scripts/gen-api-doc.js` 从 `src/routes/*.js` 生成，勿手改。
 > 约定：除标注「公开」外都需要登录（Cookie `cop_sid`），未登录 401；权限不足 403。返回 JSON；出错时 `{success:false, error, message}`。
@@ -194,32 +194,6 @@
 | GET | `/api/operation_logs` |  |  |  |
 | GET | `/api/activity/stats` | user.manage | query: type, username |  |
 
-## 项目管理（开发日志、周会、待办）（devlogs.js · 21 个）
-
-| 方法 | 路径 | 权限 | 参数 | 说明 |
-|---|---|---|---|---|
-| GET | `/api/devlogs` |  | query: done, owner, from, to |  |
-| POST | `/api/devlogs` |  | body: title, created_by |  |
-| PUT | `/api/devlogs/:id` |  |  |  |
-| DELETE | `/api/devlogs/:id` |  |  |  |
-| GET | `/api/devlogs/tree` |  |  | 树：方向 → 迭代 → 任务（递归子任务） |
-| GET | `/api/devlogs/stats` |  |  |  |
-| GET | `/api/devlogs/weekly` |  |  | 有记录的周列表（倒序） |
-| GET | `/api/devlogs/todo` |  |  |  |
-| POST | `/api/devlogs/todo` |  | body: title, created_by |  |
-| PUT | `/api/devlogs/todo/:id` |  |  |  |
-| DELETE | `/api/devlogs/todo/:id` |  |  |  |
-| GET | `/api/devlogs/todo/export` |  |  |  |
-| GET | `/api/devlogs/weekly-brief` |  | query: yw |  |
-| GET | `/api/devlogs/weekly-meeting` |  | query: yw |  |
-| PUT | `/api/devlogs/weekly-meeting` |  | body: yw, agenda, recap, risks, blockers, next_plan |  |
-| GET | `/api/devlogs/weekly-meeting/export` |  | query: yw |  |
-| POST | `/api/devlogs/weekly-claim` |  | body: kind, id, owner | 周会上认领：kind = demand \| warning \| todo \| task |
-| GET | `/api/devlogs/report` |  | query: kind |  |
-| GET | `/api/devlogs/export-md` |  |  |  |
-| GET | `/api/devlogs/:id/meeting-export` |  |  | 会议纪要导出 Word：生成 Word 可直接打开的 HTML 文档（.doc） |
-| POST | `/api/devlogs/:id/to-operations-meeting` |  | body: oem, merge | 导入到运营会议纪要（meetings 表）；已导入过时返回 409，merge=true 时覆盖更新 |
-
 ## 数据洞察（insights.js · 23 个）
 
 | 方法 | 路径 | 权限 | 参数 | 说明 |
@@ -248,7 +222,7 @@
 | POST | `/api/insights/:id/ties` |  | body: related | 跨表联动：按共享键关联，计算匹配率 |
 | POST | `/api/insights/:id/ask` |  | body: question |  |
 
-## 工具箱 / 意见反馈 / ADG / 查询手册 / 数据视图（misc.js · 17 个）
+## 工具箱 / 意见反馈 / ADG / 查询手册 / 数据视图（misc.js · 13 个）
 
 | 方法 | 路径 | 权限 | 参数 | 说明 |
 |---|---|---|---|---|
@@ -257,10 +231,6 @@
 | POST | `/api/tools/manage` | tool.manage | body: name, sql_template |  |
 | PUT | `/api/tools/manage/:id` | tool.manage |  |  |
 | DELETE | `/api/tools/manage/:id` | tool.manage |  |  |
-| GET | `/api/opinions` |  |  |  |
-| POST | `/api/opinions` |  | body: content, submitter |  |
-| PUT | `/api/opinions/:id` | user.manage | body: status, reply |  |
-| DELETE | `/api/opinions/:id` | user.manage |  |  |
 | GET | `/api/adg/systems` |  |  |  |
 | POST | `/api/adg/systems` | adg.edit | body: name |  |
 | PUT | `/api/adg/systems/:id` | adg.edit |  |  |

@@ -7,7 +7,7 @@ const ROOT = path.join(__dirname, '..');
 const MODULES = {
   auth: '登录与账号', customers: '客户档案 / 关键人 / 拜访 / 事件 / 质保 / OEM 映射', dashboard: '首页看板（三视角、趋势、车辆明细、自定义模块）',
   workbench: '我的待办', meetings: '会议纪要 / 任务 / 材料', warnings: '预警闭环 / 规则 / 阶段总结', demands: '需求管理 / 部门需求池',
-  contracts: '合同管理', documents: '文档管理', system: '系统管理（用户、角色、权限、日志）', devlogs: '项目管理（开发日志、周会、待办）',
+  contracts: '合同管理', documents: '文档管理', system: '系统管理（用户、角色、权限、日志）',
   insights: '数据洞察', misc: '工具箱 / 意见反馈 / ADG / 查询手册 / 数据视图',
 };
 const RE = /r\.(get|post|put|delete)\(\s*'([^']+)'/g;

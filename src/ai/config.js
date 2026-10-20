@@ -58,9 +58,9 @@ function deepMerge(base, over) {
 function fromEnv(env) {
   const o = { llm: {}, sql: {}, engine: {}, external: { dify: {}, openai_app: {} } };
   const set = (obj, key, val, fn) => { if (val !== undefined && val !== '') obj[key] = fn ? fn(val) : val; };
-  set(o.llm, 'baseUrl', env.AI_LLM_BASE_URL);
-  set(o.llm, 'apiKey', env.AI_LLM_API_KEY);
-  set(o.llm, 'model', env.AI_LLM_MODEL);
+  set(o.llm, 'baseUrl', env.AI_LLM_BASE_URL || env.LLM_BASE_URL);
+  set(o.llm, 'apiKey', env.AI_LLM_API_KEY || env.LLM_API_KEY);
+  set(o.llm, 'model', env.AI_LLM_MODEL || env.LLM_MODEL);
   set(o.llm, 'toolCalling', env.AI_LLM_TOOL_CALLING, v => v !== 'false' && v !== '0');
   set(o.sql, 'type', env.AI_SQL_TYPE);
   set(o.sql, 'file', env.AI_SQL_FILE, v => path.resolve(ROOT, v));

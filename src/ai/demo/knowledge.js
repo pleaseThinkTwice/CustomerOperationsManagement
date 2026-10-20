@@ -19,7 +19,7 @@ const QA = [
 ];
 
 const ANALYSIS = [
-  ['口径：接入率', '接入率 = 已接入车辆数 / 出货 PACK 数。出货以 cust_project.pack_count 为准，接入以 veh_access 为准，两者按客户（oem）和电芯容量（cell_cap）对齐。'],
+  ['口径：接入率', '接入率 = 已接入车辆数 / Pack 出货数。接入以 dwd_vehicle_access 行数为准，出货取 dws_shipment 中 ship_level = pack 的数量合计，两者按客户（oem）和电芯容量（cell_cap）对齐。'],
   ['口径：活跃车辆', '最近 30 天内有上线记录（last_online_date >= 今天 - 30 天）的车辆记为活跃车辆。'],
 ];
 

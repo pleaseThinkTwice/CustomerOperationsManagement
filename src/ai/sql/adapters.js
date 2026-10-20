@@ -21,7 +21,7 @@ function sqliteAdapter(cfg) {
   const fs = require('node:fs');
   const { DatabaseSync } = require('node:sqlite');
   if (!fs.existsSync(cfg.file)) {
-    const e = new Error(`业务库文件不存在：${cfg.file}（演示库可用 npm run ai:seed 生成）`);
+    const e = new Error(`业务库文件不存在：${cfg.file}`);
     e.code = 'DB_MISSING';
     throw e;
   }

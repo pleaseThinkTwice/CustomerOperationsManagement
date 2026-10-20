@@ -46,7 +46,7 @@ const tables = {
   meetings: T('会议纪要', {
     id: c('id'), oem: c('text'), title: c('text'), meeting_date: c('date'), purpose: c('longtext'),
     participants_external: c('text'), participants_internal: c('text'), recorder: c('text'), material_name: c('text'),
-    source_devlog_id: c('int', '从项目日志导入时的来源'), created_by: c('text'), created_at: c('datetime'),
+    created_by: c('text'), created_at: c('datetime'),
   }),
   meeting_consensus: T('会议共识', { id: c('id'), meeting_id: c('int'), content: c('longtext'), sort_order: c('int') }),
   tasks: T('会议待办任务', {
@@ -123,26 +123,7 @@ const tables = {
     id: c('id'), name: c('text'), description: c('text'), category: c('text'), params: c('json'), sql_template: c('longtext'),
     result_columns: c('json'), enabled: c('bool'),
   }),
-  opinions: T('意见箱', {
-    id: c('id'), content: c('longtext'), category: c('text'), module: c('text'), contact: c('text'), submitter: c('text'),
-    page: c('text'), status: c('text', '待处理/处理中/已采纳/已关闭'), reply: c('longtext'), created_at: c('datetime'),
-  }),
-  devlogs: T('项目日志：任务树 / 会议 / 里程碑', {
-    id: c('id'), title: c('text'), entry_type: c('text', 'task | meeting | milestone'), parent_id: c('int', '父任务；会议行动项挂在会议下'),
-    owner: c('text'), priority: c('text'), status: c('text', '未开始/进行中/已完成/已暂停'), start_date: c('date'), due_date: c('date'),
-    actual_date: c('date', '实际完成日'), description: c('longtext'), direction: c('text', '方向'), iteration: c('text', '迭代'),
-    module: c('text'), depend_on: c('text'), estimate: c('real', '预估人天'), progress: c('int', '里程碑进度%'),
-    meeting_date: c('date'), meeting_time: c('text'), meeting_location: c('text'), attendees: c('text'), topics: c('longtext'),
-    minutes: c('longtext'), created_by: c('text'), created_at: c('datetime'), updated_at: c('datetime'),
-  }),
-  devlog_todos: T('项目待完善池', {
-    id: c('id'), title: c('text'), detail: c('longtext'), source: c('text'), priority: c('text'), status: c('text'),
-    tag: c('text'), oem: c('text'), owner: c('text'), created_by: c('text'), created_at: c('datetime'),
-  }),
-  weekly_meetings: T('周会纪要（按 ISO 年周）', {
-    id: c('id'), yw: c('text', '如 2026-W38'), agenda: c('longtext'), recap: c('longtext'), risks: c('longtext'),
-    blockers: c('longtext'), next_plan: c('longtext'), updated_at: c('datetime'),
-  }, { unique: [['yw']] }),
+
   insights: T('数据洞察（对分析库表的学习结果）', {
     id: c('id'), table_name: c('text'), db: c('text'), status: c('text'), meta: c('json'), charts: c('json'),
     conclusions: c('json'), columns_meta: c('json'), joins: c('json'), starred: c('bool'), note: c('text'),

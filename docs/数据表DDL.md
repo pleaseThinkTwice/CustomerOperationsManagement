@@ -282,10 +282,6 @@ DISTRIBUTED BY HASH(`oem`) BUCKETS 8 PROPERTIES ("replication_num" = "1");
 | contracts | 合同 |
 | dashboard_modules | 首页自定义图表模块 |
 | tools | 工具箱：参数化 SQL 查询 |
-| opinions | 意见箱 |
-| devlogs | 项目日志：任务树 / 会议 / 里程碑 |
-| devlog_todos | 项目待完善池 |
-| weekly_meetings | 周会纪要（按 ISO 年周） |
 | insights | 数据洞察（对分析库表的学习结果） |
 | insight_followups | 洞察信号跟进 |
 | adg_systems | 系统导航（ADG） |
@@ -412,7 +408,6 @@ CREATE TABLE IF NOT EXISTS `meetings` (
   `participants_internal` VARCHAR(255),
   `recorder` VARCHAR(255),
   `material_name` VARCHAR(255),
-  `source_devlog_id` BIGINT COMMENT '从项目日志导入时的来源',
   `created_by` VARCHAR(255),
   `created_at` DATETIME
 ) COMMENT='会议纪要' DEFAULT CHARSET=utf8mb4;
@@ -652,74 +647,6 @@ CREATE TABLE IF NOT EXISTS `tools` (
   `result_columns` JSON,
   `enabled` TINYINT(1)
 ) COMMENT='工具箱：参数化 SQL 查询' DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `opinions` (
-  `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
-  `content` TEXT,
-  `category` VARCHAR(255),
-  `module` VARCHAR(255),
-  `contact` VARCHAR(255),
-  `submitter` VARCHAR(255),
-  `page` VARCHAR(255),
-  `status` VARCHAR(255) COMMENT '待处理/处理中/已采纳/已关闭',
-  `reply` TEXT,
-  `created_at` DATETIME
-) COMMENT='意见箱' DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `devlogs` (
-  `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
-  `title` VARCHAR(255),
-  `entry_type` VARCHAR(255) COMMENT 'task | meeting | milestone',
-  `parent_id` BIGINT COMMENT '父任务；会议行动项挂在会议下',
-  `owner` VARCHAR(255),
-  `priority` VARCHAR(255),
-  `status` VARCHAR(255) COMMENT '未开始/进行中/已完成/已暂停',
-  `start_date` DATE,
-  `due_date` DATE,
-  `actual_date` DATE COMMENT '实际完成日',
-  `description` TEXT,
-  `direction` VARCHAR(255) COMMENT '方向',
-  `iteration` VARCHAR(255) COMMENT '迭代',
-  `module` VARCHAR(255),
-  `depend_on` VARCHAR(255),
-  `estimate` DOUBLE COMMENT '预估人天',
-  `progress` BIGINT COMMENT '里程碑进度%',
-  `meeting_date` DATE,
-  `meeting_time` VARCHAR(255),
-  `meeting_location` VARCHAR(255),
-  `attendees` VARCHAR(255),
-  `topics` TEXT,
-  `minutes` TEXT,
-  `created_by` VARCHAR(255),
-  `created_at` DATETIME,
-  `updated_at` DATETIME
-) COMMENT='项目日志：任务树 / 会议 / 里程碑' DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `devlog_todos` (
-  `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
-  `title` VARCHAR(255),
-  `detail` TEXT,
-  `source` VARCHAR(255),
-  `priority` VARCHAR(255),
-  `status` VARCHAR(255),
-  `tag` VARCHAR(255),
-  `oem` VARCHAR(255),
-  `owner` VARCHAR(255),
-  `created_by` VARCHAR(255),
-  `created_at` DATETIME
-) COMMENT='项目待完善池' DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS `weekly_meetings` (
-  `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
-  `yw` VARCHAR(255) COMMENT '如 2026-W38',
-  `agenda` TEXT,
-  `recap` TEXT,
-  `risks` TEXT,
-  `blockers` TEXT,
-  `next_plan` TEXT,
-  `updated_at` DATETIME,
-  UNIQUE (`yw`)
-) COMMENT='周会纪要（按 ISO 年周）' DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `insights` (
   `id` BIGINT PRIMARY KEY AUTO_INCREMENT,

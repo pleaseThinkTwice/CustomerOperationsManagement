@@ -11,10 +11,11 @@ const { Router, HttpError, sendJson } = require('./http/router');
 const { parseBody } = require('./http/body');
 const auth = require('./core/auth');
 const ai = require('./core/ai-bridge');
+const { buildSemantic } = require('./core/ai-semantic');
 
 const ROUTE_MODULES = [
   'auth', 'customers', 'meetings', 'warnings', 'dashboard', 'workbench', 'demands', 'contracts', 'documents',
-  'system', 'devlogs', 'insights', 'misc',
+  'system', 'insights', 'misc',
 ];
 
 async function createApp() {
@@ -30,7 +31,7 @@ async function createApp() {
 
   // QA / text2sql 模块（另一线程实现）存在时挂载；否则只提供任务进度接口
   const aiRouter = ai.external && typeof ai.external.createAiRouter === 'function'
-    ? ai.external.createAiRouter({ dataDir: config.DATA_DIR, opsDbFile: config.OPS_DB.file, analyticsDbFile: config.ANALYTICS_DB.file })
+    ? ai.external.createAiRouter(aiOverrides())
     : null;
   if (!aiRouter) {
     router.get('/api/task/progress/:id', async (req, res, x) => {
@@ -108,6 +109,17 @@ function loadPrototype() {
     }
     return cache;
   };
+}
+
+// 数智分析默认查分析库（与看板同一份数据）；单独设置了 AI_SQL_* 时以 AI 模块自己的配置为准
+function aiOverrides() {
+  const o = { storeDb: path.join(config.DATA_DIR, 'ai.sqlite'), kbFolder: path.join(config.DATA_DIR, 'kb') };
+  if (process.env.AI_SQL_TYPE || process.env.AI_SQL_FILE || process.env.AI_SQL_URL) return o;
+  const A = config.ANALYTICS_DB;
+  const tableName = (t) => process.env['ANALYTICS_TABLE_' + t] || (A.tablePrefix + t);
+  o.semanticFile = buildSemantic({ root: config.ROOT, dataDir: config.DATA_DIR, tableName });
+  o.sql = A.driver === 'demo' ? { type: 'sqlite', file: A.file } : { type: 'doris', url: A.url };
+  return o;
 }
 
 module.exports = { createApp };
