@@ -26,6 +26,7 @@ npm run reset-data   # 清空本地数据，下次启动重新生成
 ## 文档
 
 - [docs/业务逻辑.md](docs/业务逻辑.md)：每个页面的逻辑、指标口径、待决策事项
+- [docs/页面逻辑说明.md](docs/页面逻辑说明.md) / [docs/页面逻辑问题清单.md](docs/页面逻辑问题清单.md)：前端各页面逻辑与待处理问题
 - [docs/数据需求.md](docs/数据需求.md)：公司侧要准备的表、取值约定、接入步骤
 - [docs/数据表DDL.md](docs/数据表DDL.md)：分析库 / 运营库字段与建表语句（生成）
 - [docs/API.md](docs/API.md)：接口清单（生成）
@@ -43,12 +44,12 @@ src/
   db/                    运营库：驱动（sqlite / mysql）、表结构、通用增删改查、初始化数据
   analytics/             分析库：表结构（公司侧要提供的表）、全部看板口径、演示数据生成
   routes/                按页面划分的接口
-  ai/                    QA / 知识库 / text2sql 模块（另行合入，存在时自动挂载）
+  ai/                    Q&A 知识库问答 + 数智分析（text2sql），挂在同一个服务上
 public/login.html        登录页
 scripts/                 数仓自检、文档生成
 test/                    node:test 接口测试
 ```
 
-## AI 模块：知识库问答 + 数智分析（Text2SQL）
+## AI：Q&A 知识库 + 数智分析
 
-见 [docs/AI模块-问答与Text2SQL接入说明.md](docs/AI模块-问答与Text2SQL接入说明.md)。
+`npm start` 后直接可用。数智分析默认查分析库（与首页看板同一份数据），不配大模型时问答走关键词匹配、数智分析执行示例 SQL。接大模型配 `.env` 里的 `LLM_BASE_URL / LLM_API_KEY / LLM_MODEL`。细节见 [docs/AI模块-问答与Text2SQL接入说明.md](docs/AI模块-问答与Text2SQL接入说明.md)。

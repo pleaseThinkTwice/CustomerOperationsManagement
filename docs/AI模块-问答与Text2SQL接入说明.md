@@ -1,6 +1,8 @@
 # AI 模块：知识库问答 + 数智分析（Text2SQL）接入说明
 
-日期：2026-10-20　｜　代码：`src/ai/`　｜　分支：`claude/project-thread-kuvgtq`
+日期：2026-10-20　｜　代码：`src/ai/`
+
+> **在平台里运行（`npm start`）时**：数智分析默认查分析库，也就是首页看板用的同一份数据。语义层由 `src/analytics/schema.js`（表和字段）加 `config/semantic.analytics.json`（枚举、口径、示例 SQL、常用问题）在启动时合成到 `data/semantic.analytics.json`；接公司 Doris 时跟随 `ANALYTICS_DB_*` 和表名映射。大模型配置读 `AI_LLM_*`，没配时回落到 `LLM_*`。只有显式设置了 `AI_SQL_*` 才改查别的库。下文的 `npm run ai:demo`、`config/semantic.json`、演示业务库只用于单独调试 AI 模块。
 
 ## 1. 结论
 
@@ -19,7 +21,7 @@
 
 ## 2. 调研与选型
 
-上一轮调研（2026-10-12，见分支 `claude/great-cray-43ev6j` 的《NL2SQL与知识库问答开源工具调研》）比较了 SQLBot、DB-GPT、WrenAI、Vanna、Chat2DB，以及 RAGFlow、Dify、FastGPT、MaxKB、AnythingLLM。这次结合原型的实际情况重新取舍：
+上一轮调研（2026-10-12，见 [docs/调研/NL2SQL与知识库问答开源工具调研.md](调研/NL2SQL与知识库问答开源工具调研.md)）比较了 SQLBot、DB-GPT、WrenAI、Vanna、Chat2DB，以及 RAGFlow、Dify、FastGPT、MaxKB、AnythingLLM。这次结合原型的实际情况重新取舍：
 
 | 方案 | 结论 | 原因 |
 | --- | --- | --- |
@@ -124,10 +126,10 @@ ai.tasks.start(async report => { report({ current: 1, total: 3, thought: '…' }
 | `AI_LLM_TOOL_CALLING` | 模型是否支持 function calling | `true` |
 | `AI_SQL_TYPE` | 业务库类型：`sqlite` / `mysql` / `doris` / `postgres` | `sqlite` |
 | `AI_SQL_URL` | 连接串，如 `mysql://ai_ro:pwd@host:9030/test` | 空 |
-| `AI_SQL_FILE` | SQLite 文件 | `data/demo_business.sqlite` |
+| `AI_SQL_FILE` | SQLite 文件 | 平台内：分析库；单独调试：`data/demo_business.sqlite` |
 | `AI_SQL_MAX_ROWS` | 单次查询行数上限 | `5000` |
 | `AI_SQL_ALLOW_TABLES` | 可查表白名单（逗号分隔；`*` 为全部） | 语义层登记的表 |
-| `AI_SEMANTIC_FILE` | 语义层文件 | `config/semantic.json` |
+| `AI_SEMANTIC_FILE` | 语义层文件 | 平台内：启动时合成；单独调试：`config/semantic.json` |
 | `AI_STORE_DB` | 本模块自有存储 | `data/ai.sqlite` |
 | `AI_ENGINE_QA` / `AI_ENGINE_ANALYSIS` | `builtin` / `dify` / `openai_app` | `builtin` |
 | `AI_DIFY_BASE_URL`、`AI_DIFY_QA_KEY`、`AI_DIFY_ANALYSIS_KEY` | Dify 应用 API | 空 |
