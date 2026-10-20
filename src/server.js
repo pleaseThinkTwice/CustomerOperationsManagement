@@ -1,18 +1,14 @@
+'use strict';
 const http = require('node:http');
+const config = require('./config');
+const { createApp } = require('./app');
 
-const PORT = process.env.PORT || 3000;
-
-const server = http.createServer((req, res) => {
-  if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', service: 'CustomerOperationsManagement' }));
-    return;
-  }
-
-  res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-  res.end('CustomerOperationsManagement is running.');
-});
-
-server.listen(PORT, () => {
-  console.log(`Server running at http://localhost:`);
+createApp().then(({ handle }) => {
+  const server = http.createServer((req, res) => { handle(req, res); });
+  server.listen(config.PORT, () => {
+    console.log(`客户运营管理平台已启动：http://localhost:${config.PORT}`);
+  });
+}).catch((e) => {
+  console.error('启动失败：', e);
+  process.exit(1);
 });

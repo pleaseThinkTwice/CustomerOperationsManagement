@@ -1,11 +1,18 @@
 {
   "name": "customer-operations-management",
   "version": "1.0.0",
-  "description": "Customer operations management project starter",
+  "description": "客户运营管理平台：原型页面 + 零依赖 Node 后端（可插拔数据层）",
   "main": "src/server.js",
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "test": "node --test test/*.test.js",
+    "reset-data": "node -e \"require('fs').rmSync('data',{recursive:true,force:true})\"",
+    "check-analytics": "node scripts/check-analytics.js",
+    "docs": "node scripts/gen-api-doc.js && node scripts/gen-ddl-doc.js"
   },
   "keywords": [
     "customer",
