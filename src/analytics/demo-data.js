@@ -73,7 +73,7 @@ async function generate(db) {
 
   const vehicles = []; const warnings = []; const ships = []; const adjusts = []; const orders = [];
   let wid = 1; let woId = 1;
-  const order = (type, w, t) => orders.push({ wo_id: `WO${String(woId++).padStart(7, '0')}`, wo_type: type, vin: w.vin, oem: w.oem, cell_cap: w.cell_cap, vehicle_model: w.vehicle_model, pn: w.pn, fault_type: w.fault_type, create_time: fmtDt(t), close_time: rnd() < 0.8 ? fmtDt(addDays(t, 2 + Math.floor(rnd() * 15))) : null, plant: w.plant });
+  const order = (type, w, t) => t > today ? 0 : orders.push({ wo_id: `WO${String(woId++).padStart(7, '0')}`, wo_type: type, vin: w.vin, oem: w.oem, cell_cap: w.cell_cap, vehicle_model: w.vehicle_model, pn: w.pn, fault_type: w.fault_type, create_time: fmtDt(t), close_time: ((c) => (rnd() < 0.8 && c <= today ? fmtDt(c) : null))(addDays(t, 2 + Math.floor(rnd() * 15))), plant: w.plant });
   for (const p of PRODUCTS) {
     const sop = new Date(p.sop + 'T12:00:00');
     const spanDays = Math.max(30, Math.round((today - sop) / 86400e3));

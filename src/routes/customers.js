@@ -136,7 +136,7 @@ function register(r, { repo, analytics, config, HttpError }) {
   r.put('/api/warranty_settings/:id', async (req, res, x) => {
     if (!(await repo.update('warranty_settings', x.params.id, { ...x.body, source: 'manual' }))) throw new HttpError(404, '记录不存在');
     return { success: true };
-  });
+  }, { perm: 'warning.edit' });
   // 从数仓质保政策初始化（已存在的 客户×容量×车型 不覆盖）
   r.post('/api/warranty_settings/init', async (req, res, x) => {
     const pols = await analytics.warrantyPolicies(x.query.oem || x.body.oem || '', x.query.cell_cap || x.body.cell_cap || '');
@@ -147,7 +147,7 @@ function register(r, { repo, analytics, config, HttpError }) {
       await repo.insert('warranty_settings', { ...p, ...key, source: 'doris' }); added++;
     }
     return { success: true, added, total: pols.length };
-  });
+  }, { perm: 'warning.edit' });
   // Excel 导入：读取 data/import/warranty.xlsx（列：客户/容量/车型/PN/乘用年限/乘用里程/乘用SOH/营运年限/营运里程/营运SOH），
   // 文件不存在时退化为从数仓全量初始化。force=1 覆盖已有记录。
   r.post('/api/warranty_settings/parse-excel', async (req, res, x) => {
@@ -173,7 +173,7 @@ function register(r, { repo, analytics, config, HttpError }) {
       imported++;
     }
     return { success: true, imported, pn_matched_doris: matched, pn_no_doris: noMatch, source: fs.existsSync(file) ? file : 'doris' };
-  });
+  }, { perm: 'warning.edit' });
 
   // ---------- OEM 映射 ----------
   r.get('/api/oem_mapping', async (req, res, x) => repo.find('oem_mapping', x.query.oem ? { oem: x.query.oem } : {}, { order: 'oem' }));
