@@ -2368,12 +2368,36 @@ table .ctr, table th.ctr { text-align: center; }
     { oem: 'NIO',  oem_ch: '蔚来汽车',     name_cn: '蔚来',     level: 'A级', relationship_status: '稳定合作' },
   ];
   var PROJECTS = [
-    { name: '153Ah 铁锂', cap: 153, cellType: 'LFP', struct: ['1P204S', '1P192S'], sop: '2025-06', pack: 20240, conn: 15300, connRate: 75.6, overdue: 12, alarm: 320, closed: 240, packIdMiss: 214, alarm7: 28 },
-    { name: '100Ah 方壳', cap: 100, cellType: 'NCM', struct: '1P96S',  sop: '2024-10', pack: 12800, conn: 11200, connRate: 87.5, overdue: 8,  alarm: 180, closed: 150, packIdMiss: 96, alarm7: 15 },
-    { name: '75Ah 刀片',  cap: 75,  cellType: 'AB', struct: '1P120S', sop: '2023-05', pack: 9800,  conn: 8300,  connRate: 84.7, overdue: 5,  alarm: 96,  closed: 88,  packIdMiss: 141, alarm7: 6 },
-    { name: '50Ah 圆柱',  cap: 50,  cellType: 'LFP', struct: '2P90S',  sop: '2023-01', pack: 6100,  conn: 5000,  connRate: 82.0, overdue: 3,  alarm: 54,  closed: 49,  packIdMiss: 60, alarm7: 4 },
+    { name: '153Ah 铁锂', stage: '量产', cap: 153, cellType: 'LFP', struct: ['1P204S', '1P192S'], sop: '2025-06', pack: 20240, conn: 15300, connRate: 75.6, overdue: 12, alarm: 320, closed: 240, packIdMiss: 214, alarm7: 28 },
+    { name: '100Ah 方壳', stage: '量产', cap: 100, cellType: 'NCM', struct: '1P96S',  sop: '2024-10', pack: 12800, conn: 11200, connRate: 87.5, overdue: 8,  alarm: 180, closed: 150, packIdMiss: 96, alarm7: 15 },
+    { name: '75Ah 刀片', stage: '停产',  cap: 75,  cellType: 'AB', struct: '1P120S', sop: '2023-05', pack: 9800,  conn: 8300,  connRate: 84.7, overdue: 5,  alarm: 96,  closed: 88,  packIdMiss: 141, alarm7: 6 },
+    { name: '50Ah 圆柱', stage: '开发',  cap: 50,  cellType: 'LFP', struct: '2P90S',  sop: '2023-01', pack: 6100,  conn: 5000,  connRate: 82.0, overdue: 3,  alarm: 54,  closed: 49,  packIdMiss: 60, alarm7: 4 },
   ];
   var MODES = ['绝缘故障', 'SOC 一致性', '容量衰减', '自放电异常', '压差报警', '热失控预警'];
+  var ALL_PAGES = [
+    ['page1', '首页看板'], ['page17', '我的待办'], ['page15', '系统导航'], ['page2', '客户档案'], ['page3', '会议纪要'],
+    ['page4', '预警闭环'], ['page5', '阶段总结'], ['page6', 'Q&A知识库'], ['page9', '数智分析'], ['page19', '工具箱'],
+    ['page18', '知识中心'], ['page14', '数据洞察'], ['page7', '文档管理'], ['page8', 'OEM映射'], ['page10', '需求管理'],
+    ['page16', '部门需求池'], ['page12', '合同管理'], ['page13', '项目管理'],
+  ].map(function (x) { return { perm: x[0] + '.view', name: x[1], page: x[0] }; });
+  var TODOS = [
+    { kind: 'meeting_task', id: 101, title: '提交产线验证报告', meta: '小米SU7 量产协调会 · 计划 2026-09-25', status: '进行中' },
+    { kind: 'meeting_task', id: 102, title: '完善批次追溯', meta: '电芯质量专项会 · 计划 2026-09-20', status: '已逾期' },
+    { kind: 'meeting_task', id: 103, title: '整理季度对账单', meta: '季度商务对账会', status: '已完成', actual_date: '2026-09-02' },
+    { kind: 'warning', id: 3, title: '153Ah · 绝缘故障', meta: '小米汽车', status: '未闭环' },
+    { kind: 'warning', id: 4, title: '100Ah · 压差报警', meta: '小米汽车', status: '已闭环' },
+    { kind: 'pool', id: 1, title: '预警外发周报自动化', meta: '部门需求池', status: '待审批' },
+    { kind: 'pool', id: 2, title: '质保统览口径梳理', meta: '部门需求池', status: '已通过' },
+  ];
+  var STAGE_SUMMARY = [
+    { id: 1, name_cn: '小米汽车', summary_date: '2026-09-15', failure_mode: '绝缘故障', dispatch_count: 12, reduced_breakdown: 3, is_milestone: false, milestone_note: '' },
+    { id: 2, name_cn: '小米汽车', summary_date: '2026-08-31', failure_mode: '压差报警', dispatch_count: 8, reduced_breakdown: 2, is_milestone: true, milestone_note: '压差治理闭环' },
+  ];
+  var SYS_USERS = [
+    { id: 1, username: 'admin', employee_id: 'admin', name: '系统管理员', role_id: 1, role_code: 'admin', role_name: '管理员', is_admin: true, is_active: 1, has_password: true, account_status: '正常', oem_perms: [], dynamic_cols: {} },
+    { id: 2, username: 'E001', employee_id: 'E001', name: '冯瑾奕', role_id: 2, role_code: 'user', role_name: '普通用户', is_admin: false, is_active: 1, has_password: true, account_status: '正常', oem_perms: ['XMS', 'NIO'], dynamic_cols: { region: '华北' }, module_override: false },
+    { id: 3, username: 'E002', employee_id: 'E002', name: '李强', role_id: 2, role_code: 'user', role_name: '普通用户', is_admin: false, is_active: 1, has_password: true, account_status: '正常', oem_perms: ['BYD'], dynamic_cols: {}, module_override: true, module_modules: ['page1.view', 'page4.view'] },
+  ];
   function months(n) {
     var out = [], now = new Date(NOW);
     for (var i = n - 1; i >= 0; i--) {
@@ -2506,15 +2530,15 @@ table .ctr, table th.ctr { text-align: center; }
   function makeCustomers() {
     var out = [];
     CUSTOMERS.forEach(function (c, i) {
-      out.push({ oem: c.oem, oem_ch: c.oem_ch, name_cn: c.name_cn, name_en: c.name_cn, address: '北京市', location: '华北', kpi: 'S级', decision_auth: '总部集采', level: c.level, cooperation_scope: '动力电池', relationship_status: c.relationship_status, market_quality: 'A+', algorithm_capability: '中', key_persons: [{ id: i + 1, name: '张建军', position: '采购总监', type: 'external', phone: '138-0000-0001', email: 'zjj@example.com' }], visit_plans: [], agreements: [] });
+      out.push({ oem: c.oem, oem_ch: c.oem_ch, name_cn: c.name_cn, name_en: c.name_cn, address: '北京市', location: '华北', kpi: '年出货 5GWh', decision_auth: '总部集采', level: c.level, cooperation_scope: '动力电池', relationship_status: c.relationship_status, market_quality: 'A+', algorithm_capability: '中', key_persons: [{ id: i + 1, name: '张建军', position: '采购总监', type: 'external', phone: '138-0000-0001', email: 'zjj@example.com' }], visit_plans: [], agreements: [] });
     });
     return out;
   }
 
   function dummyContracts() {
     return [
-      { id: 1, contract_no: 'XMS-2026-001', title: '15GWh 动力电池供应合同', parent_id: null, sub_count: 2, oem: OEM, contract_type: '主合同', status: '生效中', sign_date: '2026-01-15', start_date: '2026-02-01', end_date: '2027-01-31', amount: 125000000, currency: 'CNY', their_company: '小米汽车科技', their_signer: '张建军', payment_terms: 'T+60', important_notes: '', remark: '', has_file: false, file_name: '' },
-      { id: 2, contract_no: 'XMS-2024-088', title: 'BMS 软件授权补充协议', parent_id: 1, sub_count: 0, oem: OEM, contract_type: '补充协议', status: '履行中', sign_date: '2024-05-20', start_date: '2024-06-01', end_date: '2026-05-31', amount: 8500000, currency: 'CNY', their_company: '小米汽车科技', their_signer: '李文博', payment_terms: 'T+90', important_notes: '', remark: '', has_file: false, file_name: '' },
+      { id: 1, contract_no: 'XMS-2026-001', title: '15GWh 动力电池供应合同', parent_id: null, sub_count: 2, oem: OEM, contract_type: '主合同', status: '执行中', sign_date: '2026-01-15', start_date: '2026-02-01', end_date: '2027-01-31', amount: 125000000, currency: 'CNY', their_company: '小米汽车科技', their_signer: '张建军', payment_terms: 'T+60', important_notes: '', remark: '', has_file: false, file_name: '' },
+      { id: 2, contract_no: 'XMS-2024-088', title: 'BMS 软件授权补充协议', parent_id: 1, sub_count: 0, oem: OEM, contract_type: '补充协议', status: '执行中', sign_date: '2024-05-20', start_date: '2024-06-01', end_date: '2026-05-31', amount: 8500000, currency: 'CNY', their_company: '小米汽车科技', their_signer: '李文博', payment_terms: 'T+90', important_notes: '', remark: '', has_file: false, file_name: '' },
     ];
   }
   function dummyDemands() {
@@ -2525,8 +2549,10 @@ table .ctr, table th.ctr { text-align: center; }
   }
   function dummyDocuments() {
     return [
-      { id: 1, name_cn: '小米汽车', capacity_ah: 153, doc_type: '技术规格', title: 'SU7 电池规格书', file_name: 'SU7_spec_v3.pdf', upload_date: '2026-08-01' },
-      { id: 2, name_cn: '小米汽车', capacity_ah: 153, doc_type: '测试报告', title: '型式试验报告', file_name: 'TYPE_TEST_153.pdf', upload_date: '2026-07-15' },
+      { id: 1, oem: OEM, name_cn: '小米汽车', capacity_ah: 153, doc_type: '数据委托处理协议', title: 'SU7 数据委托处理协议', file_name: 'SU7_DPA_v3.pdf', upload_date: '2026-08-01' },
+      { id: 2, oem: OEM, name_cn: '小米汽车', capacity_ah: 153, doc_type: '数据转发费用协议', title: '153Ah 数据转发费用协议', file_name: 'FWD_FEE_153.pdf', upload_date: '2026-07-15' },
+      { id: 3, oem: OEM, name_cn: '小米汽车', capacity_ah: null, doc_type: '阳光协议', title: '阳光协议（通用）', file_name: 'SUNSHINE.pdf', upload_date: '2026-06-20' },
+      { id: 4, oem: 'NIO', name_cn: '蔚来', capacity_ah: 100, doc_type: '数据委托处理协议', title: 'ET5 数据委托处理协议', file_name: 'NIO_DPA.pdf', upload_date: '2026-05-10' },
     ];
   }
 
@@ -2553,10 +2579,16 @@ table .ctr, table th.ctr { text-align: center; }
     if (u === '/api/customers/cell_products') return json([{ cell_cap: 153, cell_structure: '1P204S', pn_system: 'XR153' }, { cell_cap: 100, cell_structure: '1P96S', pn_system: 'XF100' }]);
     if (u === '/api/customers/by_cap') return json(CUSTOMERS);
     if (u === '/api/customers' && method === 'GET') {
-      if (qs) { var list = makeCustomers(); return json(list); }
-      return json(makeCustomers());
+      var kw = (q.get('name_cn') || '').toLowerCase(), lv = q.get('level') || '';
+      return json(makeCustomers().filter(function (c) {
+        if (lv && c.level !== lv) return false;
+        return !kw || [c.oem, c.oem_ch, c.name_cn].some(function (v) { return String(v || '').toLowerCase().indexOf(kw) >= 0; });
+      }));
     }
-    if (/^\/api\/customers\/[^/]+$/.test(u) && method === 'GET') return json(makeCustomers()[0] || {});
+    if (/^\/api\/customers\/[^/]+$/.test(u) && method === 'GET') {
+      var coem = decodeURIComponent(u.split('/')[3]);
+      return json(makeCustomers().filter(function (c) { return c.oem === coem; })[0] || { error: '客户不存在' });
+    }
     if (/^\/api\/customers\/[^/]+$/.test(u) && method === 'PUT') return json({ success: true });
     if (/^\/api\/customers\/[^/]+$/.test(u) && method === 'DELETE') return json({ success: true });
     if (u === '/api/customers' && method === 'POST') return json({ success: true, oem: 'NEWOEM' });
@@ -2578,7 +2610,11 @@ table .ctr, table th.ctr { text-align: center; }
     if (u === '/api/oem_comparison') return json({ success: true, cell_cap: p(q, 'cell_cap', '153'), rows: CUSTOMERS.map(function (c, i) { return { oem: c.oem, oem_ch: c.oem_ch, access_count: 5000 + i * 800, active_count: 4000 + i * 600, mileage_count: i }; }) });
     if (u === '/api/events' && method === 'GET') return json(events());
     if (u === '/api/events') return json({ success: true, id: 99 });
-    if (u === '/api/workbench/my_todos') return json({ success: true, total: 8, done: 3, todo: 5, name: '系统管理员', username: 'admin', items: [] });
+    if (u === '/api/workbench/my_todos') {
+      var tdDone = ['已完成', '已闭环', '已通过'];
+      var tdDoneN = TODOS.filter(function (t) { return tdDone.indexOf(t.status) >= 0; }).length;
+      return json({ success: true, total: TODOS.length, done: tdDoneN, todo: TODOS.length - tdDoneN, name: '系统管理员', username: 'admin', items: TODOS.map(function (t) { return Object.assign({}, t); }) });
+    }
 
     // 预警
     if (u === '/api/warnings' && method === 'GET') { var ps = parseInt(p(q, 'page_size', '0'), 10) || 0; return json(makeWarnings(parseInt(p(q, 'page', '1'), 10) || 1, ps)); }
@@ -2608,7 +2644,14 @@ table .ctr, table th.ctr { text-align: center; }
     if (u === '/api/meetings/batch-create') return json({ success: true, count: 0 });
     if (/^\/api\/meetings\/\d+\/(notify|notify_tasks)/.test(u)) return json({ success: true });
     // 任务
-    if (/^\/api\/tasks\/\d+/.test(u)) return json({ success: true });
+    if (/^\/api\/tasks\/\d+/.test(u)) {
+      if (method === 'PUT') {
+        var tb = {}; try { tb = JSON.parse((init && init.body) || '{}'); } catch (e) { }
+        var tid = parseInt(u.split('/')[3], 10);
+        TODOS.forEach(function (t) { if (t.kind === 'meeting_task' && t.id === tid && tb.status) { t.status = tb.status; t.actual_date = tb.status === '已完成' ? NOW : ''; } });
+      }
+      return json({ success: true });
+    }
 
     // 拜访/关键人
     if (u === '/api/visit_plans') return json({ success: true, id: 9 });
@@ -2617,7 +2660,14 @@ table .ctr, table th.ctr { text-align: center; }
     if (/^\/api\/key_persons\/\d+/.test(u)) return json({ success: true });
 
     // 阶段总结
-    if (u === '/api/stage_summary') return json([{ id: 1, name_cn: '小米汽车', summary_date: '2026-09-15', failure_mode: '绝缘故障', dispatch_count: 12, reduced_breakdown: 3, is_milestone: false, milestone_note: '' }]);
+    if (u === '/api/stage_summary') return json(STAGE_SUMMARY.map(function (x) { return Object.assign({}, x); }));
+    if (/^\/api\/stage_summary\/\d+\/milestone$/.test(u)) {
+      var ss = STAGE_SUMMARY.filter(function (x) { return x.id === parseInt(u.split('/')[3], 10); })[0];
+      if (!ss) return json({ success: false, message: '记录不存在' });
+      var sb = {}; try { sb = JSON.parse((init && init.body) || '{}'); } catch (e) { }
+      ss.is_milestone = !ss.is_milestone; ss.milestone_note = ss.is_milestone ? (sb.note || '') : '';
+      return json({ success: true, is_milestone: ss.is_milestone });
+    }
 
     // 合同
     if (u === '/api/contracts/stats') return json({ total: 2, total_amount: 133500000,
@@ -2633,11 +2683,19 @@ table .ctr, table th.ctr { text-align: center; }
     if (u === '/api/demands' && method === 'POST') return json({ success: true, id: 9 });
     if (/^\/api\/demands\/\d+/.test(u)) return json({ success: true });
     // 需求池
-    if (u === '/api/demand-pool/meta') return json({ can_approve: true, approvers: [], categories: [{ id: 1, name: '产品' }], me: { name: 'admin' } });
+    if (u === '/api/demand-pool/meta') return json({ can_approve: true, approvers: [{ name: '李瑞林' }, { name: '刘子丽' }], categories: [{ id: 1, name: '产品' }], me: { name: 'admin' } });
     if (/^\/api\/demand-pool/.test(u)) return json([]);
 
     // 文档
-    if (u === '/api/documents' && method === 'GET') return json(dummyDocuments());
+    if (u === '/api/documents' && method === 'GET') {
+      var doem = q.get('oem') || '', dcap = q.get('capacity_ah') || '', dtype = q.get('doc_type') || '', dnone = q.get('capacity_empty') === '1';
+      return json(dummyDocuments().filter(function (d) {
+        if (doem && d.oem !== doem) return false;
+        if (dtype && d.doc_type !== dtype) return false;
+        if (dnone) return d.capacity_ah == null;
+        return !dcap || String(d.capacity_ah) === String(dcap).replace(/ah$/i, '');
+      }));
+    }
 
     // OEM 映射
     if (u === '/api/oem_mapping' && method === 'GET') return json(CUSTOMERS.map(function (c, i) { return { id: i + 1, oem: c.oem, oem_ch: c.oem_ch, cust_grp_name: c.name_cn }; }));
@@ -2685,13 +2743,17 @@ table .ctr, table th.ctr { text-align: center; }
     if (/^\/api\/obs\/list/.test(u)) return json([]);
 
     // 系统管理
-    if (u === '/api/users/all-detail') return json([]);
-    if (u === '/api/users' && method === 'GET') return json([]);
+    if (u === '/api/users/all-detail') return json({ success: true, users: SYS_USERS.map(function (x) { return Object.assign({}, x); }), dynamic_cols: [{ col_key: 'region', col_name: '负责区域' }], permissions: [], module_pages: ALL_PAGES });
+    if (u === '/api/users' && method === 'GET') return json(SYS_USERS.map(function (x) { return Object.assign({}, x); }));
+    if (/^\/api\/users\/\d+\/module-perms$/.test(u) && method === 'GET') {
+      var mu = SYS_USERS.filter(function (x) { return x.id === parseInt(u.split('/')[3], 10); })[0] || {};
+      return json({ success: true, all_modules: ALL_PAGES, role_code: mu.role_code || 'user', role_default_modules: ['page1.view', 'page17.view', 'page2.view', 'page3.view'], is_override: !!mu.module_override, override_modules: mu.module_modules || [] });
+    }
     if (u === '/api/users' && method === 'POST') return json({ success: true, id: 9 });
     if (/^\/api\/users\/\d+/.test(u)) return json({ success: true });
     if (u === '/api/roles' && method === 'GET') return json([{ id: 1, name: '管理员', code: 'admin', is_builtin: true, description: '', permissions: ['*'] }, { id: 2, name: '普通用户', code: 'user', is_builtin: false, description: '', permissions: [] }]);
     if (/^\/api\/roles\/\d+\/permissions/.test(u)) return json({ success: true, role: { id: 1, name: '管理员' }, permissions: ['*'] });
-    if (u === '/api/permissions/pages') return json({ pages: [{ perm: 'page1.view', name: '首页看板' }, { perm: 'page2.view', name: '客户档案' }, { perm: 'page3.view', name: '会议纪要' }, { perm: 'page4.view', name: '预警闭环' }, { perm: 'page5.view', name: '阶段总结' }, { perm: 'page6.view', name: 'Q&A知识库' }, { perm: 'page7.view', name: '文档管理' }, { perm: 'page8.view', name: 'OEM映射' }, { perm: 'page9.view', name: '数智分析' }, { perm: 'page10.view', name: '需求管理' }, { perm: 'page12.view', name: '合同管理' }], edits: [] });
+    if (u === '/api/permissions/pages') return json({ pages: ALL_PAGES, edits: [{ perm: 'customer.edit', name: '客户档案' }, { perm: 'meeting.edit', name: '会议纪要' }, { perm: 'warning.edit', name: '预警闭环' }, { perm: 'contract.edit', name: '合同管理' }] });
     if (u === '/api/login_logs') return json([]);
     if (u === '/api/operation_logs') return json([]);
     if (u === '/api/activity/stats') return json({});
@@ -3034,7 +3096,7 @@ const App = {
             page13: ['项目管理', '大任务拆解 · 迭代 · 待完善清单'],
             page14: ['数据洞察', '让 Agent 学习表结构 · 沉淀数据知识'],
             page15: ['系统导航', 'ADG 现有系统 · 组件直达'],
-            page16: ['部门需求池', '提需求 · 瑞林/子丽审批 · 完成时间闭环']
+            page16: ['部门需求池', '提需求 · 授权审批人审批 · 完成时间闭环']
         };
         const t = titles[pageId] || ['', ''];
         const titleEl = document.getElementById('headerTitle');
@@ -3690,11 +3752,21 @@ const Utils = {
         return `<span class="badge badge-${cls}">${status}</span>`;
     },
 
+    // 客户等级字典：筛选、表单、徽章共用
+    CUSTOMER_LEVELS: ['S级', 'A级', 'B级', 'C级'],
+
+    // 等级下拉选项；当前值不在字典里时原样保留为一项，避免保存时被悄悄改掉
+    levelOptions(cur) {
+        const list = this.CUSTOMER_LEVELS.slice();
+        if (cur && !list.includes(cur)) list.push(cur);
+        return list.map(l => `<option value="${this.esc(l)}" ${l === cur ? 'selected' : ''}>${this.esc(l)}</option>`).join('');
+    },
+
     // 等级徽章
     levelBadge(level) {
-        return level === '重要'
-            ? `<span class="badge badge-purple">${level}</span>`
-            : `<span class="badge badge-info">${level}</span>`;
+        if (!level) return '<span style="color:var(--text-muted);">-</span>';
+        const cls = { 'S级': 'purple', 'A级': 'warning', 'B级': 'info', 'C级': 'secondary' }[level] || 'info';
+        return `<span class="badge badge-${cls}">${this.esc(level)}</span>`;
     },
 
     // 格式化日期
@@ -3991,7 +4063,7 @@ const OpinionBox = {
     categories: ['功能建议', 'Bug反馈', '体验优化', '其他'],
     // 所属模块：模块 → 子部分（对应各导航模块）。「整个系统」无子部分。
     modules: {
-        '运营': ['首页看板', '我的待办', '系统导航', '客户档案', '会议纪要', '预警闭环', '阶段总结', '合同管理', '部门需求池', '项目/开发日志'],
+        '运营': ['首页看板', '我的待办', '系统导航', '客户档案', '会议纪要', '预警闭环', '阶段总结', '合同管理', '部门需求池', '项目管理'],
         '智能': ['Q&A知识库', '数智分析', '工具箱', '知识中心', '数据洞察'],
         '管理': ['需求管理', 'OEM映射', '文档管理', '系统管理'],
         '整个系统': [],
@@ -5248,6 +5320,8 @@ const ThreeView = (() => {
       { name: '接入车辆', color: SEQ.g2, data: (d.projects || []).map(p => p.conn || 0) }, 480, 'grp');
     legendRedraw.grp = () => { const el = document.getElementById('t3GrpBar'); if (el) { el.innerHTML = grpHtml(); addChartDownloads(el); } };
 
+    // 项目阶段取接口真实值（开发 / 量产 / 停产），没有数据显示「-」
+    const stageTd = st => st ? `<span class="pill ${{ '量产': 'g', '开发': 'o', '停产': 'r' }[st] || 'b'}">${esc(st)}</span>` : '-';
     // 项目列表（点击行 → 进入项目视角）
     const projRows = (d.projects || []).map(p => {
       const connRate = p.connRate != null ? p.connRate + '%' : 'N/A';
@@ -5255,7 +5329,7 @@ const ThreeView = (() => {
       const clRate = p.alarm ? (100 * (p.closed || 0) / p.alarm).toFixed(1) + '%' : '-';
       return `<tr style="cursor:pointer" onclick="ThreeView.gotoProject('${esc(oem)}','${esc(p.cap)}')">
         <td><b>${esc(p.name)}</b></td><td class="num">${esc(p.cap)}</td><td>${esc(p.cellType || '-')}</td><td>${esc(structTxt(p.struct))}</td>
-        <td><span class="pill g">量产</span></td><td>${esc(p.sop || '-')}</td>
+        <td>${stageTd(p.stage)}</td><td>${esc(p.sop || '-')}</td>
         <td class="num">${fmt(p.pack)}</td><td class="num">${fmt(p.conn)}</td><td class="num">${esc(connRate)}</td>${missTd(p.packIdMiss, p.conn)}
         <td class="num">${fmt(p.overdue)}（${esc(odRate)}）</td><td class="num">${fmt(p.alarm)}</td>
         <td class="num">${fmt(p.closed)}（${esc(clRate)}）</td>
@@ -5590,7 +5664,7 @@ const ThreeView = (() => {
       { icon: '🔋', label: '电芯累计出货', val: wan(info.cell) + ' 颗', sub: `${fmt(info.pack)} 包 · ${info.custCount || 0} 客户`, cls: 'hl' },
       { icon: '📥', label: '接入车辆数', val: wan(info.conn) + ' 辆', tip: '已装车并接入的车辆' },
       missCard(info.packIdMiss, info.conn),
-      { icon: '⚠️', label: '失效车辆数', val: failVal(info), sub: state.cellMode ? `失效模式：${state.cellMode}` : '联动 工单数（现场）', cls: 'bad', tip: '失效车辆数 = 现场工单数' },
+      { icon: '⚠️', label: '失效车辆数', val: failVal(info), sub: state.cellMode ? `失效模式：${state.cellMode}` : '', cls: 'bad', tip: '失效车辆数 = 现场工单数' },
       { icon: '✅', label: '市场已闭环', val: fmt(info.closed), sub: `闭环率 ${closeRate}`, cls: 'ok' },
       { icon: '📉', label: '失效率（ppm）', val: fmt(ppmOf(info)), cls: 'bad', tip: '失效率 = 失效车辆数 / 接入车辆数 × 10⁶' },
       { icon: '📊', label: '今年接入', val: fmt(info.year), tip: '跨客户合计' },
@@ -6757,9 +6831,12 @@ const Page1 = {
         try {
             // 1) 内联加载离线渲染引擎源码
             let engineJs = '';
-            try { engineJs = await (await fetch('/static/js/pages/dashboard_export.js')).text(); }
-            catch (e) { engineJs = ''; }
-            if (!engineJs.trim()) { Toast.error('离线渲染引擎加载失败'); return; }
+            if (!window.__offlineMockInstalled) try {
+                const er = await fetch('/static/js/pages/dashboard_export.js');
+                engineJs = er.ok ? await er.text() : '';
+            } catch (e) { engineJs = ''; }
+            // 拿不到引擎（离线单文件 / 发布页没有 /static）→ 退回导出当前渲染结果的静态快照，保证按钮可用
+            if (!engineJs.trim() || !/OfflineDash/.test(engineJs)) { await this._downloadSnapshot(host, view, oem); return; }
             // 2) 现取当前视角数据（一次请求）
             let q = `?view=${encodeURIComponent(view)}`;
             if (view === 'customer') q += `&oem=${encodeURIComponent(oem)}`;
@@ -6843,6 +6920,42 @@ ${engineJs}
         } catch (e) {
             Toast.error('生成下载失败：' + e.message);
         }
+    },
+
+    // 静态快照：克隆 #p1Dashboard 当前 DOM（SVG 图表已是成品），去掉脚本事件，内联样式后下载
+    async _downloadSnapshot(host, view, oem) {
+        const clone = host.cloneNode(true);
+        clone.querySelectorAll('script').forEach(n => n.remove());
+        clone.querySelectorAll('*').forEach(n => {
+            [...n.attributes].forEach(a => { if (/^on/i.test(a.name)) n.removeAttribute(a.name); });
+        });
+        clone.querySelectorAll('select, input, textarea').forEach(n => n.setAttribute('disabled', ''));
+        let css = '';
+        document.querySelectorAll('style').forEach(s => { css += s.textContent + '\n'; });
+        const custSel = document.getElementById('p1Customer');
+        const opt = custSel && custSel.selectedOptions && custSel.selectedOptions[0];
+        const custName = (opt && opt.textContent && opt.textContent.split(' (')[0]) || oem || '客户';
+        const now = new Date();
+        const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+        const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+        const vname = { customer: '客户视角', project: '项目视角', cell: '电芯视角' }[view] || '客户视角';
+        const html = `<!DOCTYPE html>
+<html lang="zh-CN" data-theme="${theme}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>客户看板 · ${Utils.esc(custName)} · ${vname} · ${dateStr}</title>
+<style>${css}</style>
+</head>
+<body>
+<div style="padding:24px;max-width:1600px;margin:0 auto;">
+  <div style="font-size:12px;color:var(--text-muted);margin:0 0 12px;">${Utils.esc(vname)} · ${Utils.esc(custName)} · 生成于 ${now.toLocaleString('zh-CN')}</div>
+  <div id="p1Dashboard">${clone.innerHTML}</div>
+</div>
+</body>
+</html>`;
+        const ok = await FileSaver.save(new Blob([html], { type: 'text/html;charset=utf-8' }), `客户看板_${custName}_${vname}_${dateStr}.html`);
+        if (ok) Toast.success('已下载当前看板快照');
     },
 
     switchView(mode, shouldAuto) {
@@ -9097,7 +9210,11 @@ const PageTodo = {
     // 会议任务状态下拉（负责人本人可直接改状态，后端权限分层放行）
     _taskSelect(it) {
         if (it.kind !== 'meeting_task' || !it.id) return `<span style="flex:none;">${this._status(it)}</span>`;
-        const opts = ['待处理', '进行中', '已完成'].map(s =>
+        const base = ['待处理', '进行中', '已完成'];
+        // 已逾期等不可手选的状态：作为只读的当前项回显，不再错显成「待处理」
+        const extra = it.status && !base.includes(it.status)
+            ? `<option value="${Utils.esc(it.status)}" selected disabled>${Utils.esc(it.status)}</option>` : '';
+        const opts = extra + base.map(s =>
             `<option value="${s}" ${it.status === s ? 'selected' : ''}>${s}</option>`).join('');
         return `<select style="flex:none;font-size:12px;padding:2px 6px;border:1px solid var(--border-row);border-radius:6px;background:var(--bg-card);color:var(--text-primary);"
                 onchange="PageTodo.setTaskStatus(${it.id}, this.value)">${opts}</select>`;
@@ -9153,9 +9270,10 @@ const PageTodo = {
         const kinds = [
             { key: 'all', label: '待办', fn: it => !isDone(it) },
             { key: 'done', label: '✅ 已完成', fn: isDone },
-            { key: 'warning', label: '⚠️ 认领预警', fn: it => it.kind === 'warning' },
-            { key: 'pool', label: '📥 部门需求', fn: it => it.kind === 'pool' },
-            { key: 'meeting_task', label: '📌 会议任务', fn: it => it.kind === 'meeting_task' },
+            // 分类只列未完成项，已完成统一归到「已完成」，数量与「待办」口径一致
+            { key: 'warning', label: '⚠️ 认领预警', fn: it => it.kind === 'warning' && !isDone(it) },
+            { key: 'pool', label: '📥 部门需求', fn: it => it.kind === 'pool' && !isDone(it) },
+            { key: 'meeting_task', label: '📌 会议任务', fn: it => it.kind === 'meeting_task' && !isDone(it) },
         ];
         this._filter = this._filter || 'all';
         if (filterEl) {
@@ -9639,8 +9757,7 @@ const Page2 = {
                 <label>等级</label>
                 <select id="p2FilterLevel">
                     <option value="">全部</option>
-                    <option value="重要">重要</option>
-                    <option value="一般">一般</option>
+                    ${Utils.CUSTOMER_LEVELS.map(l => `<option value="${l}">${l}</option>`).join('')}
                 </select>
             </div>
             <button class="btn btn-primary" id="p2Search">查 询</button>
@@ -9723,7 +9840,7 @@ const Page2 = {
     async openForm(rawOem) {
         // onclick 里用 encodeURIComponent 传参，这里还原，避免特殊字符（如单引号）破坏 JS/HTML
         const oem = rawOem ? decodeURIComponent(rawOem) : '';
-        let c = { oem: '', oem_ch: '', name_cn: '', name_en: '', address: '', location: '', kpi: '', decision_auth: '', level: '一般', cooperation_scope: '', relationship_status: '', market_quality: '', algorithm_capability: '' };
+        let c = { oem: '', oem_ch: '', name_cn: '', name_en: '', address: '', location: '', kpi: '', decision_auth: '', level: 'B级', cooperation_scope: '', relationship_status: '', market_quality: '', algorithm_capability: '' };
         const isEdit = !!oem;
         if (isEdit) {
             const detail = await API.get(`/api/customers/${encodeURIComponent(oem)}`);
@@ -9750,7 +9867,7 @@ const Page2 = {
             <div class="form-group"><label>决策权</label><input type="text" id="mfDecision" value="${Utils.esc(c.decision_auth)}" placeholder="关键决策人/决策层级，如：李总(总监/最终拍板)"></div>
             <div class="form-row">
                 <div class="form-group"><label>等级</label>
-                    <select id="mfLevel"><option value="重要" ${c.level==='重要'?'selected':''}>重要</option><option value="一般" ${c.level==='一般'?'selected':''}>一般</option></select>
+                    <select id="mfLevel">${Utils.levelOptions(c.level)}</select>
                 </div>
                 <div class="form-group"><label>合作界面</label><input type="text" id="mfScope" value="${Utils.esc(c.cooperation_scope)}" placeholder="如：商务对接/技术对接"></div>
             </div>
@@ -12778,8 +12895,14 @@ const Page5 = {
     },
 
     async toggleMilestone(id) {
-        const note = await Dialog.prompt('标记为里程碑？可填写说明（留空则直接标记）：', '');
-        if (note === null) return;  // 取消
+        const rec = (this._data || []).find(d => d.id === id);
+        let note = '';
+        if (rec && rec.is_milestone) {
+            if (!(await Dialog.confirm('取消这条记录的里程碑标记？'))) return;
+        } else {
+            note = await Dialog.prompt('标记为里程碑？可填写说明（留空则直接标记）：', '');
+            if (note === null) return;  // 取消
+        }
         const res = await API.post(`/api/stage_summary/${id}/milestone`, {note: note});
         if (res && res.success) {
             Toast.success(res.is_milestone ? '已标记为里程碑' : '已取消里程碑');
@@ -13649,12 +13772,16 @@ const Page7 = {
 
         let url = '/api/documents?';
         if (oem) url += `oem=${encodeURIComponent(oem)}&`;
-        if (cap) url += `capacity_ah=${encodeURIComponent(cap)}&`;
+        // 「通用」= 未标容量的文档：不能把「通用」原样当容量值传
+        const generic = cap === '通用';
+        if (generic) url += 'capacity_empty=1&';
+        else if (cap) url += `capacity_ah=${encodeURIComponent(cap)}&`;
         if (dtype) url += `doc_type=${encodeURIComponent(dtype)}&`;
 
         const container = document.getElementById('p7List');
         container.innerHTML = '<div class="loading"></div>';
-        const data = await API.get(url);
+        let data = await API.get(url);
+        if (generic && Array.isArray(data)) data = data.filter(d => d.capacity_ah === null || d.capacity_ah === undefined || d.capacity_ah === '');
         if (!data || !data.length) {
             container.innerHTML = '<div class="empty-state"><div class="empty-icon">&#128194;</div><p>暂无文档</p></div>';
             return;
@@ -15269,7 +15396,7 @@ const PageDemandPool = {
                 <input type="checkbox" id="dpiMine" ${this._mine ? 'checked' : ''}> 只看我提的
             </label>
             <span style="flex:1;"></span>
-            <span style="font-size:12px;color:var(--text-muted);">审批：由系统配置的授权审批人（任一通过即通过）</span>
+            <span style="font-size:12px;color:var(--text-muted);">审批：<span id="dpiApprovers">授权审批人</span>（任一通过即通过）</span>
         </div>
 
         <div id="dpiStats" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;"></div>
@@ -15294,9 +15421,18 @@ const PageDemandPool = {
         this.load();
     },
 
+    // 审批人名单来自接口（授权名单换人后文案自动跟随）
+    _approverText() {
+        const list = ((this._meta && this._meta.approvers) || [])
+            .map(a => typeof a === 'string' ? a : (a && (a.name || a.username)) || '').filter(Boolean);
+        return list.length ? list.join('/') : '授权审批人';
+    },
+
     async load() {
         if (!this._meta) {
             this._meta = await API.get('/api/demand-pool/meta') || { can_approve: false, approvers: [], categories: [], me: {} };
+            const ap = document.getElementById('dpiApprovers');
+            if (ap) ap.textContent = this._approverText();
         }
         const q = new URLSearchParams();
         if (this._filter !== '全部') q.set('status', this._filter);
@@ -15415,7 +15551,7 @@ const PageDemandPool = {
                 <div class="form-group"><label>责任处理人</label>${ownerInput}</div>
                 <div class="form-group"><label>计划完成日期</label><input type="date" id="dp-planned" value="${d.planned_date ? String(d.planned_date).substring(0,10) : ''}"></div>
             </div>
-            ${id ? '' : `<div style="font-size:12px;color:var(--text-muted);">提报后将进入 <b>待审批</b>，由 李瑞林/刘子丽 任一审批。</div>`}
+            ${id ? '' : `<div style="font-size:12px;color:var(--text-muted);">提报后将进入 <b>待审批</b>，由 ${Utils.esc(this._approverText())} 任一审批。</div>`}
             <div style="text-align:right;">
                 <button class="btn btn-secondary" onclick="Modal.close()">取消</button>
                 <button class="btn btn-primary" id="dp-save">${id ? '保存' : '提报'}${id && d.status === '已通过' ? '(通过后不可改标题)' : ''}</button>
@@ -16239,7 +16375,7 @@ const PageContract = {
             <td class="cell-ellipsis" title="${Utils.esc(c.their_company)}">${Utils.esc(c.their_company) || '-'}</td>
             <td>${c.has_file ? '<a href="javascript:;" class="btn btn-sm btn-secondary" onclick="PageContract.viewFile(' + c.id + ')" title="查看原合同">📄 原合同</a>' : (App.hasPerm('contract.edit') ? `<a href="javascript:;" class="btn btn-sm btn-secondary" style="font-size:11px;" onclick="PageContract.uploadFile(${c.id})">📎 上传</a>` : '<span style="color:var(--text-muted);font-size:11px;">-</span>')}</td>
             <td class="actions">
-                ${App.hasPerm('customer.edit') ? `<button class="btn btn-sm btn-secondary" onclick="PageContract.openEdit(${c.id})">编辑</button>
+                ${App.hasPerm('contract.edit') ? `<button class="btn btn-sm btn-secondary" onclick="PageContract.openEdit(${c.id})">编辑</button>
                 <button class="btn btn-sm btn-danger" onclick="PageContract.del(${c.id})">删</button>` : '<span style="color:var(--text-muted);font-size:11px;">只读</span>'}
             </td>
         </tr>`;
@@ -16268,8 +16404,13 @@ const PageContract = {
 
     async loadStats() {
         const box = document.getElementById('pcStats');
-        const s = await API.get('/api/contracts/stats');
+        const [s, all] = await Promise.all([API.get('/api/contracts/stats'), API.get('/api/contracts')]);
         if (!s) return;
+        // 状态是手工维护的：已过到期日仍标「执行中」的不计入执行中，单独提示待续签
+        const list = Array.isArray(all) ? all : [];
+        const statusRunning = (s.by_status || []).find(x => x.label === '执行中')?.value || 0;
+        const overdueRunning = list.filter(c => c.status === '执行中' && c.end_date && this.daysUntil(c.end_date) < 0).length;
+        const running = Math.max(0, statusRunning - overdueRunning);
         const amtStr = s.total_amount ? this.fmtAmount(s.total_amount, 'CNY') : '0';
         // 统计块
         const tiles = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
@@ -16283,7 +16424,8 @@ const PageContract = {
             </div>
             <div class="card stat-card" style="padding:16px 17px;position:relative;">
                 <div class="tile-icon warn" style="position:absolute;right:14px;top:14px;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:16px;background:rgba(255,169,77,0.12);color:var(--warning);">⏳</div>
-                <div class="stat-label">执行中</div><div class="stat-value" style="margin-top:8px;">${(s.by_status||[]).find(x=>x.label==='执行中')?.value||0}</div>
+                <div class="stat-label">执行中</div><div class="stat-value" style="margin-top:8px;">${running}</div>
+                ${overdueRunning ? `<div style="font-size:12px;color:var(--danger);margin-top:4px;">另有 ${overdueRunning} 份已过到期日待续签</div>` : ''}
             </div>
             <div class="card stat-card" style="padding:16px 17px;position:relative;">
                 <div class="tile-icon danger" style="position:absolute;right:14px;top:14px;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:16px;background:rgba(255,107,107,0.12);color:var(--danger);">✅</div>
