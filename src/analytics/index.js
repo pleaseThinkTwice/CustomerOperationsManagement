@@ -7,7 +7,10 @@
 //   近 7 天：warning_time >= 今天-7 天；超期 overdue：外发未闭环且触发已超过 7 天
 //   活跃车辆 active：last_online_date >= 指定日期（默认近 30 天）
 //   在保 insured：质保起算日 + 年限未到期 且 里程未超限（年限/里程取平台质保设置，无则取数仓质保政策，再无则 8 年/不限里程）
-//   PPM：外发预警涉及电芯数 ÷ 出货电芯数 × 1e6
+//   过保 overdue（看板 KPI/项目/车型）：接入车辆中 质保起算日 + 年限已到期 或 里程超限 的车数；insured = 接入 − 过保
+//   pack_id 缺失 packIdMiss：接入车辆中 pack_id 为空的车数
+//   失效车辆 fieldWo：现场工单（dwd_work_order.wo_type='现场'）涉及的去重 VIN 数
+//   失效率 ppm（电芯视角）：失效车辆 ÷ 接入车辆 × 1e6；批次 ppm：批次外发预警数 ÷ 批次出货电芯数 × 1e6；PN 追溯 ppm：PN 现场工单数 ÷ PN 出货电芯数 × 1e6
 const config = require('../config');
 const { openDb } = require('../db');
 const { tables } = require('./schema');
@@ -99,13 +102,14 @@ async function createAnalytics() {
       const base = await all(`SELECT ${g}, usage_type, COUNT(*) AS access_count,
           SUM(CASE WHEN last_online_date >= ? THEN 1 ELSE 0 END) AS active30,
           SUM(CASE WHEN access_date >= ? THEN 1 ELSE 0 END) AS access15,
-          SUM(CASE WHEN access_date >= ? THEN 1 ELSE 0 END) AS this_year
+          SUM(CASE WHEN access_date >= ? THEN 1 ELSE 0 END) AS this_year,
+          SUM(CASE WHEN pack_id IS NULL OR pack_id = '' THEN 1 ELSE 0 END) AS pack_id_miss
         FROM ${T('dwd_vehicle_access')} WHERE ${f.sql} GROUP BY ${g}, usage_type`, [daysAgo(30), daysAgo(15), `${new Date().getFullYear()}-01-01`, ...f.params]);
       const out = new Map();
       for (const r of base) {
         const key = groupBy.map((k) => r[k]).join('|');
-        const o = out.get(key) || Object.assign(Object.fromEntries(groupBy.map((k) => [k, r[k]])), { access_count: 0, active30: 0, access15: 0, this_year: 0, expired_cnt: 0 });
-        o.access_count += num(r.access_count); o.active30 += num(r.active30); o.access15 += num(r.access15); o.this_year += num(r.this_year);
+        const o = out.get(key) || Object.assign(Object.fromEntries(groupBy.map((k) => [k, r[k]])), { access_count: 0, active30: 0, access15: 0, this_year: 0, pack_id_miss: 0, expired_cnt: 0 });
+        o.access_count += num(r.access_count); o.active30 += num(r.active30); o.access15 += num(r.access15); o.this_year += num(r.this_year); o.pack_id_miss += num(r.pack_id_miss);
         // 过保：起算日早于 今天-年限 或 里程超限
         const pol = policies(r) || {};
         const commercial = r.usage_type === 'commercial';
@@ -153,21 +157,87 @@ async function createAnalytics() {
       return (await all(`SELECT cell_cap, fault_type, COUNT(*) AS outgoing_count, SUM(is_closed) AS closed_count FROM ${T('dwd_warning')} WHERE is_outgoing = 1 AND ${f.sql} GROUP BY cell_cap, fault_type ORDER BY outgoing_count DESC`, f.params))
         .map((r) => ({ cell_cap: String(r.cell_cap), fault_type: r.fault_type, outgoing_count: num(r.outgoing_count), closed_count: num(r.closed_count) }));
     },
-    // 近 12 个月按失效模式的 触发/闭环/客诉 矩阵
-    async quality(oem, caps, monthsN = 12) {
-      const labels = lastMonths(monthsN);
+    // 质量矩阵：近 N 月（默认 48）按失效模式的 触发/闭环/客诉 + 工单（预警/批改/现场）
+    // 结构：{ labels:['YY-MM'], alarm:{模式:{'YY-MM':n}}, closed, complaint, workorder, workorder_type:{类型:{模式:{'YY-MM':n}}} }
+    async quality(oem, caps, monthsN = 48) {
+      const months = lastMonths(monthsN);
+      const labels = months.map((l) => l.slice(2));
       const f = filt({ oem, caps });
+      const since = months[0] + '-01';
+      const q = { labels, alarm: {}, closed: {}, complaint: {}, workorder: {}, workorder_type: { 预警: {}, 批改: {}, 现场: {} } };
+      const put = (obj, mode, m, v) => { if (!v) return; const l = m.slice(2); if (!labels.includes(l)) return; (obj[mode] = obj[mode] || {})[l] = (obj[mode][l] || 0) + v; };
       const rows = await all(`SELECT ${d.month('warning_time')} AS m, fault_type, COUNT(*) AS alarm, SUM(is_closed) AS closed, SUM(is_complaint) AS complaint
-        FROM ${T('dwd_warning')} WHERE warning_time >= ? AND ${f.sql} GROUP BY ${d.month('warning_time')}, fault_type`, [labels[0] + '-01', ...f.params]);
-      const modes = [...new Set(rows.map((r) => r.fault_type))].sort();
-      const q = { labels: labels.map((l) => l.slice(2)), alarm: {}, closed: {}, complaint: {} };
-      for (const m of modes) { q.alarm[m] = labels.map(() => 0); q.closed[m] = labels.map(() => 0); q.complaint[m] = labels.map(() => 0); }
-      for (const r of rows) {
-        const i = labels.indexOf(r.m); if (i < 0) continue;
-        q.alarm[r.fault_type][i] = num(r.alarm); q.closed[r.fault_type][i] = num(r.closed); q.complaint[r.fault_type][i] = num(r.complaint);
+        FROM ${T('dwd_warning')} WHERE is_outgoing = 1 AND warning_time >= ? AND ${f.sql} GROUP BY ${d.month('warning_time')}, fault_type`, [since, ...f.params]);
+      for (const r of rows) { put(q.alarm, r.fault_type, r.m, num(r.alarm)); put(q.closed, r.fault_type, r.m, num(r.closed)); put(q.complaint, r.fault_type, r.m, num(r.complaint)); }
+      const wo = await all(`SELECT ${d.month('create_time')} AS m, wo_type, fault_type, COUNT(*) AS n
+        FROM ${T('dwd_work_order')} WHERE create_time >= ? AND ${f.sql} GROUP BY ${d.month('create_time')}, wo_type, fault_type`, [since, ...f.params]);
+      for (const r of wo) {
+        put(q.workorder, r.fault_type, r.m, num(r.n));
+        if (q.workorder_type[r.wo_type]) put(q.workorder_type[r.wo_type], r.fault_type, r.m, num(r.n));
       }
       return q;
     },
+
+    // ---------- 工单 / 失效（现场工单 = 失效车辆口径） ----------
+    async workOrderGroups(oem, caps, groupBy, woType = '现场') {
+      const f = filt({ oem, caps });
+      const g = groupBy.join(', ');
+      return (await all(`SELECT ${g}, COUNT(DISTINCT vin) AS n FROM ${T('dwd_work_order')} WHERE wo_type = ? AND ${f.sql} GROUP BY ${g}`, [woType, ...f.params]))
+        .map((r) => ({ ...r, n: num(r.n) }));
+    },
+    // 失效模式构成：按客户 × 失效模式的现场工单车辆数
+    async failModes(oem, caps) {
+      const rows = await api.workOrderGroups(oem, caps, ['oem', 'fault_type']);
+      const m = new Map();
+      for (const r of rows) { const o = m.get(r.oem) || { oem: r.oem, counts: {} }; o.counts[r.fault_type] = r.n; m.set(r.oem, o); }
+      return [...m.values()];
+    },
+    // PN 追溯：电芯出货（PN × 客户）对上现场工单数
+    async pnTrace(oem, caps) {
+      const f = filt({ oem, caps });
+      const ships = await all(`SELECT pn, oem, MAX(plant) AS plant, SUM(qty) AS qty FROM ${T('dws_shipment')} WHERE ship_level = 'cell' AND pn IS NOT NULL AND ${f.sql} GROUP BY pn, oem`, f.params);
+      const fails = await api.workOrderGroups(oem, caps, ['pn', 'oem']);
+      const fm = new Map(fails.map((r) => [r.pn + '|' + r.oem, r.n]));
+      return ships.map((s) => ({ pn: s.pn, cust: s.oem, plant: s.plant, qty: num(s.qty), failed: fm.get(s.pn + '|' + s.oem) || 0 }))
+        .sort((a, b) => a.pn.localeCompare(b.pn) || a.cust.localeCompare(b.cust));
+    },
+    // 累计失效率走势：近 N 月每月末 累计现场工单车辆 ÷ 累计接入车辆 × 1e6，按客户
+    async ppmTrend(oem, caps, monthsN = 10) {
+      const months = lastMonths(monthsN);
+      const f = filt({ oem, caps });
+      const acc = await all(`SELECT oem, ${d.month('access_date')} AS m, COUNT(*) AS n FROM ${T('dwd_vehicle_access')} WHERE ${f.sql} GROUP BY oem, ${d.month('access_date')}`, f.params);
+      const wo = await all(`SELECT oem, ${d.month('create_time')} AS m, COUNT(DISTINCT vin) AS n FROM ${T('dwd_work_order')} WHERE wo_type = '现场' AND ${f.sql} GROUP BY oem, ${d.month('create_time')}`, f.params);
+      const oems = [...new Set(acc.map((r) => r.oem))].sort();
+      const cum = (rows, o, m) => rows.filter((r) => r.oem === o && r.m <= m).reduce((s, r) => s + num(r.n), 0);
+      return {
+        labels: months.map((m) => m.slice(2)),
+        series: oems.map((o) => ({ oem: o, data: months.map((m) => { const c = cum(acc, o, m); return c ? Math.round(cum(wo, o, m) / c * 1e6) : 0; }) })),
+      };
+    },
+    // SOH 分布：按客户各 SOH 区间占比（%）
+    async sohDist(oem, caps) {
+      const f = filt({ oem, caps });
+      const rows = await all(`SELECT oem, SUM(CASE WHEN soh < 90 THEN 1 ELSE 0 END) AS b0, SUM(CASE WHEN soh >= 90 AND soh < 92 THEN 1 ELSE 0 END) AS b1,
+          SUM(CASE WHEN soh >= 92 AND soh < 94 THEN 1 ELSE 0 END) AS b2, SUM(CASE WHEN soh >= 94 AND soh < 96 THEN 1 ELSE 0 END) AS b3,
+          SUM(CASE WHEN soh >= 96 AND soh < 98 THEN 1 ELSE 0 END) AS b4, SUM(CASE WHEN soh >= 98 THEN 1 ELSE 0 END) AS b5
+        FROM ${T('dwd_vehicle_access')} WHERE soh IS NOT NULL AND ${f.sql} GROUP BY oem ORDER BY oem`, f.params);
+      return rows.map((r) => {
+        const v = ['b0', 'b1', 'b2', 'b3', 'b4', 'b5'].map((k) => num(r[k])); const t = v.reduce((a, b) => a + b, 0) || 1;
+        return { oem: r.oem, data: v.map((x) => Math.round(x / t * 1000) / 10) };
+      });
+    },
+    // SOH 箱线：按累计里程 / 累计循环分桶的 min/Q1/中位/Q3/max，整体 + 按 Pack PN
+    async sohBox(oem, caps) {
+      const f = filt({ oem, caps });
+      const rows = await all(`SELECT pack_pn, soh, mileage_km, cycle_count FROM ${T('dwd_vehicle_access')} WHERE soh IS NOT NULL AND ${f.sql}`, f.params);
+      const build = (list) => ({ mileage: boxes(list, 'mileage_km', MILEAGE_BUCKETS), cycle: boxes(list, 'cycle_count', CYCLE_BUCKETS) });
+      const byPn = {};
+      const groups = new Map();
+      for (const r of rows) { if (!r.pack_pn) continue; (groups.get(r.pack_pn) || groups.set(r.pack_pn, []).get(r.pack_pn)).push(r); }
+      for (const [pn, list] of groups) byPn[pn] = build(list);
+      return { ...build(rows), byPn };
+    },
+
     async warningDistribution(oem, caps, group) {
       const f = filt({ oem, caps });
       const since = lastMonths(12)[0] + '-01';
@@ -259,6 +329,20 @@ async function createAnalytics() {
     },
   };
   return api;
+}
+
+const MILEAGE_BUCKETS = [['0~2万', 0, 2e4], ['2~4万', 2e4, 4e4], ['4~6万', 4e4, 6e4], ['6~8万', 6e4, 8e4], ['8~10万', 8e4, 1e5], ['10~15万', 1e5, 1.5e5], ['15~20万', 1.5e5, 2e5], ['20万+', 2e5, Infinity]];
+const CYCLE_BUCKETS = [['0~100', 0, 100], ['100~200', 100, 200], ['200~300', 200, 300], ['300~500', 300, 500], ['500~800', 500, 800], ['800~1200', 800, 1200], ['1200+', 1200, Infinity]];
+function quantile(sorted, p) {
+  if (!sorted.length) return null;
+  const i = (sorted.length - 1) * p; const lo = Math.floor(i); const hi = Math.ceil(i);
+  return Math.round((sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo)) * 10) / 10;
+}
+function boxes(rows, key, buckets) {
+  return buckets.map(([range, lo, hi]) => {
+    const v = rows.filter((r) => r[key] != null && Number(r[key]) >= lo && Number(r[key]) < hi).map((r) => Number(r.soh)).sort((a, b) => a - b);
+    return { range, n: v.length, min: quantile(v, 0), q1: quantile(v, 0.25), median: quantile(v, 0.5), q3: quantile(v, 0.75), max: quantile(v, 1) };
+  });
 }
 
 function lastMonths(n) {

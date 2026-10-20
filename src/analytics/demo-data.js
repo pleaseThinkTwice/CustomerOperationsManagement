@@ -33,6 +33,9 @@ const PRODUCTS = [
   { oem: 'NIO', cap: '153', struct: '1P192S', s: 192, pn: 'NE153', model: 'ET5', sop: '2023-06-01', n: 1400 },
   { oem: 'NIO', cap: '75', struct: '1P112S', s: 112, pn: 'NE075', model: 'ES6', sop: '2023-11-20', n: 700 },
 ];
+const CELL_TYPE = { 153: 'LFP', 100: 'NCM', 75: 'LFP', 50: 'NCM' };
+// 同一电芯 PN 下按车型编号 Pack PN（质保条款按 Pack PN 维护）
+PRODUCTS.forEach((p, i) => { p.ppn = `${p.pn}-${String(PRODUCTS.slice(0, i).filter((q) => q.pn === p.pn).length + 1).padStart(2, '0')}`; });
 const MODES = ['绝缘故障', 'SOC 一致性', '容量衰减', '自放电异常', '压差报警', '热失控预警'];
 const MODE_W = [0.22, 0.2, 0.18, 0.14, 0.2, 0.06];
 const PLANTS = ['宁德基地', '溧阳基地', '宜宾基地'];
@@ -60,20 +63,22 @@ async function generate(db) {
 
   await insert('dim_oem', OEMS.map((o) => ({ oem: o.oem, oem_ch: o.oem_ch, cust_grp_name: o.grp })));
   await insert('dim_cell_product', PRODUCTS.map((p) => ({
-    oem: p.oem, cell_cap: p.cap, cell_structure: p.struct, pn_system: p.pn, vehicle_model: p.model, series_count: p.s, sop_date: p.sop, plant: pick(PLANTS),
+    oem: p.oem, cell_cap: p.cap, cell_structure: p.struct, pn_system: p.pn, cell_type: CELL_TYPE[p.cap], vehicle_model: p.model, series_count: p.s, sop_date: p.sop, plant: pick(PLANTS),
   })));
   await insert('dim_warranty_policy', PRODUCTS.map((p) => ({
-    oem: p.oem, cell_cap: p.cap, vehicle_model: p.model, pn: `${p.pn}-01`,
+    oem: p.oem, cell_cap: p.cap, vehicle_model: p.model, pn: p.ppn,
     passenger_years: 8, passenger_mileage: 160000 + Math.round(rnd() * 3) * 70000, passenger_soh: 70 + Math.round(rnd() * 2) * 5,
     commercial_years: 5, commercial_mileage: 300000, commercial_soh: 70,
   })));
 
-  const vehicles = []; const warnings = []; const ships = []; const adjusts = [];
-  let wid = 1;
+  const vehicles = []; const warnings = []; const ships = []; const adjusts = []; const orders = [];
+  let wid = 1; let woId = 1;
+  const order = (type, w, t) => orders.push({ wo_id: `WO${String(woId++).padStart(7, '0')}`, wo_type: type, vin: w.vin, oem: w.oem, cell_cap: w.cell_cap, vehicle_model: w.vehicle_model, pn: w.pn, fault_type: w.fault_type, create_time: fmtDt(t), close_time: rnd() < 0.8 ? fmtDt(addDays(t, 2 + Math.floor(rnd() * 15))) : null, plant: w.plant });
   for (const p of PRODUCTS) {
     const sop = new Date(p.sop + 'T12:00:00');
     const spanDays = Math.max(30, Math.round((today - sop) / 86400e3));
     const batches = Array.from({ length: 6 }, (_, i) => `B${p.cap}${String.fromCharCode(65 + i)}${pad(Math.floor(rnd() * 90) + 10)}`);
+    const cellPns = [`P${p.cap}-A`, `P${p.cap}-B`, `P${p.cap}-C`].slice(0, 2 + Math.floor(rnd() * 2));
     // 出货：从 SOP 起按月出货，Pack 总量 ≈ 接入车辆 × 1.2
     const months = Math.ceil(spanDays / 30);
     const packTotal = Math.round(p.n * 1.2);
@@ -81,10 +86,10 @@ async function generate(db) {
       const d = addDays(sop, m * 30 + Math.floor(rnd() * 20));
       if (d > today) break;
       const packQty = Math.max(1, Math.round(packTotal / months * (0.6 + rnd() * 0.8)));
-      const batch = pick(batches); const plant = pick(PLANTS);
-      ships.push({ oem: p.oem, cell_cap: p.cap, vehicle_model: p.model, ship_level: 'pack', qty: packQty, ship_date: fmtDate(d), batch_no: batch, plant });
-      ships.push({ oem: p.oem, cell_cap: p.cap, vehicle_model: p.model, ship_level: 'module', qty: packQty * 6, ship_date: fmtDate(d), batch_no: batch, plant });
-      ships.push({ oem: p.oem, cell_cap: p.cap, vehicle_model: p.model, ship_level: 'cell', qty: packQty * p.s, ship_date: fmtDate(d), batch_no: batch, plant });
+      const batch = pick(batches); const plant = pick(PLANTS); const cpn = cellPns[Math.floor(rnd() * cellPns.length)];
+      ships.push({ oem: p.oem, cell_cap: p.cap, vehicle_model: p.model, ship_level: 'pack', qty: packQty, ship_date: fmtDate(d), pn: p.ppn, batch_no: batch, plant });
+      ships.push({ oem: p.oem, cell_cap: p.cap, vehicle_model: p.model, ship_level: 'module', qty: packQty * 6, ship_date: fmtDate(d), pn: p.ppn, batch_no: batch, plant });
+      ships.push({ oem: p.oem, cell_cap: p.cap, vehicle_model: p.model, ship_level: 'cell', qty: packQty * p.s, ship_date: fmtDate(d), pn: cpn, batch_no: batch, plant });
     }
     for (let i = 0; i < p.n; i++) {
       const vin = `L${p.oem.slice(0, 2)}${p.cap}${String(100000 + vehicles.length).slice(1)}${pad(Math.floor(rnd() * 99))}`;
@@ -99,8 +104,9 @@ async function generate(db) {
       const soh = Math.round((100 - ageDays / 365 * (commercial ? 4 : 2.2) - rnd() * 3) * 10) / 10;
       vehicles.push({
         vin, deviceid: `DEV${p.pn}${String(i).padStart(5, '0')}`, oem: p.oem, cell_cap: p.cap, cell_structure: p.struct, vehicle_model: p.model,
-        pack_pn: `${p.pn}-P${pad(Math.floor(rnd() * 3) + 1)}`, usage_type: commercial ? 'commercial' : 'passenger',
+        pack_pn: p.ppn, pack_id: rnd() < 0.015 ? null : `PK${p.cap}${String(vehicles.length).padStart(7, '0')}`, usage_type: commercial ? 'commercial' : 'passenger',
         access_date: fmtDate(access), last_online_date: fmtDate(lastOnline), warranty_start_date: fmtDate(wStart), mileage_km: mileage, soh,
+        cycle_count: Math.round(mileage / (420 + rnd() * 160)),
       });
       // 预警：约 9% 的车出过预警，营运车概率更高
       if (rnd() < (commercial ? 0.2 : 0.08)) {
@@ -111,14 +117,22 @@ async function generate(db) {
           const out = rnd() < 0.72 ? 1 : 0;
           const age = (today - wt) / 86400e3;
           const closed = out && rnd() < (age > 7 ? 0.86 : 0.35) ? 1 : 0;
-          warnings.push({
+          const wr = {
             warning_id: `W${String(wid++).padStart(7, '0')}`, vin, oem: p.oem, cell_cap: p.cap, vehicle_model: p.model,
             fault_type: pick(MODES, MODE_W), warning_time: fmtDt(wt), is_outgoing: out, is_closed: closed,
             close_time: closed ? fmtDt(addDays(wt, 1 + Math.floor(rnd() * 12))) : null, is_complaint: out && rnd() < 0.08 ? 1 : 0,
             batch_no: pick(batches), pack_no: `P${pad(Math.floor(rnd() * 20))}`, cell_pos: `C${1 + Math.floor(rnd() * p.s)}`, soh: Math.max(60, soh - Math.round(rnd() * 8)),
-          });
+          };
+          warnings.push(wr);
+          // 工单：外发预警约 45% 开预警工单，其中约 35% 升级为现场工单（现场更换 = 失效车辆）
+          const wctx = { ...wr, pn: cellPns[Math.floor(rnd() * cellPns.length)], plant: pick(PLANTS) };
+          if (out && rnd() < 0.45) {
+            order('预警', wctx, addDays(wt, 1));
+            if (rnd() < 0.35) order('现场', wctx, addDays(wt, 3 + Math.floor(rnd() * 10)));
+          }
         }
       }
+      if (rnd() < 0.008) order('批改', { vin, oem: p.oem, cell_cap: p.cap, vehicle_model: p.model, pn: cellPns[0], fault_type: pick(MODES, MODE_W), plant: pick(PLANTS) }, addDays(access, Math.floor(rnd() * Math.max(1, ageDays))));
       if (rnd() < 0.006) adjusts.push({ vin, oem: p.oem, cell_cap: p.cap, check_date: fmtDate(addDays(today, -Math.floor(rnd() * 90))), mileage_diff_km: Math.round((1 + rnd() * 9) * 10) / 10 });
     }
   }
@@ -126,7 +140,8 @@ async function generate(db) {
   await insert('dwd_vehicle_access', vehicles);
   await insert('dwd_warning', warnings);
   await insert('dwd_mileage_adjust', adjusts);
-  return { vehicles: vehicles.length, warnings: warnings.length, shipments: ships.length };
+  await insert('dwd_work_order', orders);
+  return { vehicles: vehicles.length, warnings: warnings.length, shipments: ships.length, orders: orders.length };
 }
 
 module.exports = { generate, OEMS, PRODUCTS, MODES };

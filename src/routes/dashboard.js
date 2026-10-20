@@ -68,14 +68,18 @@ function register(r, { repo, analytics, ai, HttpError }) {
       const s = ship.find((x) => String(x.cell_cap) === cap) || {};
       const w = wByCap.find((x) => String(x.cell_cap) === cap) || {};
       const conn = sumBy(a, 'access_count'); const pack = Number(s.pack || 0);
-      const sop = prods.filter((x) => String(x.cell_cap) === cap).map((x) => x.sop_date).sort()[0] || '';
-      return { name: `${cap}Ah ${p.cell_structure}`, cap: Number(cap), struct: p.cell_structure, sop: sop.slice(0, 7), pack, conn, connRate: pack ? Math.round(conn / pack * 1000) / 10 : 0, overdue: w.overdue || 0, alarm: w.alarm || 0, closed: w.closed || 0, alarm7: w.alarm7 || 0 };
+      const capProds = prods.filter((x) => String(x.cell_cap) === cap);
+      const sop = capProds.map((x) => x.sop_date).sort()[0] || '';
+      const structs = [...new Set(capProds.map((x) => x.cell_structure).filter(Boolean))];
+      // overdue = 过保车辆数；alarmOverdue = 外发预警超 7 天未闭环
+      return { name: `${cap}Ah ${p.cell_structure}`, cap: Number(cap), cellType: p.cell_type || '', struct: structs.length > 1 ? structs : (structs[0] || ''), sop: sop.slice(0, 7), pack, conn, connRate: pack ? Math.round(conn / pack * 1000) / 10 : 0,
+        packIdMiss: sumBy(a, 'pack_id_miss'), overdue: sumBy(a, 'expired_cnt'), alarmOverdue: w.overdue || 0, alarm: w.alarm || 0, closed: w.closed || 0, alarm7: w.alarm7 || 0 };
     }).sort((a, b) => b.cap - a.cap);
     const { persons, visits, meetings } = await opsBlocks(oem);
     const conn = sumBy(acc, 'access_count');
     return {
       view: 'customer', oem, cellCap: '',
-      kpi: { cellShip: shipT.cell, packShip: shipT.pack, conn, insured: conn - sumBy(acc, 'expired_cnt'), active: sumBy(acc, 'active30'), alarm: wk.alarm, closed: wk.closed, alarm7: wk.alarm7, closed7: wk.closed7, todoDone: todo.done, todoAll: todo.total },
+      kpi: { cellShip: shipT.cell, packShip: shipT.pack, conn, packIdMiss: sumBy(acc, 'pack_id_miss'), insured: conn - sumBy(acc, 'expired_cnt'), overdue: sumBy(acc, 'expired_cnt'), alarmOverdue: wk.overdue, active: sumBy(acc, 'active30'), alarm: wk.alarm, closed: wk.closed, alarm7: wk.alarm7, closed7: wk.closed7, todoDone: todo.done, todoAll: todo.total },
       trend: await trendBlock(oem, []), projects, quality: await A.quality(oem, []), outgoingModes: await A.modes(oem, [], { outgoing: true }),
       contacts: persons.filter((p) => p.type === 'external').map((p) => ({ name: p.name, role: p.position || p.department, tel: p.phone })),
       visits: visits.map((v) => { const [st, stTxt] = VISIT_ST(v); return { t: v.subject, who: v.contact_person || v.created_by, st, stTxt, date: v.visit_date }; }),
@@ -92,8 +96,9 @@ function register(r, { repo, analytics, ai, HttpError }) {
     const wByModel = await A.warningGroups(oem, caps, ['vehicle_model']);
     const prods = await A.products(oem, caps);
     const p0 = prods[0] || {};
-    const ws = await repo.find('warranty_settings', { oem, cell_cap: caps[0] || '' });
-    const pols = ws.length ? ws : await A.warrantyPolicies(oem, caps);
+    let ws = [];
+    for (const cap of caps) ws = ws.concat(await repo.find('warranty_settings', oem ? { oem, cell_cap: cap } : { cell_cap: cap }));
+    const pols = ws.length ? ws : (await A.warrantyPolicies(oem, caps)).map((p) => ({ ...p, id: null }));
     const pol0 = pols[0] || {};
     const conn = sumBy(acc, 'access_count');
     const mil = await A.mileageAdjust(oem, caps, 0, 0);
@@ -101,13 +106,14 @@ function register(r, { repo, analytics, ai, HttpError }) {
       view: 'project', oem, cellCap: caps.join(','),
       info: {
         packShip: shipT.pack, moduleShip: shipT.module, cellShip: shipT.cell, conn, access15: sumBy(acc, 'access15'), connRate: shipT.pack ? Math.round(conn / shipT.pack * 1000) / 10 : 0,
-        insured: conn - sumBy(acc, 'expired_cnt'), overdue: wk.overdue, alarm: wk.alarm, closed: wk.closed, alarm7: wk.alarm7, closed7: wk.closed7,
-        struct: p0.cell_structure || '', cap: Number(caps[0] || 0), s: p0.series_count || 0, sop: (prods.map((p) => p.sop_date).sort()[0] || '').slice(0, 7),
+        packIdMiss: sumBy(acc, 'pack_id_miss'), insured: conn - sumBy(acc, 'expired_cnt'), overdue: sumBy(acc, 'expired_cnt'), alarmOverdue: wk.overdue, alarm: wk.alarm, closed: wk.closed, alarm7: wk.alarm7, closed7: wk.closed7,
+        struct: p0.cell_structure || '', cellType: p0.cell_type || '', cap: Number(caps[0] || 0), s: p0.series_count || 0, sop: (prods.map((p) => p.sop_date).sort()[0] || '').slice(0, 7),
         qy: pol0.passenger_years ? `${pol0.passenger_years}年` : '-', qkm: pol0.passenger_mileage ? `${Math.round(pol0.passenger_mileage / 10000)}万` : '-', qsoh: pol0.passenger_soh || '-',
       },
       trend: await trendBlock(oem, caps),
-      cars: acc.map((a) => { const w = wByModel.find((x) => x.vehicle_model === a.vehicle_model) || {}; return { name: a.vehicle_model, vehicle_model: a.vehicle_model, struct: a.cell_structure, conn: a.access_count, overdue: w.overdue || 0, alarm: w.alarm || 0 }; }),
-      warranty: pols.map((p) => ({ vehicle_model: p.vehicle_model, pn: p.pn, years: p.passenger_years, mileage: p.passenger_mileage, soh: p.passenger_soh })),
+      cars: acc.map((a) => { const w = wByModel.find((x) => x.vehicle_model === a.vehicle_model) || {}; return { name: a.vehicle_model, vehicle_model: a.vehicle_model, struct: a.cell_structure, conn: a.access_count, packIdMiss: a.pack_id_miss, overdue: a.expired_cnt, alarmOverdue: w.overdue || 0, alarm: w.alarm || 0 }; }),
+      sohBox: await A.sohBox(oem, caps),
+      warranty: pols.map((p) => ({ id: p.id, cell_cap: p.cell_cap, vehicle_model: p.vehicle_model, pn: p.pn, years: p.passenger_years, mileage: p.passenger_mileage, soh: p.passenger_soh })),
       modesDetail: await A.modes(oem, caps, { outgoing: false }), modes: await A.modes(oem, caps, { outgoing: true }), outgoingModes: await A.modes(oem, caps, { outgoing: true }),
       quality: await A.quality(oem, caps), active: sumBy(acc, 'active30'), mileage: mil.count, events: await eventsOf(oem, caps),
     };
@@ -120,15 +126,21 @@ function register(r, { repo, analytics, ai, HttpError }) {
     const wByOem = await A.warningGroups('', caps, ['oem']);
     const shipT = await A.shipTotals('', caps);
     const wk = await A.warningKpi('', caps);
+    const wo = await A.workOrderGroups('', caps, ['oem']);
     const rows = acc.map((a) => {
       const s = ship.find((x) => x.oem === a.oem) || {}; const w = wByOem.find((x) => x.oem === a.oem) || {};
-      return { oem: a.oem, cap: Number(caps[0]), pack: Number(s.pack || 0), cell: Number(s.cell || 0), conn: a.access_count, year: a.this_year, alarm: w.alarm || 0, closed: w.closed || 0 };
+      const fieldWo = (wo.find((x) => x.oem === a.oem) || {}).n || 0;
+      return { oem: a.oem, cap: Number(caps[0]), pack: Number(s.pack || 0), cell: Number(s.cell || 0), conn: a.access_count, packIdMiss: a.pack_id_miss, fieldWo, year: a.this_year, alarm: w.alarm || 0, closed: w.closed || 0 };
     }).sort((a, b) => b.conn - a.conn);
+    const ppm = await A.ppmTrend('', caps);
+    const conn = sumBy(rows, 'conn'); const fieldWo = sumBy(rows, 'fieldWo');
     return {
       view: 'cell', cellCap: caps.join(','), rows,
-      info: { pack: shipT.pack, cell: shipT.cell, conn: sumBy(rows, 'conn'), alarm: wk.alarm, closed: wk.closed, ppm: shipT.cell ? Math.round(wk.alarm / shipT.cell * 1e6 * 10) / 10 : 0, year: sumBy(rows, 'year'), custCount: rows.length },
+      // 失效率 ppm = 现场工单车辆数 ÷ 接入车辆数 × 1e6
+      info: { pack: shipT.pack, cell: shipT.cell, conn, packIdMiss: sumBy(rows, 'packIdMiss'), fieldWo, alarm: wk.alarm, closed: wk.closed, ppm: conn ? Math.round(fieldWo / conn * 1e6) : 0, year: sumBy(rows, 'year'), custCount: rows.length },
       modes: await A.modes('', caps, { outgoing: false }), outgoingModes: await A.modes('', caps, { outgoing: true }),
       batches: await A.batches('', caps), risks: await A.risks('', caps), quality: await A.quality('', caps), events: await eventsOf('', caps),
+      failModes: await A.failModes('', caps), sohDist: await A.sohDist('', caps), ppmLabels: ppm.labels, ppmTrend: ppm.series, pnTrace: await A.pnTrace('', caps),
     };
   }
   r.get('/api/dashboard/three_view', async (req, res, x) => {
