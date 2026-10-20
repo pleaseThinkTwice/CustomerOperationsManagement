@@ -48,3 +48,7 @@ public/login.html        登录页
 scripts/                 数仓自检、文档生成
 test/                    node:test 接口测试
 ```
+
+## AI 模块：知识库问答 + 数智分析（Text2SQL）
+
+见 [docs/AI模块-问答与Text2SQL接入说明.md](docs/AI模块-问答与Text2SQL接入说明.md)。

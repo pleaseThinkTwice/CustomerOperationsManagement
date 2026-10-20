@@ -1,0 +1,111 @@
+{
+  "_说明": "text2sql 语义层。到公司后：把 tables 换成 test 库真实表名和字段含义，glossary 写清业务口径，examples 放 10~30 条标准问答 SQL。改完无需重启。",
+  "tables": {
+    "cust_oem": {
+      "desc": "客户（主机厂 OEM）主数据，一个 OEM 一行",
+      "columns": {
+        "oem": "客户代码（主键，如 XMS、BYD）",
+        "oem_ch": "客户简称（中文）",
+        "name_cn": "客户集团名称",
+        "level": { "desc": "客户等级", "values": ["S级", "A级", "B级"] },
+        "relationship_status": { "desc": "合作关系", "values": ["战略合作", "深度绑定", "稳定合作"] },
+        "region": "所属区域"
+      }
+    },
+    "cust_project": {
+      "desc": "客户项目（客户 × 电芯容量），记录出货 PACK 数",
+      "columns": {
+        "project_id": "项目 ID",
+        "oem": "客户代码，关联 cust_oem.oem",
+        "cell_cap": { "desc": "电芯容量（Ah）", "values": ["153", "100", "75"] },
+        "cell_structure": "成组方式，如 1P204S",
+        "pn_system": "系统 PN",
+        "sop_month": "SOP 月份（YYYY-MM）",
+        "pack_count": "累计出货 PACK 数"
+      }
+    },
+    "veh_access": {
+      "desc": "车辆接入台账，一辆已接入平台的车一行",
+      "columns": {
+        "vin": "车架号（主键）",
+        "oem": "客户代码",
+        "cell_cap": "电芯容量（Ah）",
+        "access_date": "首次接入日期（YYYY-MM-DD）",
+        "last_online_date": "最近一次上线日期（YYYY-MM-DD）",
+        "mileage_km": "累计里程（km）"
+      }
+    },
+    "warn_record": {
+      "desc": "电池预警记录，一次预警一行",
+      "columns": {
+        "warn_id": "预警 ID",
+        "vin": "车架号，关联 veh_access.vin",
+        "oem": "客户代码",
+        "cell_cap": "电芯容量（Ah）",
+        "warn_date": "预警日期（YYYY-MM-DD）",
+        "fault_type": { "desc": "失效模式", "values": ["绝缘故障", "SOC 一致性", "容量衰减", "自放电异常", "压差报警", "热失控预警"] },
+        "risk_level": { "desc": "风险等级", "values": ["高", "中", "低"] },
+        "closure_status": { "desc": "闭环状态", "values": ["已闭环", "未闭环"] },
+        "dispatched": "是否已外发给客户（1 是 / 0 否）",
+        "close_date": "闭环日期，未闭环为空"
+      }
+    },
+    "demand": {
+      "desc": "客户需求池",
+      "columns": {
+        "demand_id": "需求 ID",
+        "oem": "提出需求的客户代码",
+        "title": "需求标题",
+        "category": { "desc": "需求分类", "values": ["数据接入", "预警策略", "报表需求", "算法优化", "系统对接"] },
+        "status": { "desc": "状态", "values": ["待评审", "开发中", "已上线", "已关闭"] },
+        "priority": { "desc": "优先级", "values": ["高", "中", "低"] },
+        "created_date": "提出日期",
+        "owner": "负责人"
+      }
+    },
+    "contract": {
+      "desc": "客户合同",
+      "columns": {
+        "contract_id": "合同 ID",
+        "oem": "客户代码",
+        "name": "合同名称",
+        "amount": "合同金额（元）",
+        "status": { "desc": "合同状态", "values": ["生效中", "履行中", "已到期"] },
+        "sign_date": "签订日期",
+        "end_date": "到期日期"
+      }
+    }
+  },
+  "glossary": [
+    { "term": "接入率", "definition": "已接入车辆数 / 出货 PACK 数。接入车辆数 = veh_access 行数，出货 PACK 数 = SUM(cust_project.pack_count)，按 oem + cell_cap 对齐" },
+    { "term": "活跃车辆", "definition": "last_online_date 在最近 30 天内（含今天）的车辆；今天以系统日期为准" },
+    { "term": "闭环率", "definition": "已闭环预警数 / 预警总数，closure_status = '已闭环'" },
+    { "term": "平均闭环时长", "definition": "已闭环预警的 close_date - warn_date 天数的平均值" },
+    { "term": "外发", "definition": "dispatched = 1 的预警，即已推送给客户处理" },
+    { "term": "客户名称", "definition": "回答时用 cust_oem.oem_ch 展示客户，不要只给代码" }
+  ],
+  "notes": [
+    "日期字段都是 'YYYY-MM-DD' 文本；SQLite 用 date('now') / strftime 计算，MySQL/Doris 用 CURDATE() / DATE_FORMAT",
+    "金额单位为元，回答时可换算为万元"
+  ],
+  "examples": [
+    {
+      "question": "各客户的接入车辆数和接入率",
+      "sql": "SELECT o.oem_ch AS 客户, a.接入车辆数, p.出货PACK数, ROUND(a.接入车辆数 * 100.0 / p.出货PACK数, 1) AS 接入率百分比\nFROM cust_oem o\nJOIN (SELECT oem, COUNT(*) AS 接入车辆数 FROM veh_access GROUP BY oem) a ON a.oem = o.oem\nJOIN (SELECT oem, SUM(pack_count) AS 出货PACK数 FROM cust_project GROUP BY oem) p ON p.oem = o.oem\nORDER BY 接入车辆数 DESC"
+    },
+    {
+      "question": "近 90 天各失效模式的预警数和闭环率",
+      "sql": "SELECT fault_type AS 失效模式, COUNT(*) AS 预警数,\n       ROUND(SUM(CASE WHEN closure_status = '已闭环' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS 闭环率百分比\nFROM warn_record\nWHERE warn_date >= date('now', '-90 day')\nGROUP BY fault_type ORDER BY 预警数 DESC"
+    },
+    {
+      "question": "小米汽车 153Ah 的未闭环高风险预警",
+      "sql": "SELECT w.warn_id, w.vin, w.warn_date, w.fault_type, w.dispatched\nFROM warn_record w JOIN cust_oem o ON o.oem = w.oem\nWHERE o.oem_ch = '小米汽车' AND w.cell_cap = 153 AND w.closure_status = '未闭环' AND w.risk_level = '高'\nORDER BY w.warn_date DESC"
+    }
+  ],
+  "commonQuestions": [
+    "各客户的接入车辆数和接入率",
+    "近 90 天各失效模式的预警数和闭环率",
+    "各客户当前活跃车辆数",
+    "生效中和履行中的合同总金额（万元），按客户分组"
+  ]
+}

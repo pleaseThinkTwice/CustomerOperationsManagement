@@ -9,10 +9,12 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test test/*.test.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
     "reset-data": "node -e \"require('fs').rmSync('data',{recursive:true,force:true})\"",
     "check-analytics": "node scripts/check-analytics.js",
-    "docs": "node scripts/gen-api-doc.js && node scripts/gen-ddl-doc.js"
+    "docs": "node scripts/gen-api-doc.js && node scripts/gen-ddl-doc.js",
+    "ai:demo": "node --disable-warning=ExperimentalWarning src/ai/serve.js",
+    "ai:seed": "node --disable-warning=ExperimentalWarning src/ai/demo/seed.js"
   },
   "keywords": [
     "customer",

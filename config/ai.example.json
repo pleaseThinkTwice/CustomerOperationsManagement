@@ -1,0 +1,21 @@
+{
+  "_说明": "复制为 config/ai.json 后按公司环境填写（该文件已加入 .gitignore，不会提交密钥）。环境变量同名配置优先级更高，见 docs/AI模块-问答与Text2SQL接入说明.md。",
+  "engine": { "qa": "builtin", "analysis": "builtin" },
+  "llm": {
+    "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "apiKey": "sk-xxx",
+    "model": "qwen-plus",
+    "toolCalling": true
+  },
+  "sql": {
+    "type": "doris",
+    "url": "mysql://ai_readonly:密码@doris-fe.company.local:9030/test",
+    "maxRows": 5000,
+    "allowTables": []
+  },
+  "agent": { "maxSteps": 8, "historyTurns": 6 },
+  "external": {
+    "dify": { "baseUrl": "", "qaKey": "", "analysisKey": "" },
+    "openai_app": { "qaUrl": "", "qaKey": "", "qaModel": "model", "analysisUrl": "", "analysisKey": "", "analysisModel": "model" }
+  }
+}
