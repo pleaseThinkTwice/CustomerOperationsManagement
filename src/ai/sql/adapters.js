@@ -61,7 +61,7 @@ function mysqlAdapter(cfg) {
     async describe(table) {
       const [rows] = await pool.query(
         `SELECT COLUMN_NAME AS col, COLUMN_TYPE AS type, COLUMN_COMMENT AS comment FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`, [dbName, table]);
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`, table.includes('.') ? table.split('.', 2) : [dbName, table]);
       return rows.map(r => ({ col: r.col, type: r.type, comment: r.comment || '' }));
     },
     async query(sql) {

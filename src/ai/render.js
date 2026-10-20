@@ -52,10 +52,16 @@ function markdownToHtml(md) {
       out.push(`<${tag}>` + items.map(t => `<li>${inline(t)}</li>`).join('') + `</${tag}>`);
       continue;
     }
+    if (/^>\s?/.test(line)) {
+      const q = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) q.push(lines[i++].replace(/^>\s?/, ''));
+      out.push(`<blockquote>${q.map(inline).join('<br>')}</blockquote>`);
+      continue;
+    }
     if (/^\s*$/.test(line)) { i++; continue; }
     if (/^---+\s*$/.test(line)) { out.push('<hr>'); i++; continue; }
     const para = [];
-    while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s|```|\s*([-*]|\d+\.)\s+|\s*\|)/.test(lines[i])) para.push(lines[i++]);
+    while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s|```|>|\s*([-*]|\d+\.)\s+|\s*\|)/.test(lines[i])) para.push(lines[i++]);
     if (para.length) out.push(`<p>${para.map(inline).join('<br>')}</p>`);
     else { out.push(`<p>${inline(line)}</p>`); i++; }
   }

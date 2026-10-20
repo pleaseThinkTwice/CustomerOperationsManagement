@@ -42,6 +42,11 @@ function createCatalog(cfg) {
     const allowAll = allow.includes('*');
     const allowSet = new Set(allow.map(t => t.toLowerCase()));
     const picked = all.filter(t => allowAll || allowSet.has(t.table.toLowerCase()));
+    // 跨库的「库.表」（如 ANALYTICS_TABLE_dwd_warning=dw.dwd_warning）不在当前库的表清单里，直接按登记的名字纳入
+    if (!allowAll) {
+      const have = new Set(picked.map(t => t.table.toLowerCase()));
+      for (const t of allow) if (t.includes('.') && !have.has(t.toLowerCase())) picked.push({ table: t, comment: '' });
+    }
     const tables = [];
     for (const t of picked) {
       const meta = s.tables[t.table] || {};
