@@ -1,0 +1,47 @@
+{
+  "_说明": "数智分析（text2sql）在平台里默认查分析库（与首页看板同一份数据）。表和字段说明在启动时由 src/analytics/schema.js 生成，这里只维护枚举值、业务口径、示例 SQL 和常用问题。口径与 src/analytics/index.js 顶部注释保持一致。",
+  "values": {
+    "dws_shipment.ship_level": ["cell", "module", "pack"],
+    "dwd_vehicle_access.usage_type": ["passenger", "commercial"],
+    "dwd_warning.fault_type": ["绝缘故障", "SOC 一致性", "容量衰减", "自放电异常", "压差报警", "热失控预警"],
+    "dwd_work_order.wo_type": ["预警", "批改", "现场"],
+    "dwd_work_order.fault_type": ["绝缘故障", "SOC 一致性", "容量衰减", "自放电异常", "压差报警", "热失控预警"]
+  },
+  "glossary": [
+    { "term": "接入数", "definition": "dwd_vehicle_access 行数（每车一行）" },
+    { "term": "接入率", "definition": "接入数 ÷ Pack 出货数；Pack 出货数 = dws_shipment 中 ship_level = 'pack' 的 SUM(qty)，按 oem + cell_cap 对齐" },
+    { "term": "预警数", "definition": "dwd_warning 中 is_outgoing = 1 的条数（外发预警）；闭环数为其中 is_closed = 1 的条数" },
+    { "term": "闭环率", "definition": "外发预警中 is_closed = 1 的条数 ÷ 外发预警条数" },
+    { "term": "超期", "definition": "外发且未闭环、触发已超过 7 天的预警" },
+    { "term": "活跃车辆", "definition": "last_online_date 在最近 30 天内的车辆" },
+    { "term": "失效车辆", "definition": "现场工单（dwd_work_order.wo_type = '现场'）涉及的去重 VIN 数" },
+    { "term": "失效率 ppm", "definition": "失效车辆 ÷ 接入车辆 × 1,000,000" },
+    { "term": "过保", "definition": "质保起算日 warranty_start_date + 质保年限已到期，或 mileage_km 超过质保里程；年限与里程取 dim_warranty_policy（乘用 passenger_* / 营运 commercial_*，按 usage_type 选），按 oem + cell_cap + vehicle_model 关联" },
+    { "term": "pack_id 缺失", "definition": "接入车辆中 pack_id 为空的车数" },
+    { "term": "客户名称", "definition": "回答时用 dim_oem.oem_ch 展示客户，不要只给编码" }
+  ],
+  "notes": [
+    "日期是 'YYYY-MM-DD' 文本，时间是 'YYYY-MM-DD HH:MM:SS'；SQLite 用 date('now') / strftime，Doris/MySQL 用 CURDATE() / DATE_FORMAT",
+    "cell_cap 是文本，如 '153'"
+  ],
+  "examples": [
+    {
+      "question": "各客户的接入车辆数和接入率",
+      "sql": "SELECT o.oem_ch AS 客户, a.接入车辆数, s.Pack出货数, ROUND(a.接入车辆数 * 100.0 / s.Pack出货数, 1) AS 接入率百分比\nFROM dim_oem o\nJOIN (SELECT oem, COUNT(*) AS 接入车辆数 FROM dwd_vehicle_access GROUP BY oem) a ON a.oem = o.oem\nJOIN (SELECT oem, SUM(qty) AS Pack出货数 FROM dws_shipment WHERE ship_level = 'pack' GROUP BY oem) s ON s.oem = o.oem\nORDER BY a.接入车辆数 DESC"
+    },
+    {
+      "question": "近 90 天各失效模式的外发预警数和闭环率",
+      "sql": "SELECT fault_type AS 失效模式, COUNT(*) AS 外发预警数,\n       ROUND(SUM(is_closed) * 100.0 / COUNT(*), 1) AS 闭环率百分比\nFROM dwd_warning\nWHERE is_outgoing = 1 AND warning_time >= date('now', '-90 day')\nGROUP BY fault_type ORDER BY 外发预警数 DESC"
+    },
+    {
+      "question": "各客户的失效车辆数和失效率（ppm）",
+      "sql": "SELECT o.oem_ch AS 客户, COALESCE(f.失效车辆, 0) AS 失效车辆, a.接入车辆,\n       ROUND(COALESCE(f.失效车辆, 0) * 1000000.0 / a.接入车辆, 0) AS 失效率ppm\nFROM dim_oem o\nJOIN (SELECT oem, COUNT(*) AS 接入车辆 FROM dwd_vehicle_access GROUP BY oem) a ON a.oem = o.oem\nLEFT JOIN (SELECT oem, COUNT(DISTINCT vin) AS 失效车辆 FROM dwd_work_order WHERE wo_type = '现场' GROUP BY oem) f ON f.oem = o.oem\nORDER BY 失效率ppm DESC"
+    }
+  ],
+  "commonQuestions": [
+    "各客户的接入车辆数和接入率",
+    "近 90 天各失效模式的外发预警数和闭环率",
+    "各客户的失效车辆数和失效率（ppm）",
+    "各客户当前活跃车辆数"
+  ]
+}
