@@ -1,16 +1,22 @@
 {
   "name": "customer-operations-management",
   "version": "1.0.0",
-  "description": "Customer operations management project starter",
+  "description": "Customer operations management platform (prototype) with plug-and-play AI module (knowledge QA + text2sql)",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "ai:demo": "node --disable-warning=ExperimentalWarning src/ai/serve.js",
+    "ai:seed": "node --disable-warning=ExperimentalWarning src/ai/demo/seed.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
   },
   "keywords": [
     "customer",
     "operations",
     "management"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.13"
+  }
 }
