@@ -1,11 +1,13 @@
 import json
 import os
+import sqlite3
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from aiohttp import ClientSession, web
 
-from app import make_app
+from app import DB, make_app
 from prompt_engine import full_context, validate_sql
 from query_runner import execute_sql
 
@@ -100,6 +102,43 @@ class PromptOnlyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["row_count"], 500)
         self.assertTrue(data["truncated"])
         self.assertEqual(data["rows"][-1], ["500"])
+
+    async def test_chat_sql_can_be_saved_and_reused(self):
+        status, result = await self.ask("2026年9月净销售额是多少？")
+        self.assertEqual(status, 200)
+        self.assertEqual(result["action"], "sql")
+        key = None
+        try:
+            async with ClientSession() as session:
+                async with session.post(self.url + "/saved/api/chat/save", json={"name": "九月净销售额", "sql": result["sql"]}) as response:
+                    self.assertEqual(response.status, 200)
+                    saved = await response.json()
+                key = saved["template_key"]
+                async with session.post(self.url + f"/saved/api/templates/{key}/run", json={}) as response:
+                    self.assertEqual(response.status, 200)
+                    rerun = await response.json()
+                self.assertEqual(rerun["rows"], result["rows"])
+                async with session.post(self.url + "/saved/api/chat/save", json={"name": "非法", "sql": "DELETE FROM orders"}) as response:
+                    self.assertEqual(response.status, 400)
+        finally:
+            if key:
+                (Path(__file__).resolve().parents[1] / "queries" / f"{key}.json").unlink(missing_ok=True)
+                with sqlite3.connect(DB) as db:
+                    db.execute("DELETE FROM saved_queries WHERE template_key = ?", (key,))
+
+    async def test_knowledge_edit_updates_prompt_and_rejects_overflow(self):
+        file = Path(__file__).resolve().parents[1] / "knowledge" / "业务术语.md"
+        original = file.read_text(encoding="utf-8")
+        try:
+            async with ClientSession() as session:
+                async with session.put(self.url + "/saved/api/knowledge/业务术语", json={"content": original + "\n临时验收术语：仅用于测试。"}) as response:
+                    self.assertEqual(response.status, 200)
+                self.assertIn("临时验收术语", full_context())
+                async with session.put(self.url + "/saved/api/knowledge/业务术语", json={"content": "x" * 20001}) as response:
+                    self.assertEqual(response.status, 400)
+                self.assertIn("临时验收术语", full_context())
+        finally:
+            file.write_text(original, encoding="utf-8")
 
 
 if __name__ == "__main__":

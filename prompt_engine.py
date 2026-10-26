@@ -84,13 +84,13 @@ def schema_text():
     return "\n".join(lines)
 
 
-def full_context():
+def full_context(overrides=None):
     schema = schema_text()
     parts = ["# 当前数据库结构（自动读取）\n" + schema]
     for name in KNOWLEDGE_FILES:
         file = ROOT / "knowledge" / name
         if file.exists():
-            parts.append(f"# {name}\n" + file.read_text(encoding="utf-8"))
+            parts.append(f"# {name}\n" + (overrides or {}).get(name, file.read_text(encoding="utf-8")))
     content = "\n\n".join(parts)
     if len(content) > 30000:
         raise ValueError("知识和 schema 超过 3 万字符；请精简内容后重试，当前不会悄悄截断")

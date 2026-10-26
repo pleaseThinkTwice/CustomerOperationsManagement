@@ -72,6 +72,8 @@
     .knowledge-item summary::after { content: "展开"; font-size: 12px; font-weight: 400; color: #718096; }
     .knowledge-item details[open] summary::after { content: "收起"; }
     .knowledge-item pre { margin: 0 0 18px; }
+    .knowledge-item textarea { width: 100%; min-height: 220px; margin-bottom: 12px; font-family: ui-monospace, monospace; font-size: 13px; }
+    .knowledge-actions { display: flex; gap: 10px; margin: 0 0 14px; align-items: center; flex-wrap: wrap; }
     @media (max-width: 700px) { header { padding: 0 15px; gap: 15px; } .brand { font-size: 15px; } nav { gap: 12px; overflow-x: auto; } nav button { font-size: 13px; } main { margin: 25px auto; padding: 0 15px; } .panel { padding: 19px; } .form { grid-template-columns: 1fr; gap: 14px; } .number { font-size: 34px; } }
   </style>
 </head>
@@ -124,7 +126,8 @@
 
   <main id="knowledge" hidden>
     <h1>知识说明</h1>
-    <p class="lead">这些文件随项目保存，每次提问都会完整进入模型提示词。点击标题查看，修改请编辑 knowledge/ 文件。</p>
+    <p class="lead">这些文件随项目保存，每次提问都会完整进入模型提示词。展开后可直接编辑，保存后下一次提问立即生效。</p>
+    <div id="schema-preview" class="knowledge-grid"></div>
     <div id="knowledge-list" class="knowledge-grid"></div>
   </main>
 
@@ -258,12 +261,33 @@
     async function loadKnowledge() {
       if ($('knowledge-list').childElementCount) return;
       try {
+        try {
+          const schema = await api('/saved/api/schema');
+          const box = document.createElement('section'), details = document.createElement('details'), title = document.createElement('summary'), content = document.createElement('pre');
+          box.className = 'knowledge-item'; title.textContent = '当前数据库表结构（自动读取）'; content.textContent = schema.content;
+          details.append(title, content); box.append(details); $('schema-preview').replaceChildren(box);
+        } catch (error) { $('schema-preview').textContent = error.message; }
         const data = await api('/saved/api/knowledge');
         if (!data.files?.length) { $('knowledge-list').textContent = '知识文件暂时为空。'; return; }
         for (const file of data.files) {
           const box = document.createElement('section'); box.className = 'knowledge-item';
           const details = document.createElement('details'), title = document.createElement('summary'), content = document.createElement('pre');
-          title.textContent = file.title; content.textContent = file.content; details.append(title, content); box.append(details); $('knowledge-list').append(box);
+          const editor = document.createElement('textarea'), actions = document.createElement('div'), edit = document.createElement('button'), save = document.createElement('button'), cancel = document.createElement('button'), status = document.createElement('span');
+          title.textContent = file.title; content.textContent = file.content;
+          actions.className = 'knowledge-actions'; edit.className = 'secondary'; save.className = 'primary'; cancel.className = 'secondary';
+          edit.type = save.type = cancel.type = 'button'; edit.textContent = '编辑'; save.textContent = '保存知识'; cancel.textContent = '取消';
+          editor.hidden = save.hidden = cancel.hidden = true;
+          edit.addEventListener('click', () => { editor.value = content.textContent; content.hidden = edit.hidden = true; editor.hidden = save.hidden = cancel.hidden = false; editor.focus(); });
+          cancel.addEventListener('click', () => { editor.hidden = save.hidden = cancel.hidden = true; content.hidden = edit.hidden = false; status.textContent = ''; });
+          save.addEventListener('click', async () => {
+            save.disabled = true; status.textContent = '保存中…';
+            try {
+              const result = await api('/saved/api/knowledge/' + encodeURIComponent(file.title), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: editor.value }) });
+              content.textContent = result.content; editor.hidden = save.hidden = cancel.hidden = true; content.hidden = edit.hidden = false; status.textContent = '已保存，下次提问生效。';
+            } catch (error) { status.textContent = error.message; }
+            finally { save.disabled = false; }
+          });
+          actions.append(edit, save, cancel, status); details.append(title, content, editor, actions); box.append(details); $('knowledge-list').append(box);
         }
       } catch (error) { $('knowledge-list').textContent = error.message; }
     }
@@ -274,7 +298,7 @@
       box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       return box;
     }
-    function appendSqlResult(data) {
+    function appendSqlResult(data, question) {
       const box = appendMessage('assistant', '');
       const summary = document.createElement('p');
       summary.textContent = data.explanation || '查询完成。';
@@ -292,7 +316,18 @@
       }
       if (data.truncated) { const note = document.createElement('p'); note.textContent = '结果超过 500 行，仅显示前 500 行。请缩小查询范围。'; box.append(note); }
       const details = document.createElement('details'), label = document.createElement('summary'), sql = document.createElement('pre');
-      label.textContent = '查看 SQL'; sql.textContent = data.sql || ''; details.append(label, sql); box.append(details);
+      const save = document.createElement('button'), note = document.createElement('p');
+      label.textContent = '查看 SQL'; sql.textContent = data.sql || '';
+      save.type = 'button'; save.className = 'secondary'; save.textContent = '核对 SQL 后保存为常用';
+      note.className = 'note'; note.textContent = '保存的是本次固定 SQL；日期等条件不会自动变化。';
+      save.addEventListener('click', async () => {
+        save.disabled = true;
+        try {
+          await api('/saved/api/chat/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: question.slice(0, 60), sql: data.sql }) });
+          await loadTemplates(); save.textContent = '已保存到常用'; note.textContent = '已保存；在“常用查询”中可直接运行。';
+        } catch (error) { note.textContent = error.message; save.disabled = false; }
+      });
+      details.append(label, sql, save, note); box.append(details);
     }
     async function askQuestion(event) {
       event.preventDefault();
@@ -307,7 +342,7 @@
         });
         if (data.action === 'answer') appendMessage('assistant', data.answer || '暂无可确认的答案。');
         else if (data.action === 'clarify') appendMessage('assistant', data.question || '请补充查询条件。');
-        else if (data.action === 'sql') appendSqlResult(data);
+        else if (data.action === 'sql') appendSqlResult(data, question);
         const followup = data.action === 'clarify' ? data.question : data.action === 'answer' ? data.answer : (data.explanation || '已查询') + '；SQL：' + (data.sql || '');
         chatHistory.push({ role: 'user', content: question }, { role: 'assistant', content: String(followup || '').slice(0, 1000) });
         chatHistory = chatHistory.slice(-6);

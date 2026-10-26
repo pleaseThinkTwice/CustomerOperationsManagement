@@ -26,10 +26,8 @@ def get_template(key):
     if template.get("id") != key:
         raise ValueError("查询模板编号不匹配")
     sql = template.get("sql", "").strip()
-    if (not re.match(r"^(SELECT|WITH)\b", sql, re.I)
-            or ";" in sql.rstrip(";")
-            or re.search(r"\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|GRANT|REVOKE|TRUNCATE|MERGE|CALL|EXECUTE|COPY)\b", sql, re.I)):
-        raise ValueError("查询模板只能包含单条 SELECT 或 WITH 查询")
+    from prompt_engine import allowed_tables, validate_sql
+    validate_sql(sql, allowed_tables(), urlparse(setting("QUERY_DATABASE_URL", f"sqlite:///{ROOT / 'data' / 'demo.sqlite'}")).scheme.lower())
     return template
 
 

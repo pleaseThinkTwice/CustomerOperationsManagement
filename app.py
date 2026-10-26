@@ -3,13 +3,15 @@
 import asyncio
 import json
 import os
+import secrets
 import sqlite3
 from pathlib import Path
 
 from aiohttp import web
-from prompt_engine import answer
+from prompt_engine import KNOWLEDGE_FILES, answer, allowed_tables, database_url, full_context, schema_text, validate_sql
 from query_runner import get_template, list_templates, run
 from settings import setting
+from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parent
@@ -46,10 +48,35 @@ async def knowledge(_request):
     root = ROOT / "knowledge"
     priority = ["表与字段说明.md", "业务术语.md", "常见问答.md", "SQL示例.md"]
     ordered = [root / name for name in priority if (root / name).exists()]
-    ordered += sorted(file for file in root.glob("*.md") if file.name not in {*priority, "README.md"})
     for file in ordered:
         files.append({"title": file.stem, "content": file.read_text(encoding="utf-8")})
     return web.json_response({"files": files})
+
+
+async def schema(_request):
+    try:
+        return web.json_response({"content": await asyncio.to_thread(schema_text)})
+    except Exception as exc:
+        raise web.HTTPServiceUnavailable(text="无法读取表结构；请检查数据库连接和 PROMPT_TABLES") from exc
+
+
+async def update_knowledge(request):
+    name = request.match_info["name"] + ".md"
+    if name not in KNOWLEDGE_FILES:
+        raise web.HTTPNotFound(text="知识文件不存在")
+    body = await request.json()
+    content = body.get("content") if isinstance(body, dict) else None
+    if not isinstance(content, str) or not content.strip() or len(content) > 20000:
+        raise web.HTTPBadRequest(text="知识内容应为 1–20000 字")
+    try:
+        full_context({name: content})
+    except ValueError as exc:
+        raise web.HTTPBadRequest(text=str(exc)) from exc
+    file = ROOT / "knowledge" / name
+    temporary = file.with_suffix(".md.tmp")
+    temporary.write_text(content, encoding="utf-8")
+    temporary.replace(file)
+    return web.json_response({"title": file.stem, "content": content})
 
 
 async def chat_status(_request):
@@ -97,6 +124,31 @@ async def save_query(request):
     return web.json_response({"id": query_id, "name": name.strip()})
 
 
+async def save_chat_query(request):
+    body = await request.json()
+    if not isinstance(body, dict):
+        raise web.HTTPBadRequest(text="保存内容格式无效")
+    name, sql = body.get("name"), body.get("sql")
+    if not isinstance(name, str) or not 1 <= len(name.strip()) <= 60:
+        raise web.HTTPBadRequest(text="名称应为 1–60 个字符")
+    try:
+        sql = validate_sql(sql, allowed_tables(), urlparse(database_url()).scheme.lower())
+    except ValueError as exc:
+        raise web.HTTPBadRequest(text=str(exc)) from exc
+    key = "saved_" + secrets.token_hex(8)
+    file = ROOT / "queries" / f"{key}.json"
+    template = {"id": key, "name": name.strip(), "description": "从问答保存的固定 SQL；再次运行使用相同的查询条件。", "parameters": [], "sql": sql}
+    try:
+        with file.open("x", encoding="utf-8") as stream:
+            json.dump(template, stream, ensure_ascii=False, indent=2)
+        with connect() as db:
+            cur = db.execute("INSERT INTO saved_queries (name, template_key) VALUES (?, ?)", (name.strip(), key))
+        return web.json_response({"id": cur.lastrowid, "name": name.strip(), "template_key": key})
+    except Exception:
+        file.unlink(missing_ok=True)
+        raise
+
+
 async def run_template(request):
     try:
         template = get_template(request.match_info["key"])
@@ -138,9 +190,12 @@ def make_app():
     app.router.add_get("/saved/api/queries", list_queries)
     app.router.add_get("/saved/api/templates", templates)
     app.router.add_get("/saved/api/knowledge", knowledge)
+    app.router.add_get("/saved/api/schema", schema)
+    app.router.add_put("/saved/api/knowledge/{name}", update_knowledge)
     app.router.add_get("/saved/api/chat/status", chat_status)
     app.router.add_post("/saved/api/chat/ask", chat_ask)
     app.router.add_post("/saved/api/queries", save_query)
+    app.router.add_post("/saved/api/chat/save", save_chat_query)
     app.router.add_post("/saved/api/templates/{key}/run", run_template)
     app.router.add_post("/saved/api/queries/{id}/run", execute_query)
     return app
