@@ -2,6 +2,8 @@
 
 这是一个**独立仓库**，不依赖 `CustomerOperationsManagement`。项目使用原版 [SQLBot](https://github.com/dataease/SQLBot) 提供智能问数，用一个本地入口展示知识与表说明，并保存、参数化重跑经过核对的 SQL 模板。演示数据全部为合成数据。
 
+**当前智能问数并非无 RAG：**原版 SQLBot 会按问题匹配数据源、表、术语和 SQL 示例，再把匹配内容交给模型。`knowledge/*.md` 目前只是项目内的底稿与页面说明，不会自动加入模型 prompt。如果要求全部表结构与小篇幅知识每次直接放入 prompt，需要把智能问数链路改为 prompt-only；不能把当前 SQLBot 页面当成已实现的 prompt-only 版本。
+
 ![常用查询](assets/preview.png)
 
 ## 在公司电脑启动
