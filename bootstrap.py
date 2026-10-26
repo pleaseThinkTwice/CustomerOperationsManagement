@@ -1,6 +1,5 @@
-"""Create local-only demo data and credentials without committing secrets."""
+"""Create local synthetic data and a model configuration template."""
 
-import secrets
 import sqlite3
 from pathlib import Path
 
@@ -10,9 +9,12 @@ DATA.mkdir(exist_ok=True)
 env_file = ROOT / ".env"
 if not env_file.exists():
     env_file.write_text(
-        "POSTGRES_PASSWORD=" + secrets.token_urlsafe(24) + "\n"
-        "SECRET_KEY=" + secrets.token_urlsafe(32) + "\n"
-        "DEFAULT_PWD=" + secrets.token_urlsafe(16) + "\n",
+        "# OpenAI-compatible model API; keep the key only on this computer.\n"
+        "LLM_BASE_URL=\n"
+        "LLM_API_KEY=\n"
+        "LLM_MODEL=\n"
+        "PROMPT_TABLES=orders,order_items,refunds\n"
+        "# QUERY_DATABASE_URL=sqlite:////absolute/path/to/database.sqlite\n",
         encoding="utf-8",
     )
     env_file.chmod(0o600)

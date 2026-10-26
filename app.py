@@ -1,4 +1,4 @@
-"""Standalone SQLBot portal for reviewed, reusable SQL templates."""
+"""Standalone prompt-only QA, text-to-SQL and saved-query workbench."""
 
 import asyncio
 import json
@@ -6,14 +6,14 @@ import os
 import sqlite3
 from pathlib import Path
 
-from aiohttp import ClientSession, ClientTimeout, web
+from aiohttp import web
+from prompt_engine import answer
 from query_runner import get_template, list_templates, run
 from settings import setting
 
 
 ROOT = Path(__file__).resolve().parent
 DB = ROOT / "data" / "saved-queries.sqlite3"
-UPSTREAM = setting("SQLBOT_UPSTREAM", "http://127.0.0.1:8003")
 
 
 def connect():
@@ -50,6 +50,29 @@ async def knowledge(_request):
     for file in ordered:
         files.append({"title": file.stem, "content": file.read_text(encoding="utf-8")})
     return web.json_response({"files": files})
+
+
+async def chat_status(_request):
+    ready = all(setting(name) for name in ("LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL"))
+    return web.json_response({"model_ready": ready, "model": setting("LLM_MODEL") if ready else ""})
+
+
+async def chat_ask(request):
+    body = await request.json()
+    question = body.get("question", "")
+    if not isinstance(question, str) or not 1 <= len(question.strip()) <= 2000:
+        raise web.HTTPBadRequest(text="请输入 1–2000 字的问题")
+    history = body.get("history", [])
+    if not isinstance(history, list) or len(history) > 12:
+        raise web.HTTPBadRequest(text="对话历史格式无效")
+    try:
+        return web.json_response(await answer(question.strip(), history))
+    except ValueError as exc:
+        raise web.HTTPBadRequest(text=str(exc)) from exc
+    except RuntimeError as exc:
+        raise web.HTTPServiceUnavailable(text=str(exc)) from exc
+    except Exception as exc:
+        raise web.HTTPServiceUnavailable(text="问答失败，请检查模型和只读数据库连接") from exc
 
 
 async def save_query(request):
@@ -105,42 +128,21 @@ async def execute_query(request):
         raise web.HTTPServiceUnavailable(text="查询执行失败；请检查只读数据源和 SQL 模板") from exc
 
 
-async def proxy(request):
-    # SQLBot stays on the same browser origin; the saved-query screen is /saved/.
-    upstream_url = UPSTREAM + request.rel_url.path_qs
-    headers = {key: value for key, value in request.headers.items()
-               if key.lower() not in {"host", "connection", "content-length", "accept-encoding"}}
-    async with request.app["client"].request(
-        request.method, upstream_url, headers=headers, data=await request.read(), allow_redirects=False
-    ) as upstream:
-        response_headers = {key: value for key, value in upstream.headers.items()
-                            if key.lower() not in {"transfer-encoding", "connection", "content-length", "content-encoding"}}
-        response = web.StreamResponse(status=upstream.status, headers=response_headers)
-        await response.prepare(request)
-        async for chunk in upstream.content.iter_chunked(65536):
-            await response.write(chunk)
-        await response.write_eof()
-        return response
-
-
-async def client_context(app):
-    app["client"] = ClientSession(timeout=ClientTimeout(total=None, sock_connect=15))
-    yield
-    await app["client"].close()
-
-
-
 def make_app():
     app = web.Application(client_max_size=32 * 1024 * 1024)
-    app.cleanup_ctx.append(client_context)
+    async def home(_request):
+        raise web.HTTPFound("/saved/")
+
+    app.router.add_get("/", home)
     app.router.add_get("/saved/", page)
     app.router.add_get("/saved/api/queries", list_queries)
     app.router.add_get("/saved/api/templates", templates)
     app.router.add_get("/saved/api/knowledge", knowledge)
+    app.router.add_get("/saved/api/chat/status", chat_status)
+    app.router.add_post("/saved/api/chat/ask", chat_ask)
     app.router.add_post("/saved/api/queries", save_query)
     app.router.add_post("/saved/api/templates/{key}/run", run_template)
     app.router.add_post("/saved/api/queries/{id}/run", execute_query)
-    app.router.add_route("*", "/{tail:.*}", proxy)
     return app
 
 

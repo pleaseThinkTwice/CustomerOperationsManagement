@@ -12,7 +12,7 @@ from settings import setting
 
 ROOT = Path(__file__).resolve().parent
 QUERIES = ROOT / "queries"
-PARAM = re.compile(r":([A-Za-z_][A-Za-z0-9_]*)")
+PARAM = re.compile(r"(?<!:):([A-Za-z_][A-Za-z0-9_]*)")
 MONTH = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
@@ -76,9 +76,13 @@ def bind_parameters(template, inputs):
 
 def run(template, inputs):
     values = bind_parameters(template, inputs)
+    return execute_sql(template["sql"].strip().rstrip(";"), values)
+
+
+def execute_sql(sql, values):
+    """Run validated SQL with a read-only connection and a hard result cap."""
     url = setting("QUERY_DATABASE_URL", f"sqlite:///{ROOT / 'data' / 'demo.sqlite'}")
     scheme = urlparse(url).scheme.lower()
-    sql = template["sql"].strip().rstrip(";")
     limit = 500
     if scheme == "sqlite":
         db_file = unquote(url.removeprefix("sqlite:///"))
@@ -97,7 +101,7 @@ def run(template, inputs):
                     user=unquote(parsed.username or ""), password=unquote(parsed.password or ""),
                     database=unquote(parsed.path.lstrip("/")))
         ordered = []
-        driver_sql = PARAM.sub(lambda m: (ordered.append(values[m.group(1)]), "%s")[1], sql)
+        driver_sql = PARAM.sub(lambda m: (ordered.append(values[m.group(1)]), "%s")[1], sql) if values else sql
         driver_sql = f"SELECT * FROM ({driver_sql}) AS saved_query LIMIT {limit}"
         if scheme == "mysql":
             import pymysql

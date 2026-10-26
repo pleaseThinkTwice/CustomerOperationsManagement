@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SQLBot · 问数工作台</title>
+  <title>数据问答工作台</title>
   <style>
     :root { color-scheme: light; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1b293b; background: #f6f8fb; }
     * { box-sizing: border-box; }
@@ -54,7 +54,16 @@
     .saved-list { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 12px; }
     .saved-item { background: white; border: 1px solid #d9e3ef; border-radius: 8px; padding: 9px 13px; color: #29557e; }
     .saved-item:hover { border-color: #6799d4; }
-    #bot { display: none; width: 100%; height: calc(100vh - 65px); border: 0; }
+    .chat-card { background: white; border: 1px solid #e1e7f0; border-radius: 14px; padding: 22px; box-shadow: 0 8px 28px #243c5a08; }
+    .chat-messages { display: grid; gap: 14px; min-height: 130px; margin-bottom: 22px; }
+    .bubble { max-width: 92%; padding: 14px 16px; border-radius: 12px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .bubble.user { justify-self: end; background: #eaf2ff; }
+    .bubble.assistant { justify-self: start; background: #f4f6f9; }
+    .bubble.error { color: #ad3a31; background: #fff1ef; }
+    .bubble details { border-color: #dce4ee; }
+    .bubble .table-wrap { max-width: min(75vw, 800px); }
+    textarea { width: 100%; min-height: 90px; resize: vertical; border: 1px solid #cbd6e3; border-radius: 9px; padding: 12px; font: inherit; }
+    .chat-form .actions { margin-top: 10px; }
     .knowledge-grid { display: grid; gap: 12px; }
     .knowledge-item { background: white; border: 1px solid #e1e7f0; border-radius: 10px; padding: 0 20px; }
     .knowledge-item details { margin: 0; padding: 0; border: 0; }
@@ -68,15 +77,28 @@
 </head>
 <body>
   <header>
-    <div class="brand">SQLBot 工作台</div>
+    <div class="brand">数据问答工作台</div>
     <nav aria-label="功能">
-      <button id="tab-saved" class="active" type="button" aria-pressed="true">常用查询</button>
-      <button id="tab-bot" type="button" aria-pressed="false">智能问数</button>
+      <button id="tab-bot" class="active" type="button" aria-pressed="true">智能问答</button>
+      <button id="tab-saved" type="button" aria-pressed="false">常用查询</button>
       <button id="tab-knowledge" type="button" aria-pressed="false">知识说明</button>
     </nav>
   </header>
 
-  <main id="saved">
+  <main id="bot">
+    <h1>直接提问</h1>
+    <p class="lead">少量表结构和知识每次都会完整放进模型提示词。可以问业务口径，也可以查数据。</p>
+    <div class="chat-card">
+      <div id="chat-messages" class="chat-messages" aria-live="polite"><div class="bubble assistant">例如：净销售额怎么算？或 2026 年 9 月的净销售额是多少？</div></div>
+      <form id="chat-form" class="chat-form">
+        <label for="question">你的问题</label>
+        <textarea id="question" maxlength="2000" placeholder="输入问题；口径不明确时会先追问"></textarea>
+        <div class="actions"><button id="ask" class="primary" type="submit">发送</button><span id="chat-status" class="note"></span></div>
+      </form>
+    </div>
+  </main>
+
+  <main id="saved" hidden>
     <h1>常用查询</h1>
     <p class="lead">默认选择上一个完整月。点“查询”即可查看结果。</p>
     <section class="panel" aria-label="运行查询">
@@ -100,11 +122,9 @@
     <section class="saved-area" id="saved-area" hidden><h2>已保存</h2><div id="saved-list" class="saved-list"></div></section>
   </main>
 
-  <iframe id="bot" title="SQLBot 智能问数" src="/#/chat/index?start_chat=1"></iframe>
-
   <main id="knowledge" hidden>
     <h1>知识说明</h1>
-    <p class="lead">这些文件随项目保存，供核对和修改；当前不会自动进入 SQLBot 的模型提示词。点击标题查看。</p>
+    <p class="lead">这些文件随项目保存，每次提问都会完整进入模型提示词。点击标题查看，修改请编辑 knowledge/ 文件。</p>
     <div id="knowledge-list" class="knowledge-grid"></div>
   </main>
 
@@ -113,6 +133,7 @@
     let templates = [];
     let saved = [];
     let lastRunKey = null;
+    let chatHistory = [];
     const api = async (url, options) => {
       let response;
       try { response = await fetch(url, options); }
@@ -246,11 +267,57 @@
         }
       } catch (error) { $('knowledge-list').textContent = error.message; }
     }
+    function appendMessage(role, value) {
+      const box = document.createElement('div'); box.className = 'bubble ' + role;
+      if (typeof value === 'string') box.textContent = value;
+      $('chat-messages').append(box);
+      box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      return box;
+    }
+    function appendSqlResult(data) {
+      const box = appendMessage('assistant', '');
+      const summary = document.createElement('p');
+      summary.textContent = data.explanation || '查询完成。';
+      box.append(summary);
+      const rows = data.rows || [], columns = data.columns || [];
+      if (!rows.length) { const empty = document.createElement('p'); empty.textContent = '没有查到符合条件的数据。'; box.append(empty); }
+      else {
+        const wrap = document.createElement('div'); wrap.className = 'table-wrap';
+        const table = document.createElement('table'), head = document.createElement('thead'), body = document.createElement('tbody');
+        const tr = document.createElement('tr');
+        for (const col of columns) { const th = document.createElement('th'); th.textContent = col; tr.append(th); }
+        head.append(tr);
+        for (const row of rows) { const tr = document.createElement('tr'); for (const value of row) { const td = document.createElement('td'); td.textContent = value ?? '—'; tr.append(td); } body.append(tr); }
+        table.append(head, body); wrap.append(table); box.append(wrap);
+      }
+      const details = document.createElement('details'), label = document.createElement('summary'), sql = document.createElement('pre');
+      label.textContent = '查看 SQL'; sql.textContent = data.sql || ''; details.append(label, sql); box.append(details);
+    }
+    async function askQuestion(event) {
+      event.preventDefault();
+      const question = $('question').value.trim();
+      if (!question) { $('chat-status').textContent = '请输入问题。'; $('question').focus(); return; }
+      appendMessage('user', question);
+      $('question').value = '';
+      $('ask').disabled = true; $('ask').textContent = '处理中…'; $('chat-status').textContent = '正在回答…';
+      try {
+        const data = await api('/saved/api/chat/ask', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question, history: chatHistory.slice(-6) })
+        });
+        if (data.action === 'answer') appendMessage('assistant', data.answer || '暂无可确认的答案。');
+        else if (data.action === 'clarify') appendMessage('assistant', data.question || '请补充查询条件。');
+        else if (data.action === 'sql') appendSqlResult(data);
+        const followup = data.action === 'clarify' ? data.question : data.action === 'answer' ? data.answer : (data.explanation || '已查询') + '；SQL：' + (data.sql || '');
+        chatHistory.push({ role: 'user', content: question }, { role: 'assistant', content: String(followup || '').slice(0, 1000) });
+        chatHistory = chatHistory.slice(-6);
+        $('chat-status').textContent = '';
+      } catch (error) { appendMessage('error', error.message); $('chat-status').textContent = '本次未完成'; }
+      finally { $('ask').disabled = false; $('ask').textContent = '发送'; $('question').focus(); }
+    }
     function switchTab(tab) {
       for (const key of ['saved', 'bot', 'knowledge']) {
         const active = key === tab;
         $(key).hidden = !active;
-        if (key === 'bot') $(key).style.display = active ? 'block' : 'none';
         $('tab-' + key).classList.toggle('active', active);
         $('tab-' + key).setAttribute('aria-pressed', String(active));
       }
@@ -260,6 +327,8 @@
     $('template').addEventListener('change', chooseTemplate);
     $('run').addEventListener('click', runQuery);
     $('save').addEventListener('click', saveQuery);
+    $('chat-form').addEventListener('submit', askQuestion);
+    api('/saved/api/chat/status').then(data => { if (!data.model_ready) $('chat-status').textContent = '模型未配置；请在本地 .env 填写模型信息。'; }).catch(() => {});
     loadTemplates();
   </script>
 </body>
