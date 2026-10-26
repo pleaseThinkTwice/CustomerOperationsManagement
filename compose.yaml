@@ -1,0 +1,30 @@
+name: sqlbot-knowledge-starter
+services:
+  sqlbot:
+    image: dataease/sqlbot:v1.10.2
+    container_name: sqlbot-knowledge-starter
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8003:8000'
+      - '127.0.0.1:8001:8001'
+    environment:
+      POSTGRES_SERVER: localhost
+      POSTGRES_DB: sqlbot
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SECRET_KEY: ${SECRET_KEY}
+      DEFAULT_PWD: ${DEFAULT_PWD}
+      SQL_DEBUG: 'False'
+      SERVER_IMAGE_HOST: http://localhost:8001/images/
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - files:/opt/sqlbot/data/file
+      - excel:/opt/sqlbot/data/excel
+      - images:/opt/sqlbot/images
+      - logs:/opt/sqlbot/app/logs
+volumes:
+  pgdata:
+  files:
+  excel:
+  images:
+  logs:

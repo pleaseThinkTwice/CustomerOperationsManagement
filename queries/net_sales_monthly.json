@@ -1,0 +1,7 @@
+{
+  "id": "net_sales_monthly",
+  "name": "月度净销售额",
+  "description": "有效订单金额减去已完成退款；退款先按订单汇总，避免多笔退款重复计算。",
+  "parameters": [{"name": "month", "label": "统计月份", "type": "month", "default": "2026-09", "required": true}],
+  "sql": "WITH r AS (SELECT order_id, SUM(refund_amount) AS amount FROM refunds WHERE status = 'completed' GROUP BY order_id) SELECT COALESCE(SUM(o.order_amount - COALESCE(r.amount, 0)), 0) AS net_sales FROM orders o LEFT JOIN r ON r.order_id = o.id WHERE o.status IN ('paid', 'refunded') AND o.order_date >= :month_start AND o.order_date < :month_end"
+}

@@ -1,0 +1,12 @@
+CREATE TABLE orders (id integer PRIMARY KEY, customer_id integer NOT NULL, order_date date NOT NULL, region text NOT NULL, status text NOT NULL, order_amount numeric(12,2) NOT NULL);
+CREATE TABLE order_items (id integer PRIMARY KEY, order_id integer REFERENCES orders(id), product text, amount numeric(12,2));
+CREATE TABLE refunds (id integer PRIMARY KEY, order_id integer REFERENCES orders(id), refund_amount numeric(12,2), status text);
+INSERT INTO orders VALUES (1,101,'2026-09-01','华东','paid',1000),(2,102,'2026-09-02','华南','paid',600),(3,101,'2026-09-03','华东','refunded',500),(4,103,'2026-09-04','华北','cancelled',800),(5,104,'2026-09-05','华南','paid',900),(6,105,'2026-09-06','华北','paid',400);
+INSERT INTO order_items VALUES (1,1,'键盘',600),(2,1,'鼠标',400),(3,2,'键盘',600),(4,3,'显示器',500),(5,4,'耳机',800),(6,5,'显示器',500),(7,5,'鼠标',400),(8,6,'鼠标',400);
+INSERT INTO refunds VALUES (1,3,200,'completed'),(2,3,300,'completed');
+COMMENT ON TABLE orders IS '演示订单；每单一行；paid和refunded计入毛销售额，cancelled不计；连接明细后不能直接求和订单金额';
+COMMENT ON COLUMN orders.order_amount IS '整单含税金额（人民币元），净销售额还需减去已完成退款';
+COMMENT ON TABLE order_items IS '订单明细：一单多行，注意JOIN重复统计';
+COMMENT ON TABLE refunds IS '退款记录：一单可多笔，completed才扣减销售额';
+GRANT USAGE ON SCHEMA public TO demo_reader;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO demo_reader;
