@@ -84,6 +84,7 @@ def execute_sql(sql, values):
     url = setting("QUERY_DATABASE_URL", f"sqlite:///{ROOT / 'data' / 'demo.sqlite'}")
     scheme = urlparse(url).scheme.lower()
     limit = 500
+    fetch_limit = limit + 1
     if scheme == "sqlite":
         db_file = unquote(url.removeprefix("sqlite:///"))
         conn = sqlite3.connect(f"file:{db_file}?mode=ro", uri=True, timeout=5)
@@ -91,7 +92,7 @@ def execute_sql(sql, values):
             conn.execute("PRAGMA query_only=ON")
             deadline = time.monotonic() + 5
             conn.set_progress_handler(lambda: 1 if time.monotonic() > deadline else 0, 10000)
-            cur = conn.execute(f"SELECT * FROM ({sql}) AS saved_query LIMIT {limit}", values)
+            cur = conn.execute(f"SELECT * FROM ({sql}) AS saved_query LIMIT {fetch_limit}", values)
             columns = [c[0] for c in cur.description]
             rows = cur.fetchall()
         finally: conn.close()
@@ -102,7 +103,7 @@ def execute_sql(sql, values):
                     database=unquote(parsed.path.lstrip("/")))
         ordered = []
         driver_sql = PARAM.sub(lambda m: (ordered.append(values[m.group(1)]), "%s")[1], sql) if values else sql
-        driver_sql = f"SELECT * FROM ({driver_sql}) AS saved_query LIMIT {limit}"
+        driver_sql = f"SELECT * FROM ({driver_sql}) AS saved_query LIMIT {fetch_limit}"
         if scheme == "mysql":
             import pymysql
             conn = pymysql.connect(**args, connect_timeout=5, read_timeout=10, write_timeout=10)
@@ -128,5 +129,7 @@ def execute_sql(sql, values):
             finally: conn.close()
     else:
         raise ValueError("QUERY_DATABASE_URL 仅支持 sqlite、postgresql、mysql")
+    truncated = len(rows) > limit
+    rows = rows[:limit]
     return {"columns": columns, "rows": [[str(v) if v is not None else None for v in row] for row in rows],
-            "row_count": len(rows), "sql": sql, "parameters": values}
+            "row_count": len(rows), "truncated": truncated, "sql": sql, "parameters": values}

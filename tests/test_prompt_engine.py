@@ -7,6 +7,7 @@ from aiohttp import ClientSession, web
 
 from app import make_app
 from prompt_engine import full_context, validate_sql
+from query_runner import execute_sql
 
 
 class PromptOnlyTests(unittest.IsolatedAsyncioTestCase):
@@ -77,9 +78,11 @@ class PromptOnlyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["rows"][0][0], "2900")
         self.assertEqual(len(self.requests), 3)
         context = full_context()
+        self.assertIn("数据库方言：SQLite", context)
         for request in self.requests:
             self.assertIn(context, request["messages"][0]["content"])
             self.assertIn("表 orders：", request["messages"][0]["content"])
+            self.assertIn("日期等条件必须按当前问题重新确定", request["messages"][0]["content"])
         self.assertEqual(len(self.requests[-1]["messages"]), 4)
 
     async def test_dangerous_sql_is_rejected(self):
@@ -89,6 +92,14 @@ class PromptOnlyTests(unittest.IsolatedAsyncioTestCase):
         for sql in ("SELECT * FROM sqlite_master", "SELECT pg_sleep(5) FROM orders", "SELECT * FROM orders; DELETE FROM orders"):
             with self.assertRaises(ValueError):
                 validate_sql(sql, ["orders"], "sqlite")
+        with self.assertRaises(ValueError):
+            validate_sql("SELECT * FROM orders FOR UPDATE", ["orders"], "postgres")
+
+    async def test_result_cap_is_reported(self):
+        data = execute_sql("WITH RECURSIVE seq(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM seq WHERE x <= 500) SELECT x FROM seq", {})
+        self.assertEqual(data["row_count"], 500)
+        self.assertTrue(data["truncated"])
+        self.assertEqual(data["rows"][-1], ["500"])
 
 
 if __name__ == "__main__":

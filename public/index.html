@@ -241,7 +241,7 @@
         lastRunKey = template.id;
         const alreadySaved = saved.some(item => item.template_key === template.id);
         $('save').hidden = alreadySaved;
-        showStatus('查询完成。' + (alreadySaved ? '这项查询已保存。' : '结果合适的话，可以保存到常用。'));
+        showStatus((data.truncated ? '结果超过 500 行，仅显示前 500 行。' : '查询完成。') + (alreadySaved ? '这项查询已保存。' : '结果合适的话，可以保存到常用。'));
       } catch (error) { lastRunKey = null; showStatus(error.message, true); }
       finally { $('run').disabled = false; $('run').textContent = '查询'; }
     }
@@ -290,6 +290,7 @@
         for (const row of rows) { const tr = document.createElement('tr'); for (const value of row) { const td = document.createElement('td'); td.textContent = value ?? '—'; tr.append(td); } body.append(tr); }
         table.append(head, body); wrap.append(table); box.append(wrap);
       }
+      if (data.truncated) { const note = document.createElement('p'); note.textContent = '结果超过 500 行，仅显示前 500 行。请缩小查询范围。'; box.append(note); }
       const details = document.createElement('details'), label = document.createElement('summary'), sql = document.createElement('pre');
       label.textContent = '查看 SQL'; sql.textContent = data.sql || ''; details.append(label, sql); box.append(details);
     }
