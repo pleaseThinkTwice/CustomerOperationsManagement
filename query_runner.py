@@ -3,7 +3,8 @@
 import json
 import re
 import sqlite3
-from datetime import date
+import time
+from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 from settings import setting
@@ -25,13 +26,16 @@ def get_template(key):
     if template.get("id") != key:
         raise ValueError("查询模板编号不匹配")
     sql = template.get("sql", "").strip()
-    if not re.match(r"^(SELECT|WITH)\b", sql, re.I) or ";" in sql.rstrip(";"):
+    if (not re.match(r"^(SELECT|WITH)\b", sql, re.I)
+            or ";" in sql.rstrip(";")
+            or re.search(r"\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|GRANT|REVOKE|TRUNCATE|MERGE|CALL|EXECUTE|COPY)\b", sql, re.I)):
         raise ValueError("查询模板只能包含单条 SELECT 或 WITH 查询")
     return template
 
 
 def list_templates():
     return [{k: t[k] for k in ("id", "name", "description", "parameters")}
+            | {"result_label": t.get("result_label", ""), "result_unit": t.get("result_unit", "")}
             for file in sorted(QUERIES.glob("*.json"))
             for t in [get_template(file.stem)]]
 
@@ -42,6 +46,8 @@ def bind_parameters(template, inputs):
         name = p["name"]
         raw = inputs.get(name, p.get("default"))
         if p.get("type") == "month":
+            if raw == "previous_month":
+                raw = (date.today().replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
             if not isinstance(raw, str) or not MONTH.fullmatch(raw):
                 raise ValueError(f"{p.get('label', name)}应为 YYYY-MM")
             year, month = map(int, raw.split("-"))
@@ -79,9 +85,8 @@ def run(template, inputs):
         conn = sqlite3.connect(f"file:{db_file}?mode=ro", uri=True, timeout=5)
         try:
             conn.execute("PRAGMA query_only=ON")
-            conn.set_progress_handler(lambda: 1 if __import__('time').monotonic() > deadline else 0, 10000)
-            import time
             deadline = time.monotonic() + 5
+            conn.set_progress_handler(lambda: 1 if time.monotonic() > deadline else 0, 10000)
             cur = conn.execute(f"SELECT * FROM ({sql}) AS saved_query LIMIT {limit}", values)
             columns = [c[0] for c in cur.description]
             rows = cur.fetchall()

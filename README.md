@@ -20,7 +20,7 @@ python app.py
 
 浏览器打开 **http://127.0.0.1:8000/saved/**。顶部有“智能问数”“常用查询”“知识与表说明”三个入口。SQLBot 首次登录账号为 `admin`，密码在本地 `.env` 的 `DEFAULT_PWD`。这些密码由 `bootstrap.py` 随机生成，`.env` 已排除在 Git 之外。
 
-第一次进“智能问数”需要在 SQLBot 管理页配置模型和数据源；没配置模型时，可以先在“常用查询”用合成数据试保存与重跑。`queries/net_sales_monthly.json` 默认执行本地 `data/demo.sqlite`：2026-09 为 `2900`，2026-10 为 `0`。这条查询与 SQLBot 的数据源是**两条独立配置**；要查公司数据，两边须指向同一套经过授权的只读表或视图。
+第一次进“智能问数”需要在 SQLBot 管理页配置模型和数据源；没配置模型时，可以先在“常用查询”点一次“查询”，确认结果后再点“保存到常用”，不必填名称。默认月份是上一个完整月；演示数据在 2026-09 可得到 `2900`，2026-10 为 `0`。`queries/net_sales_monthly.json` 默认执行本地 `data/demo.sqlite`。这条查询与 SQLBot 的数据源是**两条独立配置**；要查公司数据，两边须指向同一套经过授权的只读表或视图。
 
 ## 改成公司数据
 
@@ -37,7 +37,7 @@ python app.py
 | 文件 | 作用 |
 | --- | --- |
 | `compose.yaml` | 固定版本 SQLBot v1.10.2，数据写入 Docker 卷 |
-| `app.py` | 同一浏览器入口：SQLBot、常用查询、知识浏览 |
+| `app.py`、`public/index.html` | 同一浏览器入口：SQLBot、常用查询、知识浏览 |
 | `query_runner.py` | 绑定参数、只读执行、限制结果行数 |
 | `queries/*.json` | 经审核的可重跑 SQL 模板 |
 | `knowledge/*.md` | 表字段、指标口径、FAQ、SQL 示例的可修改模板 |
