@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="星风冒险：一款可离线游玩的原创横版动作冒险游戏。">
+  <title>星风冒险 · 横版动作游戏</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div><span class="eyebrow">SINGLE PLAYER · 2D ACTION</span><h1>星风冒险 <span>✦</span></h1></div>
+      <div class="top-actions"><span class="offline">无需联网 · 自动保存进度</span><button id="sound" type="button" aria-label="切换音效">♫ 音效开</button><button id="pause" type="button">暂停 P</button></div>
+    </header>
+    <section class="game-frame" aria-label="星风冒险游戏区域">
+      <canvas id="game" width="1280" height="720" tabindex="0" aria-label="横版动作游戏画面"></canvas>
+      <div id="overlay" class="overlay">
+        <div class="modal">
+          <div id="overlay-icon" class="overlay-icon">✦</div>
+          <p class="eyebrow" id="overlay-kicker">一场轻快的横版冒险</p>
+          <h2 id="overlay-title">星风冒险</h2>
+          <p id="overlay-text">穿过云杉谷地，击败沿途怪物，点亮终点的星门。</p>
+          <button id="start" class="start" type="button">开始冒险 <span>↗</span></button>
+          <p class="modal-note">键盘操作 · 无需安装 · 单机游玩</p>
+        </div>
+      </div>
+    </section>
+    <div class="bottom-bar"><span><b>A / D</b> 移动</span><span><b>空格</b> 跳跃 / 二段跳</span><span><b>J</b> 连击</span><span><b>K</b> 冲刺</span><span><b>L</b> 星光爆发</span><span><b>P</b> 暂停</span></div>
+    <p class="hint">提示：攻击怪物积攒星光，满格后按 L 释放范围技能。走到发光的旗帜会记录复活点。</p>
+  </main>
+  <script src="game.js" defer></script>
+</body>
+</html>
