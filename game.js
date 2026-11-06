@@ -37,20 +37,19 @@
     ['slime',3020],['slime',3260],['boss',3540]
   ];
   let state = 'title', camera = 0, shake = 0, freeze = 0, time = 0, message = '', messageTimer = 0;
-  let player, enemies, particles, drops, bolts, checkpoint, totalKills, audio, soundOn = true, petTimer = 0;
+  let player, enemies, particles, drops, bolts, checkpoint, totalKills, audio, soundOn = true, petTimer = 0, pendingChoices = 0;
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(SAVE_KEY) || localStorage.getItem(OLD_SAVE_KEY) || 'null'); } catch { saved = null; }
   const rnd = (a,b) => a + Math.random() * (b-a);
   const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
   const overlap = (a,b) => a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
-  const groundOf = e => e.type === 'bat' ? 420 : GROUND-e.h;
 
   function makeEnemy(type,x,id) {
     const boss = type === 'boss', bat = type === 'bat';
     const w = boss ? 106 : bat ? 50 : 52, h = boss ? 116 : bat ? 42 : 42;
     return {id,type,x,y:boss ? GROUND-h : bat ? 415 : GROUND-h,w,h,vx:0,vy:0,
       hp:boss?28:bat?3:4,maxHp:boss?28:bat?3:4,dir:-1,hurt:0,
-      attack:0,phase:rnd(0,6),home:x,hitSet:new Set()};
+      attack:0,windup:0,aimDir:-1,phase:rnd(0,6),home:x};
   }
   function freshGame(useSave=true) {
     const data = useSave && saved && !saved.won ? saved : null;
@@ -69,31 +68,52 @@
     totalKills = data?.kills || 0;
     player = {x:checkpoint,y:GROUND-60,w:38,h:60,vx:0,vy:0,dir:1,hp:6,maxHp:6,
       level:clamp(Number(meta.level)||1,1,30),xp:Math.max(0,Number(meta.xp)||0),owned,equipped,
+      perks:{power:Math.max(0,Number(meta.perks?.power)||0),guard:Math.max(0,Number(meta.perks?.guard)||0),tempo:clamp(Number(meta.perks?.tempo)||0,0,5)},
       meter:0,coins:Math.max(0,Number(meta.coins)||0),onGround:false,coyote:0,jumpBuffer:0,jumps:0,
       dash:0,dashCooldown:0,invuln:0,attack:0,attackCooldown:0,combo:0,attackHits:new Set()};
+    pendingChoices=Math.max(0,Number(meta.pendingChoices)||0);
     player.maxHp=maxHealth();player.hp=player.maxHp;
     enemies = enemySeeds.map(([type,x],id)=>makeEnemy(type,x,id)).filter(e=>!data?.defeated?.includes(e.id));
     particles=[]; drops=[]; bolts=[];petTimer=0;camera=clamp(player.x-250,0,WORLD-W);
     if (data) toast('已继续上次进度');
   }
-  function maxHealth(){return 6+Math.floor((player.level-1)/3)+catalog.armor[player.equipped.armor].bonus;}
-  function attackPower(){return 2+Math.floor((player.level-1)/3)+catalog.weapon[player.equipped.weapon].bonus;}
+  function maxHealth(){return 6+Math.floor((player.level-1)/3)+catalog.armor[player.equipped.armor].bonus+player.perks.guard;}
+  function attackPower(){return 2+Math.floor((player.level-1)/3)+catalog.weapon[player.equipped.weapon].bonus+player.perks.power;}
   function xpNeeded(){return 45+player.level*30;}
   function saveProgress(won=false) {
     const defeated = enemySeeds.map((_,id)=>id).filter(id=>!enemies.some(e=>e.id===id));
     saved = {checkpoint,kills:totalKills,coins:player.coins,defeated,won,
-      level:player.level,xp:player.xp,owned:player.owned,equipped:player.equipped};
+      level:player.level,xp:player.xp,owned:player.owned,equipped:player.equipped,
+      perks:player.perks,pendingChoices};
     try { localStorage.setItem(SAVE_KEY,JSON.stringify(saved)); } catch { /* private mode */ }
   }
   function gainXp(amount){
     player.xp+=amount;
     while(player.level<30&&player.xp>=xpNeeded()){
-      player.xp-=xpNeeded();player.level++;player.maxHp=maxHealth();player.hp=player.maxHp;
+      player.xp-=xpNeeded();player.level++;player.maxHp=maxHealth();player.hp=player.maxHp;pendingChoices++;
       toast(`升级！现在是 ${player.level} 级，生命已恢复`);
       puff(player.x+18,player.y+25,'#ffe68f',28,270);sound(900,.34,'triangle',.07);
     }
     if(player.level===30)player.xp=0;
+    if(pendingChoices>0)showChoice();
   }
+  const levelUp=document.getElementById('level-up');
+  function showChoice(){
+    state='choice';levelUp.hidden=false;
+    document.getElementById('level-summary').textContent=`当前 ${player.level} 级 · 待选祝福 ${pendingChoices} 份。选择后继续冒险。`;
+    levelUp.querySelector('[data-blessing="tempo"]').disabled=player.perks.tempo>=5;
+    levelUp.querySelector('[data-blessing="power"]').focus();
+    keys.clear();
+  }
+  for(const button of levelUp.querySelectorAll('[data-blessing]'))button.addEventListener('click',()=>{
+    const kind=button.dataset.blessing;
+    if(state!=='choice'||pendingChoices<1||(kind==='tempo'&&player.perks.tempo>=5))return;
+    player.perks[kind]++;pendingChoices--;
+    if(kind==='guard'){player.maxHp=maxHealth();player.hp=player.maxHp;}
+    saveProgress();sound(980,.28,'triangle',.065);
+    if(pendingChoices>0)showChoice();
+    else{levelUp.hidden=true;state='playing';canvas.focus();toast('祝福已生效！');}
+  });
   function toast(text){message=text;messageTimer=2.5;}
   function sound(freq=440,duration=.08,type='sine',vol=.045){
     if(!soundOn) return;
@@ -121,6 +141,7 @@
     if(state==='title'||state==='won') {freshGame(state!=='won');saveProgress();}
     if(state==='dead') { player.x=checkpoint;player.y=GROUND-player.h;player.vx=player.vy=0;player.hp=player.maxHp;player.invuln=2; }
     state='playing';overlay.hidden=true;canvas.focus();sound(670,.15,'triangle');
+    if(pendingChoices>0)showChoice();
   }
   document.getElementById('start').addEventListener('click',start);
   document.getElementById('pause').addEventListener('click',()=>togglePause());
@@ -129,7 +150,7 @@
   });
   const collection=document.getElementById('collection');
   function renderCollection(){
-    document.getElementById('collection-stats').textContent=`LV ${player.level} · 经验 ${player.xp}/${xpNeeded()} · ♥ ${player.hp}/${player.maxHp} · ✦ ${player.coins} 星币 · 攻击 ${attackPower()}`;
+    document.getElementById('collection-stats').textContent=`LV ${player.level} · ${player.level===30?'满级':`经验 ${player.xp}/${xpNeeded()}`} · ♥ ${player.hp}/${player.maxHp} · ✦ ${player.coins} 星币 · 攻击 ${attackPower()} · 迅捷 ${player.perks.tempo}`;
     for(const type of ['weapon','armor','pet']){
       const list=document.getElementById(type==='weapon'?'weapon-list':type==='armor'?'armor-list':'pet-list');
       list.replaceChildren();
@@ -195,7 +216,7 @@
   }
   function dash(){
     if(player.dashCooldown>0||player.dash>0) return;
-    player.dash=.2;player.dashCooldown=.7;player.vx=player.dir*900;player.vy=0;
+    player.dash=.2;player.dashCooldown=.7-player.perks.tempo*.08;player.vx=player.dir*900;player.vy=0;
     player.invuln=Math.max(player.invuln,.23);shake=5;puff(player.x+20,player.y+32,'#9af2ff',14,170);sound(250,.15,'triangle');
   }
   function special(){
@@ -240,7 +261,7 @@
     if(moving) p.dir=moving;
     if(p.dash>0){p.dash=Math.max(0,p.dash-dt);p.vx=p.dir*900;p.vy=0;if(Math.random()<.7)puff(p.x+18,p.y+30,'#c6f5ff',1,80);}
     else {
-      const target=moving*360, diff=target-p.vx, step=(moving?2600:3000)*dt;
+      const target=moving*(360+p.perks.tempo*20), diff=target-p.vx, step=(moving?2600:3000)*dt;
       p.vx+=clamp(diff,-step,step);
       p.vy=Math.min(p.vy+1800*dt,1100);
       if(p.jumpBuffer>0 && (p.coyote>0||p.jumps<2)){
@@ -287,11 +308,15 @@
       e.hurt=Math.max(0,e.hurt-dt);e.attack=Math.max(0,e.attack-dt);e.phase+=dt;
       const dx=p.x-e.x, near=Math.abs(dx)<460;
       if(e.type==='boss'){
-        if(near&&e.attack<=0){
-          e.attack=2.1;bolts.push({x:e.x+(dx<0?0:e.w),y:e.y+46,vx:dx<0?-360:360,life:3});
-          sound(165,.25,'sawtooth',.025);
+        if(near&&e.attack<=0&&e.windup<=0){
+          e.attack=2.4;e.windup=.65;e.aimDir=dx<0?-1:1;
+          sound(190,.16,'sawtooth',.025);
         }
-        e.vx=near?Math.sign(dx)*95:0;e.x=clamp(e.x+e.vx*dt,3350,3680);
+        if(e.windup>0){
+          e.windup-=dt;
+          if(e.windup<=0){bolts.push({x:e.x+(e.aimDir<0?0:e.w),y:e.y+46,vx:e.aimDir*360,life:3});sound(130,.22,'sawtooth',.04);}
+        }
+        e.vx=e.windup>0?0:near?Math.sign(dx)*95:0;e.x=clamp(e.x+e.vx*dt,3350,3680);
       } else if(e.type==='bat'){
         e.x+=clamp(dx,-1,1)*(near?125:0)*dt;
         e.y=clamp(e.y+(near?Math.sign(p.y-e.y)*70:0)*dt+Math.sin(e.phase*5)*.8,300,GROUND-85);
@@ -397,6 +422,12 @@
   }
   function drawEnemy(e){
     ctx.save();ctx.translate(e.x,e.y);if(e.hurt>0)ctx.globalAlpha=.5+Math.sin(time*50)*.25;
+    if(e.type==='boss'&&e.windup>0){
+      ctx.strokeStyle='#ffb3a0';ctx.lineWidth=8;ctx.globalAlpha=.4+.5*Math.sin(time*24)**2;
+      ctx.shadowColor='#ff7f79';ctx.shadowBlur=16;ctx.beginPath();
+      const from=e.aimDir<0?0:e.w;ctx.moveTo(from,46);ctx.lineTo(from+e.aimDir*320,46);ctx.stroke();
+      ctx.shadowBlur=0;ctx.globalAlpha=1;ctx.fillStyle='#ffdebf';ctx.font='bold 30px system-ui';ctx.fillText('!',48,-30);
+    }
     if(e.type==='slime'){
       ctx.fillStyle='#477a5b';ctx.beginPath();ctx.ellipse(26,35,26,8,0,0,7);ctx.fill();
       ctx.fillStyle='#8bd587';ctx.beginPath();ctx.moveTo(1,37);ctx.quadraticCurveTo(2,1,25,5+Math.sin(e.phase*7)*2);ctx.quadraticCurveTo(54,5,51,37);ctx.quadraticCurveTo(25,51,1,37);ctx.fill();
@@ -416,9 +447,12 @@
   function hud(){
     rounded(20,18,265,124,15,'#15273dcc');
     ctx.fillStyle='#fff';ctx.font='bold 15px system-ui';ctx.fillText(`星风旅人  LV ${player.level}`,37,45);
-    for(let i=0;i<player.maxHp;i++){ctx.fillStyle=i<player.hp?'#ff8d99':'#536272';ctx.font='25px system-ui';ctx.fillText('♥',36+i*32,78);}
+    const hearts=Math.min(player.maxHp,6),filled=Math.ceil(player.hp/player.maxHp*hearts);
+    for(let i=0;i<hearts;i++){ctx.fillStyle=i<filled?'#ff8d99':'#536272';ctx.font='25px system-ui';ctx.fillText('♥',36+i*32,78);}
+    if(player.maxHp>6){ctx.fillStyle='#e7f2ff';ctx.font='bold 13px system-ui';ctx.fillText(`${player.hp}/${player.maxHp}`,229,76);}
     rounded(36,91,220,10,5,'#455c6c');rounded(36,91,220*player.meter/100,10,5,'#ffdb82');
-    rounded(36,112,220,7,4,'#455c6c');rounded(36,112,220*player.xp/xpNeeded(),7,4,'#91d4f5');
+    rounded(36,112,220,7,4,'#455c6c');rounded(36,112,player.level===30?220:220*player.xp/xpNeeded(),7,4,'#91d4f5');
+    rounded(W-294,18,274,82,12,'#15273dcc');
     ctx.font='bold 13px system-ui';ctx.fillStyle='#f9e0a1';ctx.fillText(`✦ ${player.coins} 星币`,W-128,42);
     rounded(W-274,52,248,9,5,'#2d5361aa');rounded(W-274,52,248*(player.x/WORLD),9,5,'#ffdc92');
     ctx.fillStyle='#e8f7f2';ctx.font='12px system-ui';ctx.fillText(`已击败 ${totalKills} / ${enemySeeds.length}    终点 →`,W-274,80);
