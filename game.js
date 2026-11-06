@@ -4,7 +4,26 @@
   const ctx = canvas.getContext('2d');
   const overlay = document.getElementById('overlay');
   const W = canvas.width, H = canvas.height, WORLD = 3900, GROUND = 608;
-  const SAVE_KEY = 'starwind-adventure-v1';
+  const SAVE_KEY = 'starwind-adventure-v2';
+  const OLD_SAVE_KEY = 'starwind-adventure-v1';
+  const catalog = {
+    weapon: {
+      wood: {name:'旅行短剑', bonus:0, text:'初始武器 · 攻击 +0'},
+      star: {name:'星芒剑', bonus:1, text:'稀有 · 攻击 +1'},
+      storm: {name:'风暴刃', bonus:2, text:'史诗 · 攻击 +2'}
+    },
+    armor: {
+      cloth: {name:'旅人斗篷', bonus:0, text:'初始护甲 · 生命 +0'},
+      leaf: {name:'绿叶甲', bonus:1, text:'稀有 · 生命 +1'},
+      meteor: {name:'星陨甲', bonus:2, text:'史诗 · 生命 +2'}
+    },
+    pet: {
+      fox: {name:'星狐', text:'自动攻击附近怪物'},
+      rabbit: {name:'月兔', text:'定期恢复 1 点生命'},
+      wisp: {name:'云灵', text:'定期补充星光能量'}
+    }
+  };
+  const drawPool = [['weapon','star'],['weapon','star'],['weapon','storm'],['armor','leaf'],['armor','leaf'],['armor','meteor'],['pet','rabbit'],['pet','rabbit'],['pet','wisp'],['pet','wisp']];
   const keys = new Set();
   const platforms = [
     {x:330,y:500,w:175},{x:620,y:445,w:190},{x:1010,y:515,w:190},
@@ -18,9 +37,9 @@
     ['slime',3020],['slime',3260],['boss',3540]
   ];
   let state = 'title', camera = 0, shake = 0, freeze = 0, time = 0, message = '', messageTimer = 0;
-  let player, enemies, particles, drops, bolts, checkpoint, totalKills, audio, soundOn = true;
+  let player, enemies, particles, drops, bolts, checkpoint, totalKills, audio, soundOn = true, petTimer = 0;
   let saved = null;
-  try { saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch { saved = null; }
+  try { saved = JSON.parse(localStorage.getItem(SAVE_KEY) || localStorage.getItem(OLD_SAVE_KEY) || 'null'); } catch { saved = null; }
   const rnd = (a,b) => a + Math.random() * (b-a);
   const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
   const overlap = (a,b) => a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
@@ -35,19 +54,45 @@
   }
   function freshGame(useSave=true) {
     const data = useSave && saved && !saved.won ? saved : null;
+    const meta = saved || {};
+    const owned = {
+      weapon: ['wood',...(meta.owned?.weapon||[]).filter(id=>catalog.weapon[id]&&id!=='wood')],
+      armor: ['cloth',...(meta.owned?.armor||[]).filter(id=>catalog.armor[id]&&id!=='cloth')],
+      pet: ['fox',...(meta.owned?.pet||[]).filter(id=>catalog.pet[id]&&id!=='fox')]
+    };
+    const equipped = {
+      weapon: owned.weapon.includes(meta.equipped?.weapon)?meta.equipped.weapon:'wood',
+      armor: owned.armor.includes(meta.equipped?.armor)?meta.equipped.armor:'cloth',
+      pet: owned.pet.includes(meta.equipped?.pet)?meta.equipped.pet:'fox'
+    };
     checkpoint = data?.checkpoint === 1900 ? 1900 : 100;
     totalKills = data?.kills || 0;
     player = {x:checkpoint,y:GROUND-60,w:38,h:60,vx:0,vy:0,dir:1,hp:6,maxHp:6,
-      meter:0,coins:data?.coins || 0,onGround:false,coyote:0,jumpBuffer:0,jumps:0,
+      level:clamp(Number(meta.level)||1,1,30),xp:Math.max(0,Number(meta.xp)||0),owned,equipped,
+      meter:0,coins:Math.max(0,Number(meta.coins)||0),onGround:false,coyote:0,jumpBuffer:0,jumps:0,
       dash:0,dashCooldown:0,invuln:0,attack:0,attackCooldown:0,combo:0,attackHits:new Set()};
+    player.maxHp=maxHealth();player.hp=player.maxHp;
     enemies = enemySeeds.map(([type,x],id)=>makeEnemy(type,x,id)).filter(e=>!data?.defeated?.includes(e.id));
-    particles=[]; drops=[]; bolts=[]; camera=clamp(player.x-250,0,WORLD-W);
+    particles=[]; drops=[]; bolts=[];petTimer=0;camera=clamp(player.x-250,0,WORLD-W);
     if (data) toast('已继续上次进度');
   }
+  function maxHealth(){return 6+Math.floor((player.level-1)/3)+catalog.armor[player.equipped.armor].bonus;}
+  function attackPower(){return 2+Math.floor((player.level-1)/3)+catalog.weapon[player.equipped.weapon].bonus;}
+  function xpNeeded(){return 45+player.level*30;}
   function saveProgress(won=false) {
     const defeated = enemySeeds.map((_,id)=>id).filter(id=>!enemies.some(e=>e.id===id));
-    saved = {checkpoint,kills:totalKills,coins:player.coins,defeated,won};
+    saved = {checkpoint,kills:totalKills,coins:player.coins,defeated,won,
+      level:player.level,xp:player.xp,owned:player.owned,equipped:player.equipped};
     try { localStorage.setItem(SAVE_KEY,JSON.stringify(saved)); } catch { /* private mode */ }
+  }
+  function gainXp(amount){
+    player.xp+=amount;
+    while(player.level<30&&player.xp>=xpNeeded()){
+      player.xp-=xpNeeded();player.level++;player.maxHp=maxHealth();player.hp=player.maxHp;
+      toast(`升级！现在是 ${player.level} 级，生命已恢复`);
+      puff(player.x+18,player.y+25,'#ffe68f',28,270);sound(900,.34,'triangle',.07);
+    }
+    if(player.level===30)player.xp=0;
   }
   function toast(text){message=text;messageTimer=2.5;}
   function sound(freq=440,duration=.08,type='sine',vol=.045){
@@ -73,8 +118,8 @@
     overlay.hidden=false;
   }
   function start(){
-    if(state==='title'||state==='won') freshGame(state!=='won');
-    if(state==='dead') { player.x=checkpoint;player.y=GROUND-player.h;player.vx=player.vy=0;player.hp=6;player.invuln=2; }
+    if(state==='title'||state==='won') {freshGame(state!=='won');saveProgress();}
+    if(state==='dead') { player.x=checkpoint;player.y=GROUND-player.h;player.vx=player.vy=0;player.hp=player.maxHp;player.invuln=2; }
     state='playing';overlay.hidden=true;canvas.focus();sound(670,.15,'triangle');
   }
   document.getElementById('start').addEventListener('click',start);
@@ -82,7 +127,48 @@
   document.getElementById('sound').addEventListener('click',()=>{
     soundOn=!soundOn;document.getElementById('sound').textContent=soundOn?'♫ 音效开':'♫ 音效关';
   });
+  const collection=document.getElementById('collection');
+  function renderCollection(){
+    document.getElementById('collection-stats').textContent=`LV ${player.level} · 经验 ${player.xp}/${xpNeeded()} · ♥ ${player.hp}/${player.maxHp} · ✦ ${player.coins} 星币 · 攻击 ${attackPower()}`;
+    for(const type of ['weapon','armor','pet']){
+      const list=document.getElementById(type==='weapon'?'weapon-list':type==='armor'?'armor-list':'pet-list');
+      list.replaceChildren();
+      for(const [id,item] of Object.entries(catalog[type])){
+        const button=document.createElement('button'),name=document.createElement('strong'),detail=document.createElement('span');
+        const own=player.owned[type].includes(id),active=player.equipped[type]===id;
+        button.type='button';button.className='item-card'+(active?' equipped':'');button.disabled=!own||active;
+        name.textContent=(active?'✓ ':'')+item.name;detail.textContent=own?item.text:'尚未获得 · 可通过抽奖获取';
+        button.append(name,detail);
+        button.addEventListener('click',()=>{
+          const previous=player.maxHp;player.equipped[type]=id;
+          if(type==='armor'){player.maxHp=maxHealth();player.hp=clamp(player.hp+player.maxHp-previous,1,player.maxHp);}
+          if(type==='pet')petTimer=0;
+          saveProgress();renderCollection();sound(720,.13,'triangle');
+        });
+        list.append(button);
+      }
+    }
+    document.getElementById('draw').disabled=player.coins<12;
+  }
+  function toggleCollection(){
+    if(state==='title')start();
+    if(state==='playing'){state='menu';collection.hidden=false;renderCollection();document.getElementById('close-bag').focus();keys.clear();}
+    else if(state==='menu'){state='playing';collection.hidden=true;canvas.focus();}
+  }
+  document.getElementById('bag').addEventListener('click',toggleCollection);
+  document.getElementById('close-bag').addEventListener('click',toggleCollection);
+  document.getElementById('draw').addEventListener('click',()=>{
+    if(state!=='menu'||player.coins<12)return;
+    player.coins-=12;
+    const [type,id]=drawPool[Math.floor(Math.random()*drawPool.length)];
+    const duplicate=player.owned[type].includes(id);
+    if(duplicate)player.coins+=6;
+    else player.owned[type].push(id);
+    document.getElementById('draw-result').textContent=duplicate?`抽到重复的「${catalog[type][id].name}」，返还 6 星币。`:`获得「${catalog[type][id].name}」！在上方点击即可装备。`;
+    saveProgress();renderCollection();sound(duplicate?480:1100,.26,'triangle',.07);
+  });
   function togglePause(){
+    if(state==='menu'){collection.hidden=true;state='playing';}
     if(state==='playing') {state='paused';setOverlay('稍作休息','游戏暂停','你的冒险会从这里继续。','继续冒险','Ⅱ');}
     else if(state==='paused') start();
   }
@@ -93,6 +179,7 @@
     if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(key)) e.preventDefault();
     if([' ','w','arrowup'].includes(key)&&!keys.has(key)&&state==='playing') player.jumpBuffer=.14;
     if(key==='p'&&!e.repeat) togglePause();
+    if((key==='b'||key==='escape')&&!e.repeat&&(state==='playing'||state==='menu')) toggleCollection();
     if(key==='j'&&!e.repeat&&state==='playing') attack();
     if(key==='k'&&!e.repeat&&state==='playing') dash();
     if(key==='l'&&!e.repeat&&state==='playing') special();
@@ -117,7 +204,7 @@
     puff(player.x+18,player.y+26,'#ffe89c',38,490);sound(820,.4,'sine',.09);
     for(const e of enemies){
       const dx=e.x+e.w/2-(player.x+player.w/2);
-      if(Math.abs(dx)<310 && Math.abs(e.y-player.y)<230) hitEnemy(e,6,Math.sign(dx)||player.dir);
+      if(Math.abs(dx)<310 && Math.abs(e.y-player.y)<230) hitEnemy(e,5+Math.floor(attackPower()/2),Math.sign(dx)||player.dir);
     }
     bolts=bolts.filter(b=>Math.abs(b.x-player.x)>310);
   }
@@ -129,6 +216,7 @@
     sound(e.type==='boss'?140:200,.11,'square',.035);
     if(e.hp<=0){
       totalKills++;player.meter=clamp(player.meter+8,0,100);
+      gainXp(e.type==='boss'?140:e.type==='bat'?35:30);
       for(let i=0;i<(e.type==='boss'?18:3);i++) drops.push({x:e.x+e.w/2+rnd(-25,25),y:e.y+e.h/2+rnd(-20,20),vy:rnd(-130,-60),kind:'coin',life:20});
       if(e.type!=='boss' && (totalKills%4===0)) drops.push({x:e.x+e.w/2,y:e.y,vy:-120,kind:'heart',life:20});
       enemies=enemies.filter(item=>item!==e);saveProgress();
@@ -180,8 +268,20 @@
       const reach=p.combo===3?125:100;
       const box={x:p.dir>0?p.x+p.w-4:p.x-reach+4,y:p.y-6,w:reach,h:p.h+20};
       for(const e of [...enemies]) if(!p.attackHits.has(e.id)&&overlap(box,e)){
-        p.attackHits.add(e.id);hitEnemy(e,p.combo===3?3:2,p.dir);
+        p.attackHits.add(e.id);hitEnemy(e,attackPower()+(p.combo===3?1:0),p.dir);
       }
+    }
+    petTimer-=dt;
+    if(petTimer<=0){
+      const pet=p.equipped.pet;
+      if(pet==='fox'){
+        const target=enemies.filter(e=>Math.abs(e.x-p.x)<270&&Math.abs(e.y-p.y)<170).sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x))[0];
+        if(target){hitEnemy(target,1+Math.floor((p.level-1)/5),Math.sign(target.x-p.x)||p.dir);puff(target.x+target.w/2,target.y+20,'#ffd895',7,120);petTimer=1.6;}
+        else petTimer=.5;
+      }else if(pet==='rabbit'){
+        if(p.hp<p.maxHp){p.hp++;puff(p.x+18,p.y+20,'#f7d3ed',10,130);sound(690,.16,'sine',.025);petTimer=9;}
+        else petTimer=2;
+      }else{p.meter=clamp(p.meter+9,0,100);puff(p.x+18,p.y,'#d9eeff',5,80);petTimer=3;}
     }
     for(const e of [...enemies]){
       e.hurt=Math.max(0,e.hurt-dt);e.attack=Math.max(0,e.attack-dt);e.phase+=dt;
@@ -284,6 +384,17 @@
     }else{ctx.fillStyle='#e4eff5';ctx.fillRect(15,-2,27,5);ctx.fillStyle='#e8b864';ctx.fillRect(12,-4,6,9);}
     ctx.restore();
   }
+  function drawPet(){
+    const p=player,id=p.equipped.pet,x=p.x-38+Math.sin(time*3)*6,y=p.y+15+Math.sin(time*5)*7;
+    ctx.save();ctx.translate(x,y);
+    ctx.shadowBlur=14;ctx.shadowColor=id==='fox'?'#ffcc88':id==='rabbit'?'#ffd0eb':'#bdeaff';
+    ctx.fillStyle=id==='fox'?'#f2a865':id==='rabbit'?'#f6e8f1':'#bbecfa';
+    ctx.beginPath();ctx.ellipse(0,0,15,13,0,0,7);ctx.fill();ctx.shadowBlur=0;
+    if(id==='fox'){ctx.beginPath();ctx.moveTo(-12,-8);ctx.lineTo(-10,-22);ctx.lineTo(-2,-11);ctx.moveTo(5,-10);ctx.lineTo(12,-22);ctx.lineTo(13,-5);ctx.fill();}
+    if(id==='rabbit'){ctx.fillRect(-9,-28,6,19);ctx.fillRect(4,-28,6,19);}
+    if(id==='wisp'){ctx.fillStyle='#eaf9ff';ctx.beginPath();ctx.moveTo(-5,9);ctx.lineTo(0,25);ctx.lineTo(6,9);ctx.fill();}
+    ctx.fillStyle='#34435b';ctx.fillRect(-6,-2,3,3);ctx.fillRect(5,-2,3,3);ctx.restore();
+  }
   function drawEnemy(e){
     ctx.save();ctx.translate(e.x,e.y);if(e.hurt>0)ctx.globalAlpha=.5+Math.sin(time*50)*.25;
     if(e.type==='slime'){
@@ -303,10 +414,11 @@
     ctx.restore();
   }
   function hud(){
-    rounded(20,18,265,104,15,'#15273dcc');
-    ctx.fillStyle='#fff';ctx.font='bold 15px system-ui';ctx.fillText('星风旅人',37,45);
+    rounded(20,18,265,124,15,'#15273dcc');
+    ctx.fillStyle='#fff';ctx.font='bold 15px system-ui';ctx.fillText(`星风旅人  LV ${player.level}`,37,45);
     for(let i=0;i<player.maxHp;i++){ctx.fillStyle=i<player.hp?'#ff8d99':'#536272';ctx.font='25px system-ui';ctx.fillText('♥',36+i*32,78);}
     rounded(36,91,220,10,5,'#455c6c');rounded(36,91,220*player.meter/100,10,5,'#ffdb82');
+    rounded(36,112,220,7,4,'#455c6c');rounded(36,112,220*player.xp/xpNeeded(),7,4,'#91d4f5');
     ctx.font='bold 13px system-ui';ctx.fillStyle='#f9e0a1';ctx.fillText(`✦ ${player.coins} 星币`,W-128,42);
     rounded(W-274,52,248,9,5,'#2d5361aa');rounded(W-274,52,248*(player.x/WORLD),9,5,'#ffdc92');
     ctx.fillStyle='#e8f7f2';ctx.font='12px system-ui';ctx.fillText(`已击败 ${totalKills} / ${enemySeeds.length}    终点 →`,W-274,80);
@@ -320,7 +432,7 @@
     for(const d of drops){ctx.fillStyle=d.kind==='heart'?'#ff8caa':'#ffd967';ctx.beginPath();ctx.arc(d.x,d.y,d.kind==='heart'?11:7,0,7);ctx.fill();}
     for(const b of bolts){ctx.fillStyle='#f8b9c4';ctx.shadowColor='#ff8faa';ctx.shadowBlur=18;ctx.beginPath();ctx.arc(b.x,b.y,11,0,7);ctx.fill();ctx.shadowBlur=0;}
     for(const e of enemies)drawEnemy(e);
-    if(player)drawPlayer();
+    if(player){drawPet();drawPlayer();}
     for(const q of particles){ctx.globalAlpha=clamp(q.life/q.max,0,1);ctx.fillStyle=q.color;ctx.fillRect(q.x,q.y,q.size,q.size);ctx.globalAlpha=1;}
     ctx.restore();if(player)hud();
   }
